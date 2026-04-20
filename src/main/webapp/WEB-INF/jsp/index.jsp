@@ -10,18 +10,18 @@
     <title>LU Librisync | Landing</title>
     <style>
         :root {
-            --accent-900: #2f2478;
-            --accent-800: #4031a2;
-            --accent-700: #5744cb;
-            --accent-100: #ece9fd;
-            --accent-050: #f8f7ff;
-            --text-900: #241f4f;
-            --text-700: #5f6277;
-            --line: #e4e0f4;
-            --bg: #f5f5fb;
+            --accent-900: #0f7f34;
+            --accent-800: #179741;
+            --accent-700: #20b24e;
+            --accent-100: #e8f8ed;
+            --accent-050: #f6fcf7;
+            --text-900: #1f2c22;
+            --text-700: #6d7a70;
+            --line: #d9e7dc;
+            --bg: #f1f5f2;
             --panel: #fffefe;
             --white: #ffffff;
-            --shadow: 0 24px 60px rgba(47, 36, 120, 0.12);
+            --shadow: 0 24px 60px rgba(15, 127, 52, 0.12);
             --radius-xl: 24px;
             --radius-lg: 16px;
             --hero-image: url('<%= contextPath %>/assets/images/library-hero-placeholder.svg');
@@ -37,7 +37,7 @@
             font-family: "Poppins", "Segoe UI", Tahoma, sans-serif;
             color: var(--text-900);
             background:
-                radial-gradient(circle at top left, rgba(87, 68, 203, 0.10), transparent 28%),
+                radial-gradient(circle at top left, rgba(32, 178, 78, 0.12), transparent 28%),
                 linear-gradient(180deg, #f7fbf8 0%, var(--bg) 100%);
         }
 
@@ -117,7 +117,7 @@
             content: "";
             position: absolute;
             inset: 0;
-            background: linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0%, rgba(8, 11, 16, 0.18) 100%);
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0%, rgba(8, 11, 16, 0.12) 100%);
         }
 
         .content-blob {
@@ -128,31 +128,8 @@
             padding: 106px 56px 42px 54px;
             background: rgba(255, 255, 255, 0.98);
             border-radius: 0 62% 58% 0 / 0 68% 62% 0;
-            border-right: 1px solid rgba(47, 36, 120, 0.10);
-            box-shadow: 0 18px 40px rgba(47, 36, 120, 0.06);
-        }
-
-        .brand {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 16px;
-            color: var(--accent-900);
-            font-weight: 800;
-            letter-spacing: 0.02em;
-        }
-
-        .brand-mark {
-            width: 34px;
-            height: 34px;
-            border-radius: 11px;
-            color: var(--white);
-            background: linear-gradient(135deg, var(--accent-900), var(--accent-700));
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.86rem;
-            font-weight: 800;
+            border-right: 1px solid rgba(15, 127, 52, 0.10);
+            box-shadow: 0 18px 40px rgba(15, 127, 52, 0.08);
         }
 
         .content-blob h1 {
@@ -194,7 +171,7 @@
         .btn {
             color: var(--white);
             background: linear-gradient(135deg, var(--accent-900), var(--accent-700));
-            box-shadow: 0 12px 20px rgba(47, 36, 120, 0.22);
+            box-shadow: 0 12px 20px rgba(15, 127, 52, 0.22);
         }
 
         .btn:hover {
@@ -203,7 +180,7 @@
 
         .btn-outline {
             color: var(--accent-900);
-            border: 1px solid rgba(47, 36, 120, 0.18);
+            border: 1px solid rgba(15, 127, 52, 0.18);
             background: rgba(255, 255, 255, 0.72);
         }
 
@@ -222,7 +199,7 @@
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            background: rgba(47, 36, 120, 0.18);
+            background: rgba(15, 127, 52, 0.18);
         }
 
         .dot.active {
@@ -233,9 +210,9 @@
             margin-top: 18px;
             padding: 10px 12px;
             border-radius: 10px;
-            background: rgba(47, 36, 120, 0.06);
-            border: 1px dashed rgba(47, 36, 120, 0.16);
-            color: #4f5174;
+            background: rgba(15, 127, 52, 0.06);
+            border: 1px dashed rgba(15, 127, 52, 0.16);
+            color: #496252;
             font-size: 0.78rem;
             line-height: 1.45;
             max-width: 390px;
@@ -250,7 +227,7 @@
 
         .feature-zone {
             padding: 28px 28px 34px;
-            background: #f8f8fe;
+            background: #f5faf6;
         }
 
         .feature-head {
@@ -280,7 +257,7 @@
             min-height: 170px;
             border: 1px solid var(--line);
             background: var(--white);
-            box-shadow: 0 12px 30px rgba(47, 36, 120, 0.08);
+            box-shadow: 0 12px 30px rgba(15, 127, 52, 0.08);
             overflow: hidden;
         }
 
@@ -357,7 +334,7 @@
             height: 9px;
             border: none;
             border-radius: 50%;
-            background: rgba(47, 36, 120, 0.2);
+            background: rgba(15, 127, 52, 0.2);
             cursor: pointer;
             padding: 0;
         }
@@ -437,11 +414,6 @@
             <div class="hero-image" aria-hidden="true"></div>
 
             <div class="content-blob">
-                <div class="brand">
-                    <span class="brand-mark">LU</span>
-                    <span>Librisync</span>
-                </div>
-
                 <h1>Comprehensive<br>Library Portal</h1>
                 <p>Access books, manage borrowings, monitor requests, and support daily library operations through one organized platform for the LU community.</p>
 
