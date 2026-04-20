@@ -1,0 +1,276 @@
+package com.lulibrisync.service;
+
+import com.lulibrisync.config.LegacyAwarePasswordEncoder;
+import com.lulibrisync.dto.StudentProfileUpdateRequest;
+import com.lulibrisync.model.IssueStatus;
+import com.lulibrisync.model.Student;
+import com.lulibrisync.model.User;
+import com.lulibrisync.model.UserStatus;
+import com.lulibrisync.repository.IssueRecordRepository;
+import com.lulibrisync.repository.StudentRepository;
+import com.lulibrisync.repository.UserRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Locale;
+import java.util.regex.Pattern;
+
+@Service
+public class StudentService {
+
+    private static final Pattern PROFILE_PHONE_PATTERN = Pattern.compile("^\\+?[0-9 ()\\-]{7,20}$");
+    private static final Pattern PASSWORD_PATTERN = Pattern.compile("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z\\d\\s]).{12,100}$");
+
+    private final StudentRepository studentRepository;
+    private final UserRepository userRepository;
+    private final IssueRecordRepository issueRecordRepository;
+    private final LegacyAwarePasswordEncoder passwordEncoder;
+
+    public StudentService(StudentRepository studentRepository,
+                          UserRepository userRepository,
+                          IssueRecordRepository issueRecordRepository,
+                          LegacyAwarePasswordEncoder passwordEncoder) {
+        this.studentRepository = studentRepository;
+        this.userRepository = userRepository;
+        this.issueRecordRepository = issueRecordRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
+
+    public Student getStudentByEmail(String email) {
+        User user = userRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found."));
+
+        return studentRepository.findByUser_Id(user.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Student profile not found."));
+    }
+
+    public Student getStudentByStudentId(String studentId) {
+        if (studentId == null || studentId.isBlank()) {
+            throw new IllegalArgumentException("Student ID is required.");
+        }
+
+        return studentRepository.findByStudentId(studentId.trim())
+                .orElseThrow(() -> new IllegalArgumentException("Student not found."));
+    }
+
+    public List<Student> searchStudents(String studentIdKeyword) {
+        if (studentIdKeyword == null || studentIdKeyword.isBlank()) {
+            return studentRepository.findAllByOrderByStudentIdAsc();
+        }
+        return studentRepository.findByStudentIdContainingIgnoreCaseOrderByStudentIdAsc(studentIdKeyword.trim());
+    }
+
+    public StudentProfileUpdateRequest createProfileUpdateRequest(Student student) {
+        return new StudentProfileUpdateRequest(
+                student.getUser().getName(),
+                student.getCourse(),
+                student.getYearLevel(),
+                student.getPhone(),
+                student.getAddress(),
+                student.getDateOfBirth()
+        );
+    }
+
+    public StudentProfileUpdateRequest normalizeProfileUpdateRequest(StudentProfileUpdateRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("Profile details are required.");
+        }
+
+        String normalizedName = normalizeRequiredText(request.getName(), "Name", 100);
+        String normalizedCourse = normalizeOptionalText(request.getCourse(), "Course", 120, "Not set");
+        String normalizedYearLevel = normalizeOptionalText(request.getYearLevel(), "Year level", 60, "Not set");
+        String normalizedPhone = normalizeOptionalPhone(request.getPhone());
+        String normalizedAddress = normalizeOptionalText(request.getAddress(), "Address", 255, null);
+        LocalDate normalizedDateOfBirth = request.getDateOfBirth();
+
+        if (normalizedDateOfBirth != null) {
+            validateBirthDate(normalizedDateOfBirth);
+        }
+
+        return new StudentProfileUpdateRequest(
+                normalizedName,
+                normalizedCourse,
+                normalizedYearLevel,
+                normalizedPhone,
+                normalizedAddress,
+                normalizedDateOfBirth
+        );
+    }
+
+    @Transactional
+    public Student updateProfile(String email,
+                                 String name,
+                                 String course,
+                                 String yearLevel,
+                                 String phone,
+                                 String address,
+                                 LocalDate dateOfBirth) {
+        return updateProfile(email, new StudentProfileUpdateRequest(name, course, yearLevel, phone, address, dateOfBirth));
+    }
+
+    @Transactional
+    public Student updateProfile(String email, StudentProfileUpdateRequest request) {
+        User user = userRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found."));
+        Student student = studentRepository.findByUser_Id(user.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Student profile not found."));
+
+        StudentProfileUpdateRequest normalizedRequest = normalizeProfileUpdateRequest(request);
+
+        user.setName(normalizedRequest.getName());
+        student.setCourse(normalizedRequest.getCourse());
+        student.setYearLevel(normalizedRequest.getYearLevel());
+        student.setPhone(normalizedRequest.getPhone());
+        student.setAddress(normalizedRequest.getAddress());
+        student.setDateOfBirth(normalizedRequest.getDateOfBirth());
+
+        userRepository.save(user);
+        return studentRepository.save(student);
+    }
+
+    @Transactional
+    public Student updateStudentByAdmin(String studentId,
+                                        String name,
+                                        String email,
+                                        String course,
+                                        String yearLevel,
+                                        String phone,
+                                        String address,
+                                        LocalDate dateOfBirth,
+                                        UserStatus status) {
+        Student student = getStudentByStudentId(studentId);
+        User user = student.getUser();
+
+        String normalizedName = required(name, "Student name is required.");
+        String normalizedEmail = normalizeEmail(required(email, "Email address is required."));
+
+        if (userRepository.existsByEmailIgnoreCaseAndIdNot(normalizedEmail, user.getId())) {
+            throw new IllegalArgumentException("Email already exists.");
+        }
+        if (dateOfBirth != null) {
+            validateBirthDate(dateOfBirth);
+        }
+
+        user.setName(normalizedName);
+        user.setEmail(normalizedEmail);
+        user.setStatus(status == null ? UserStatus.ACTIVE : status);
+
+        student.setCourse(defaultText(course, "Not set"));
+        student.setYearLevel(defaultText(yearLevel, "Not set"));
+        student.setPhone(blankToNull(phone));
+        student.setAddress(blankToNull(address));
+        student.setDateOfBirth(dateOfBirth);
+
+        userRepository.save(user);
+        return studentRepository.save(student);
+    }
+
+    @Transactional
+    public void resetStudentPassword(String studentId, String newPassword, String confirmPassword) {
+        Student student = getStudentByStudentId(studentId);
+        User user = student.getUser();
+
+        String normalizedPassword = required(newPassword, "New password is required.");
+        String normalizedConfirmPassword = required(confirmPassword, "Confirm password is required.");
+
+        if (!normalizedPassword.equals(normalizedConfirmPassword)) {
+            throw new IllegalArgumentException("Password and confirmation do not match.");
+        }
+        if (normalizedPassword.length() < 12) {
+            throw new IllegalArgumentException("Password must be at least 12 characters.");
+        }
+        if (!PASSWORD_PATTERN.matcher(normalizedPassword).matches()) {
+            throw new IllegalArgumentException("Password must include uppercase, lowercase, number, and special character.");
+        }
+        if (passwordEncoder.matches(normalizedPassword, user.getPasswordHash())) {
+            throw new IllegalArgumentException("Choose a different password from the current one.");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(normalizedPassword));
+        userRepository.save(user);
+    }
+
+    @Transactional
+    public void deleteStudent(String studentId) {
+        Student student = getStudentByStudentId(studentId);
+        long activeIssues = issueRecordRepository.countByStudent_IdAndStatusIn(student.getId(), List.of(IssueStatus.ISSUED, IssueStatus.OVERDUE));
+        if (activeIssues > 0) {
+            throw new IllegalArgumentException("Resolve all active issues before deleting this student account.");
+        }
+
+        userRepository.delete(student.getUser());
+    }
+
+    public UserStatus[] getAvailableStatuses() {
+        return UserStatus.values();
+    }
+
+    private String required(String value, String message) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(message);
+        }
+        return value.trim();
+    }
+
+    private String normalizeEmail(String value) {
+        String normalized = value.trim().toLowerCase(Locale.ROOT);
+        if (!normalized.contains("@") || normalized.startsWith("@") || normalized.endsWith("@")) {
+            throw new IllegalArgumentException("Enter a valid email address.");
+        }
+        return normalized;
+    }
+
+    private String normalizeRequiredText(String value, String label, int maxLength) {
+        String normalized = value == null ? "" : value.trim().replaceAll("\\s+", " ");
+        if (normalized.isBlank()) {
+            throw new IllegalArgumentException(label + " is required.");
+        }
+        if (normalized.length() > maxLength) {
+            throw new IllegalArgumentException(label + " is too long.");
+        }
+        return normalized;
+    }
+
+    private String normalizeOptionalText(String value, String label, int maxLength, String fallback) {
+        String normalized = value == null ? "" : value.trim().replaceAll("\\s+", " ");
+        if (normalized.isBlank()) {
+            return fallback;
+        }
+        if (normalized.length() > maxLength) {
+            throw new IllegalArgumentException(label + " is too long.");
+        }
+        return normalized;
+    }
+
+    private String normalizeOptionalPhone(String value) {
+        String normalized = value == null ? "" : value.trim();
+        if (normalized.isBlank()) {
+            return null;
+        }
+        if (!PROFILE_PHONE_PATTERN.matcher(normalized).matches()) {
+            throw new IllegalArgumentException("Enter a valid phone number.");
+        }
+        return normalized;
+    }
+
+    private void validateBirthDate(LocalDate birthDate) {
+        if (birthDate.isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException("Birth date cannot be in the future.");
+        }
+
+        int age = birthDate.until(LocalDate.now()).getYears();
+        if (age < 5 || age > 120) {
+            throw new IllegalArgumentException("Age must be between 5 and 120.");
+        }
+    }
+
+    private String defaultText(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value.trim();
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+}

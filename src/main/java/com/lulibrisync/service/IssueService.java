@@ -1,0 +1,285 @@
+package com.lulibrisync.service;
+
+import com.lulibrisync.dto.AdminDashboardChartPoint;
+import com.lulibrisync.model.Book;
+import com.lulibrisync.model.IssueRecord;
+import com.lulibrisync.model.IssueStatus;
+import com.lulibrisync.model.Student;
+import com.lulibrisync.model.User;
+import com.lulibrisync.repository.BookRepository;
+import com.lulibrisync.repository.IssueRecordRepository;
+import com.lulibrisync.repository.StudentRepository;
+import com.lulibrisync.repository.UserRepository;
+import com.lulibrisync.repository.projection.BookBorrowStat;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+@Service
+public class IssueService {
+
+    private static final BigDecimal DAILY_FINE = new BigDecimal("10.00");
+
+    private final IssueRecordRepository issueRecordRepository;
+    private final BookRepository bookRepository;
+    private final StudentRepository studentRepository;
+    private final UserRepository userRepository;
+    private final StudentService studentService;
+
+    public IssueService(IssueRecordRepository issueRecordRepository,
+                        BookRepository bookRepository,
+                        StudentRepository studentRepository,
+                        UserRepository userRepository,
+                        StudentService studentService) {
+        this.issueRecordRepository = issueRecordRepository;
+        this.bookRepository = bookRepository;
+        this.studentRepository = studentRepository;
+        this.userRepository = userRepository;
+        this.studentService = studentService;
+    }
+
+    @Transactional
+    public IssueRecord issueBook(Long bookId, Long studentId, LocalDate dueDate, String adminEmail, String remarks) {
+        if (bookId == null) {
+            throw new IllegalArgumentException("Book is required.");
+        }
+        if (studentId == null) {
+            throw new IllegalArgumentException("Student is required.");
+        }
+        if (dueDate == null) {
+            throw new IllegalArgumentException("Due date is required.");
+        }
+
+        Book book = bookRepository.findById(bookId)
+                .orElseThrow(() -> new IllegalArgumentException("Book not found."));
+        if (book.getAvailableQuantity() == null || book.getAvailableQuantity() < 1) {
+            throw new IllegalArgumentException("Selected book is not available.");
+        }
+
+        Student student = studentRepository.findById(studentId)
+                .orElseThrow(() -> new IllegalArgumentException("Student not found."));
+        User admin = userRepository.findByEmailIgnoreCase(adminEmail)
+                .orElseThrow(() -> new IllegalArgumentException("Admin user not found."));
+
+        IssueRecord issueRecord = new IssueRecord();
+        issueRecord.setBook(book);
+        issueRecord.setStudent(student);
+        issueRecord.setIssuedBy(admin);
+        issueRecord.setIssueDate(LocalDateTime.now());
+        issueRecord.setDueDate(dueDate.atTime(17, 0));
+        issueRecord.setStatus(IssueStatus.ISSUED);
+        issueRecord.setFineAmount(BigDecimal.ZERO);
+        issueRecord.setRemarks(blankToNull(remarks));
+        issueRecord.setQrIssueCode("QR-" + System.currentTimeMillis());
+
+        book.setAvailableQuantity(book.getAvailableQuantity() - 1);
+        bookRepository.save(book);
+
+        return issueRecordRepository.save(issueRecord);
+    }
+
+    @Transactional
+    public IssueRecord returnBook(Long issueRecordId) {
+        IssueRecord issueRecord = issueRecordRepository.findById(issueRecordId)
+                .orElseThrow(() -> new IllegalArgumentException("Issue record not found."));
+
+        if (issueRecord.isReturned()) {
+            throw new IllegalArgumentException("Book is already returned.");
+        }
+
+        LocalDateTime returnTimestamp = LocalDateTime.now();
+        issueRecord.setReturnDate(returnTimestamp);
+        issueRecord.setFineAmount(calculateFine(issueRecord.getDueDate(), returnTimestamp));
+        issueRecord.setStatus(IssueStatus.RETURNED);
+
+        Book book = issueRecord.getBook();
+        int currentAvailable = book.getAvailableQuantity() == null ? 0 : book.getAvailableQuantity();
+        int totalQuantity = book.getQuantity() == null ? 1 : book.getQuantity();
+        book.setAvailableQuantity(Math.min(totalQuantity, currentAvailable + 1));
+        bookRepository.save(book);
+
+        return issueRecordRepository.save(issueRecord);
+    }
+
+    @Transactional
+    public void refreshOverdueStatuses() {
+        List<IssueRecord> activeIssues = issueRecordRepository.findByStatusInOrderByIssueDateDesc(List.of(IssueStatus.ISSUED, IssueStatus.OVERDUE));
+        LocalDateTime now = LocalDateTime.now();
+
+        for (IssueRecord issueRecord : activeIssues) {
+            if (issueRecord.getReturnDate() != null) {
+                continue;
+            }
+
+            BigDecimal fine = calculateFine(issueRecord.getDueDate(), now);
+            if (now.isAfter(issueRecord.getDueDate())) {
+                issueRecord.setStatus(IssueStatus.OVERDUE);
+                issueRecord.setFineAmount(fine);
+            } else {
+                issueRecord.setStatus(IssueStatus.ISSUED);
+                issueRecord.setFineAmount(BigDecimal.ZERO);
+            }
+        }
+
+        issueRecordRepository.saveAll(activeIssues);
+    }
+
+    public List<IssueRecord> getActiveIssues() {
+        refreshOverdueStatuses();
+        return issueRecordRepository.findActiveIssuesOrdered(List.of(IssueStatus.ISSUED, IssueStatus.OVERDUE));
+    }
+
+    public List<IssueRecord> getRecentIssues() {
+        refreshOverdueStatuses();
+        return issueRecordRepository.findTop8ByOrderByIssueDateDesc();
+    }
+
+    public List<IssueRecord> getAllIssues() {
+        refreshOverdueStatuses();
+        return issueRecordRepository.findAllByOrderByIssueDateDesc();
+    }
+
+    public List<IssueRecord> getStudentIssues(String email) {
+        refreshOverdueStatuses();
+        Student student = studentService.getStudentByEmail(email);
+        return issueRecordRepository.findByStudent_IdOrderByIssueDateDesc(student.getId());
+    }
+
+    public List<IssueRecord> getStudentIssuesByStudentId(String studentId) {
+        refreshOverdueStatuses();
+        Student student = studentService.getStudentByStudentId(studentId);
+        return issueRecordRepository.findByStudent_IdOrderByIssueDateDesc(student.getId());
+    }
+
+    public List<BookBorrowStat> getMostBorrowedBooks() {
+        return issueRecordRepository.findMostBorrowedBooks(PageRequest.of(0, 5));
+    }
+
+    public long countTransactionsManagedBy(String adminEmail) {
+        return issueRecordRepository.countByIssuedBy_EmailIgnoreCase(adminEmail);
+    }
+
+    public IssueRecord getIssueById(Long issueId) {
+        if (issueId == null) {
+            throw new IllegalArgumentException("Issue record is required.");
+        }
+        return issueRecordRepository.findById(issueId)
+                .orElseThrow(() -> new IllegalArgumentException("Issue record not found."));
+    }
+
+    @Transactional
+    public IssueRecord updateIssue(Long issueId,
+                                   LocalDate dueDate,
+                                   String remarks) {
+        IssueRecord issueRecord = getIssueById(issueId);
+        if (dueDate == null) {
+            throw new IllegalArgumentException("Due date is required.");
+        }
+
+        issueRecord.setDueDate(dueDate.atTime(17, 0));
+        issueRecord.setRemarks(blankToNull(remarks));
+
+        if (!issueRecord.isReturned()) {
+            LocalDateTime now = LocalDateTime.now();
+            BigDecimal fine = calculateFine(issueRecord.getDueDate(), now);
+            if (now.isAfter(issueRecord.getDueDate())) {
+                issueRecord.setStatus(IssueStatus.OVERDUE);
+                issueRecord.setFineAmount(fine);
+            } else {
+                issueRecord.setStatus(IssueStatus.ISSUED);
+                issueRecord.setFineAmount(BigDecimal.ZERO);
+            }
+        }
+
+        return issueRecordRepository.save(issueRecord);
+    }
+
+    @Transactional
+    public void deleteIssue(Long issueId) {
+        IssueRecord issueRecord = getIssueById(issueId);
+        if (!issueRecord.isReturned()) {
+            Book book = issueRecord.getBook();
+            int currentAvailable = book.getAvailableQuantity() == null ? 0 : book.getAvailableQuantity();
+            int totalQuantity = book.getQuantity() == null ? 1 : book.getQuantity();
+            book.setAvailableQuantity(Math.min(totalQuantity, currentAvailable + 1));
+            bookRepository.save(book);
+        }
+        issueRecordRepository.delete(issueRecord);
+    }
+
+    public List<AdminDashboardChartPoint> getWeeklyCirculationChart() {
+        LocalDate today = LocalDate.now();
+        LocalDate startDate = today.minusDays(6);
+        Map<LocalDate, long[]> chartData = new LinkedHashMap<>();
+
+        for (LocalDate date = startDate; !date.isAfter(today); date = date.plusDays(1)) {
+            chartData.put(date, new long[]{0L, 0L});
+        }
+
+        for (IssueRecord issueRecord : issueRecordRepository.findAll()) {
+            if (issueRecord.getIssueDate() != null) {
+                LocalDate issueDate = issueRecord.getIssueDate().toLocalDate();
+                if (!issueDate.isBefore(startDate) && !issueDate.isAfter(today)) {
+                    chartData.get(issueDate)[0]++;
+                }
+            }
+
+            if (issueRecord.getReturnDate() != null) {
+                LocalDate returnDate = issueRecord.getReturnDate().toLocalDate();
+                if (!returnDate.isBefore(startDate) && !returnDate.isAfter(today)) {
+                    chartData.get(returnDate)[1]++;
+                }
+            }
+        }
+
+        long maxValue = 1;
+        for (long[] values : chartData.values()) {
+            maxValue = Math.max(maxValue, Math.max(values[0], values[1]));
+        }
+
+        final long chartMaxValue = maxValue;
+        DateTimeFormatter labelFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH);
+        return chartData.entrySet().stream()
+                .map(entry -> new AdminDashboardChartPoint(
+                        labelFormatter.format(entry.getKey()),
+                        entry.getValue()[0],
+                        entry.getValue()[1],
+                        heightPercentage(entry.getValue()[0], chartMaxValue),
+                        heightPercentage(entry.getValue()[1], chartMaxValue)
+                ))
+                .toList();
+    }
+
+    private BigDecimal calculateFine(LocalDateTime dueDate, LocalDateTime referenceDate) {
+        if (dueDate == null || referenceDate == null || !referenceDate.isAfter(dueDate)) {
+            return BigDecimal.ZERO;
+        }
+
+        long overdueDays = ChronoUnit.DAYS.between(dueDate.toLocalDate(), referenceDate.toLocalDate());
+        if (overdueDays < 1) {
+            overdueDays = 1;
+        }
+        return DAILY_FINE.multiply(BigDecimal.valueOf(overdueDays));
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private int heightPercentage(long value, long maxValue) {
+        if (value < 1) {
+            return 0;
+        }
+        return Math.max(18, (int) Math.round((value * 100.0) / maxValue));
+    }
+}

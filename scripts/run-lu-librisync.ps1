@@ -1,0 +1,56 @@
+param(
+    [string]$DbUrl = "jdbc:mysql://127.0.0.1:3306/lu_librisync?useSSL=false&serverTimezone=Asia/Manila&allowPublicKeyRetrieval=true",
+    [string]$DbUsername = "root",
+    [string]$DbPassword,
+    [switch]$SkipPasswordPrompt
+)
+
+$projectRoot = Split-Path -Parent $PSScriptRoot
+$mavenCmd = Join-Path $projectRoot "tools\apache-maven-3.9.14\bin\mvn.cmd"
+$mysqlCli = "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe"
+$mavenRepo = Join-Path $projectRoot ".m2\repository"
+
+if (-not (Test-Path $mavenCmd)) {
+    throw "Local Maven was not found at $mavenCmd"
+}
+
+New-Item -ItemType Directory -Force -Path $mavenRepo | Out-Null
+
+if (-not $PSBoundParameters.ContainsKey("DbPassword") -and -not $SkipPasswordPrompt) {
+    $securePassword = Read-Host "Enter MySQL password for user '$DbUsername' (press Enter if none)" -AsSecureString
+    $passwordPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
+    try {
+        $DbPassword = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($passwordPointer)
+    } finally {
+        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordPointer)
+    }
+}
+
+$env:LU_LIBRISYNC_DB_URL = $DbUrl
+$env:LU_LIBRISYNC_DB_USERNAME = $DbUsername
+$env:LU_LIBRISYNC_DB_PASSWORD = $DbPassword
+
+Write-Host ""
+Write-Host "LU Librisync local run configuration" -ForegroundColor Cyan
+Write-Host "DB URL     : $DbUrl"
+Write-Host "DB Username: $DbUsername"
+
+if (Test-Path $mysqlCli) {
+    Write-Host "Checking MySQL access..." -ForegroundColor DarkCyan
+    $mysqlArgs = @("-u", $DbUsername, "-e", "USE lu_librisync; SELECT 'Database connection OK' AS status;")
+    if (-not [string]::IsNullOrEmpty($DbPassword)) {
+        $mysqlArgs = @("-u", $DbUsername, "-p$DbPassword", "-e", "USE lu_librisync; SELECT 'Database connection OK' AS status;")
+    }
+
+    & $mysqlCli @mysqlArgs 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "MySQL connection test failed. The app may still start, but please verify your username/password and that the 'lu_librisync' database exists."
+    }
+}
+
+Push-Location $projectRoot
+try {
+    & $mavenCmd "-Dmaven.repo.local=$mavenRepo" spring-boot:run
+} finally {
+    Pop-Location
+}

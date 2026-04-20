@@ -1,0 +1,10 @@
+/target/
+/.mvn/
+/.m2/
+/.idea/
+/.classpath
+/.project
+/.settings/
+/.vscode/settings.json
+/tools/
+/logs/

@@ -1,0 +1,348 @@
+<%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Student Profile</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="${pageContext.request.contextPath}/css/app.css">
+</head>
+<body>
+<div class="page-shell">
+    <div class="app-nav">
+        <div>
+            <span class="tag-chip">Student Portal</span>
+            <div class="brand-title mt-2">My profile</div>
+            <p class="muted-text mt-2 mb-0">Review your student details and verify any profile changes with a one-time code.</p>
+        </div>
+        <div class="nav-links">
+            <a class="nav-pill" href="${pageContext.request.contextPath}/student/dashboard">Dashboard</a>
+            <a class="nav-pill" href="${pageContext.request.contextPath}/student/catalog">Catalog</a>
+            <a class="nav-pill active" href="${pageContext.request.contextPath}/student/profile">Profile</a>
+            <a class="nav-pill" href="${pageContext.request.contextPath}/student/history">Borrowing history</a>
+            <form method="post" action="${pageContext.request.contextPath}/logout">
+                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                <button class="nav-pill warm border-0" type="submit">Logout</button>
+            </form>
+        </div>
+    </div>
+
+    <c:if test="${not empty success}">
+        <div class="alert alert-success">${success}</div>
+    </c:if>
+    <c:if test="${not empty info}">
+        <div class="alert alert-info">${info}</div>
+    </c:if>
+    <c:if test="${not empty error}">
+        <div class="alert alert-danger">${error}</div>
+    </c:if>
+
+    <section class="hero-card profile-hero-card mb-4">
+        <div class="profile-hero-grid">
+            <div class="profile-identity">
+                <div class="profile-avatar-badge">${studentInitials}</div>
+                <div>
+                    <span class="tag-chip">Student Information</span>
+                    <h1 class="profile-hero-title">${student.user.name}</h1>
+                    <p class="muted-text mb-2">
+                        ${empty student.course ? 'Not set' : student.course}
+                        <span class="profile-dot-separator"></span>
+                        ${empty student.yearLevel ? 'Not set' : student.yearLevel}
+                    </p>
+                    <div class="profile-meta-strip">
+                        <span><i class="bi bi-person-vcard"></i> ${student.studentId}</span>
+                        <span><i class="bi bi-envelope"></i> ${student.user.email}</span>
+                        <span><i class="bi bi-shield-check"></i> ${student.user.status}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="profile-hero-actions">
+                <button class="btn btn-brand" type="button" data-bs-toggle="modal" data-bs-target="#editProfileModal">
+                    <i class="bi bi-pencil-square"></i>
+                    Edit profile
+                </button>
+                <c:if test="${hasPendingProfileOtp}">
+                    <button class="btn btn-warm" type="button" data-bs-toggle="modal" data-bs-target="#verifyProfileOtpModal">
+                        <i class="bi bi-shield-lock"></i>
+                        Enter OTP
+                    </button>
+                </c:if>
+                <div class="profile-security-note">
+                    <i class="bi bi-patch-check-fill"></i>
+                    Profile updates require OTP verification before they are saved.
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="panel-grid profile-overview-grid mb-4">
+        <article class="panel-card profile-summary-card">
+            <div class="profile-summary-header">
+                <div>
+                    <div class="section-title mb-1">Profile overview</div>
+                    <p class="muted-text mb-0">A cleaner view of your current library account details.</p>
+                </div>
+                <span class="tag-chip">${student.user.status}</span>
+            </div>
+
+            <div class="profile-highlight-grid">
+                <div class="profile-highlight-tile">
+                    <span class="profile-highlight-label">Program</span>
+                    <strong>${empty student.course ? 'Not set' : student.course}</strong>
+                </div>
+                <div class="profile-highlight-tile">
+                    <span class="profile-highlight-label">Year level</span>
+                    <strong>${empty student.yearLevel ? 'Not set' : student.yearLevel}</strong>
+                </div>
+                <div class="profile-highlight-tile">
+                    <span class="profile-highlight-label">Phone</span>
+                    <strong>${empty student.phone ? 'Not provided' : student.phone}</strong>
+                </div>
+                <div class="profile-highlight-tile">
+                    <span class="profile-highlight-label">Birthday</span>
+                    <strong>${empty student.dateOfBirth ? 'Not provided' : student.dateOfBirth}</strong>
+                </div>
+            </div>
+        </article>
+
+        <article class="panel-card profile-security-card">
+            <div class="section-title mb-2">Update security</div>
+            <p class="muted-text mb-3">When you edit your details, the system creates a one-time passcode that must be entered before the new information is saved.</p>
+            <div class="profile-security-list">
+                <div class="profile-security-item">
+                    <i class="bi bi-1-circle-fill"></i>
+                    <span>Open the edit profile form and update your details.</span>
+                </div>
+                <div class="profile-security-item">
+                    <i class="bi bi-2-circle-fill"></i>
+                    <span>Request the verification code for your profile update.</span>
+                </div>
+                <div class="profile-security-item">
+                    <i class="bi bi-3-circle-fill"></i>
+                    <span>Enter the OTP to complete and save the changes.</span>
+                </div>
+            </div>
+            <c:if test="${hasPendingProfileOtp}">
+                <div class="profile-pending-otp">
+                    <i class="bi bi-hourglass-split"></i>
+                    <div>
+                        <strong>Pending verification</strong>
+                        <p class="mb-0">You still have a profile update waiting for OTP confirmation.</p>
+                    </div>
+                </div>
+            </c:if>
+        </article>
+    </section>
+
+    <section class="panel-card profile-directory-card">
+        <div class="profile-section-block">
+            <div class="profile-section-heading">
+                <span class="profile-section-icon"><i class="bi bi-person-badge"></i></span>
+                <div>
+                    <div class="section-title mb-1">Personal details</div>
+                    <p class="muted-text mb-0">Your core student identity inside LU Librisync.</p>
+                </div>
+            </div>
+            <div class="profile-detail-grid">
+                <div class="profile-detail-item">
+                    <span class="profile-detail-label">Full name</span>
+                    <strong class="profile-detail-value">${student.user.name}</strong>
+                </div>
+                <div class="profile-detail-item">
+                    <span class="profile-detail-label">Student ID</span>
+                    <strong class="profile-detail-value">${student.studentId}</strong>
+                </div>
+                <div class="profile-detail-item">
+                    <span class="profile-detail-label">Date of birth</span>
+                    <strong class="profile-detail-value">${empty student.dateOfBirth ? 'Not provided' : student.dateOfBirth}</strong>
+                </div>
+                <div class="profile-detail-item">
+                    <span class="profile-detail-label">Account status</span>
+                    <strong class="profile-detail-value">${student.user.status}</strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="profile-section-block">
+            <div class="profile-section-heading">
+                <span class="profile-section-icon"><i class="bi bi-telephone"></i></span>
+                <div>
+                    <div class="section-title mb-1">Contact details</div>
+                    <p class="muted-text mb-0">Your registered communication and home address information.</p>
+                </div>
+            </div>
+            <div class="profile-detail-grid">
+                <div class="profile-detail-item">
+                    <span class="profile-detail-label">Email address</span>
+                    <strong class="profile-detail-value">${student.user.email}</strong>
+                </div>
+                <div class="profile-detail-item">
+                    <span class="profile-detail-label">Phone number</span>
+                    <strong class="profile-detail-value">${empty student.phone ? 'Not provided' : student.phone}</strong>
+                </div>
+                <div class="profile-detail-item profile-detail-item-wide">
+                    <span class="profile-detail-label">Address</span>
+                    <strong class="profile-detail-value">${empty student.address ? 'Not provided' : student.address}</strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="profile-section-block">
+            <div class="profile-section-heading">
+                <span class="profile-section-icon"><i class="bi bi-mortarboard"></i></span>
+                <div>
+                    <div class="section-title mb-1">Academic details</div>
+                    <p class="muted-text mb-0">Your current program and student record details.</p>
+                </div>
+            </div>
+            <div class="profile-detail-grid">
+                <div class="profile-detail-item">
+                    <span class="profile-detail-label">Program</span>
+                    <strong class="profile-detail-value">${empty student.course ? 'Not set' : student.course}</strong>
+                </div>
+                <div class="profile-detail-item">
+                    <span class="profile-detail-label">Year level</span>
+                    <strong class="profile-detail-value">${empty student.yearLevel ? 'Not set' : student.yearLevel}</strong>
+                </div>
+                <div class="profile-detail-item">
+                    <span class="profile-detail-label">Created at</span>
+                    <strong class="profile-detail-value">${student.createdAt}</strong>
+                </div>
+                <div class="profile-detail-item">
+                    <span class="profile-detail-label">Last updated</span>
+                    <strong class="profile-detail-value">${student.updatedAt}</strong>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<div class="modal fade" id="editProfileModal" tabindex="-1" aria-labelledby="editProfileModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header modal-header-brand">
+                <div>
+                    <div class="modal-kicker">Profile Update</div>
+                    <h2 class="modal-title h4 mb-1" id="editProfileModalLabel">Edit your profile</h2>
+                    <p class="modal-subtitle mb-0">Update your details below. An OTP will be required before the changes are saved.</p>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" action="${pageContext.request.contextPath}/student/profile/request-otp">
+                <div class="modal-body">
+                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="name">Full name</label>
+                            <input class="form-control" id="name" name="name" value="${profileForm.name}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="studentIdDisplay">Student ID</label>
+                            <input class="form-control" id="studentIdDisplay" value="${student.studentId}" disabled>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="course">Program</label>
+                            <input class="form-control" id="course" name="course" value="${profileForm.course}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="yearLevel">Year level</label>
+                            <input class="form-control" id="yearLevel" name="yearLevel" value="${profileForm.yearLevel}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="phone">Phone</label>
+                            <input class="form-control" id="phone" name="phone" value="${profileForm.phone}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="dateOfBirth">Date of birth</label>
+                            <input class="form-control" id="dateOfBirth" name="dateOfBirth" type="date" value="${profileForm.dateOfBirth}">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="address">Address</label>
+                            <textarea class="form-control" id="address" name="address" rows="3">${profileForm.address}</textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-warm" type="button" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-brand" type="submit">
+                        <i class="bi bi-shield-lock"></i>
+                        Request OTP
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="verifyProfileOtpModal" tabindex="-1" aria-labelledby="verifyProfileOtpModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header modal-header-brand">
+                <div>
+                    <div class="modal-kicker">OTP Verification</div>
+                    <h2 class="modal-title h4 mb-1" id="verifyProfileOtpModalLabel">Confirm profile update</h2>
+                    <p class="modal-subtitle mb-0">Enter the one-time passcode for your pending profile update.</p>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" action="${pageContext.request.contextPath}/student/profile/verify-otp">
+                <div class="modal-body">
+                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                    <div class="otp-panel">
+                        <div class="otp-panel-icon"><i class="bi bi-envelope-paper"></i></div>
+                        <div>
+                            <strong>Verification destination</strong>
+                            <p class="mb-0">Use the code assigned to <span class="otp-destination">${empty otpMaskedEmail ? 'your registered email' : otpMaskedEmail}</span>.</p>
+                        </div>
+                    </div>
+
+                    <c:if test="${not empty otpPreviewCode}">
+                        <div class="otp-preview-card">
+                            <span class="otp-preview-label">Development preview OTP</span>
+                            <strong class="otp-preview-code">${otpPreviewCode}</strong>
+                            <p class="mb-0">Email delivery is not configured yet, so the code is shown here for local testing.</p>
+                        </div>
+                    </c:if>
+
+                    <div class="mt-3">
+                        <label class="form-label" for="otpCode">One-time passcode</label>
+                        <input class="form-control form-control-lg otp-input" id="otpCode" name="otpCode" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" placeholder="Enter 6-digit OTP" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-warm" type="button" data-bs-dismiss="modal">Close</button>
+                    <button class="btn btn-brand" type="submit">
+                        <i class="bi bi-check2-circle"></i>
+                        Verify and save
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    (function () {
+        var shouldOpenEditModal = ${openEditModal ? 'true' : 'false'};
+        var shouldOpenOtpModal = ${openOtpModal ? 'true' : 'false'};
+
+        var editProfileModal = document.getElementById("editProfileModal");
+        var verifyProfileOtpModal = document.getElementById("verifyProfileOtpModal");
+
+        if (shouldOpenOtpModal && verifyProfileOtpModal) {
+            bootstrap.Modal.getOrCreateInstance(verifyProfileOtpModal).show();
+            return;
+        }
+
+        if (shouldOpenEditModal && editProfileModal) {
+            bootstrap.Modal.getOrCreateInstance(editProfileModal).show();
+        }
+    })();
+</script>
+</body>
+</html>
