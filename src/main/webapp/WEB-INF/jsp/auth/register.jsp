@@ -178,24 +178,24 @@
                         <p class="field-error" id="emailError"><c:out value="${emailFieldError}"/></p>
                     </div>
 
-                    <div class="register-form-row">
-                        <div class="mb-3">
-                            <label class="form-label" for="contactNumber">Contact number</label>
-                            <input class="form-control form-control-lg" id="contactNumber" name="contactNumber" type="text" value="${contactNumberValue}" maxlength="20" autocomplete="tel" inputmode="tel" required>
-                            <p class="field-hint">Use 10 to 15 digits. A leading `+` is allowed.</p>
-                            <p class="field-error" id="contactNumberError"><c:out value="${contactNumberFieldError}"/></p>
-                        </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="contactNumber">Contact number</label>
+                        <input class="form-control form-control-lg" id="contactNumber" name="contactNumber" type="text" value="${contactNumberValue}" maxlength="20" autocomplete="tel" inputmode="tel" required>
+                        <p class="field-hint">Use 10 to 15 digits. A leading `+` is allowed.</p>
+                        <p class="field-error" id="contactNumberError"><c:out value="${contactNumberFieldError}"/></p>
+                    </div>
 
+                    <div class="register-form-row">
                         <div class="mb-3">
                             <label class="form-label" for="birthDate">Birthday</label>
                             <input class="form-control form-control-lg" id="birthDate" name="birthDate" type="date" value="${birthDateValue}" required>
                             <p class="field-error" id="birthDateError"></p>
                         </div>
-                    </div>
 
-                    <div class="mb-4">
-                        <label class="form-label" for="age">Age (auto-computed)</label>
-                        <input class="form-control form-control-lg" id="age" type="text" placeholder="Auto-computed from birthday" readonly>
+                        <div class="mb-4">
+                            <label class="form-label" for="age">Age (auto-computed)</label>
+                            <input class="form-control form-control-lg" id="age" type="text" placeholder="Auto-computed from birthday" readonly>
+                        </div>
                     </div>
 
                     <div class="register-form-row">
