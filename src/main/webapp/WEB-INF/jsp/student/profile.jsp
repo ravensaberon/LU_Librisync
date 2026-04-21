@@ -44,7 +44,18 @@
     <section class="hero-card profile-hero-card mb-4">
         <div class="profile-hero-grid">
             <div class="profile-identity">
-                <div class="profile-avatar-badge">${studentInitials}</div>
+                <div class="profile-avatar-shell">
+                    <c:choose>
+                        <c:when test="${hasProfileImage}">
+                            <img class="profile-avatar-image"
+                                 src="${pageContext.request.contextPath}/student/profile/avatar?v=${profileImageVersion}"
+                                 alt="Profile picture of ${student.user.name}">
+                        </c:when>
+                        <c:otherwise>
+                            <div class="profile-avatar-badge">${studentInitials}</div>
+                        </c:otherwise>
+                    </c:choose>
+                </div>
                 <div>
                     <span class="tag-chip">Student Information</span>
                     <h1 class="profile-hero-title">${student.user.name}</h1>
@@ -287,6 +298,50 @@
                 </div>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
+            <div class="modal-body pb-0">
+                <div class="profile-avatar-editor">
+                    <div class="profile-avatar-editor-preview">
+                        <div class="profile-avatar-shell profile-avatar-shell-modal">
+                            <c:choose>
+                                <c:when test="${hasProfileImage}">
+                                    <img class="profile-avatar-image"
+                                         src="${pageContext.request.contextPath}/student/profile/avatar?v=${profileImageVersion}"
+                                         alt="Profile picture of ${student.user.name}">
+                                </c:when>
+                                <c:otherwise>
+                                    <div class="profile-avatar-badge">${studentInitials}</div>
+                                </c:otherwise>
+                            </c:choose>
+                        </div>
+                        <div>
+                            <strong class="d-block">Profile picture</strong>
+                            <p class="muted-text mb-0">Upload a JPG, PNG, or WEBP image up to 5 MB.</p>
+                        </div>
+                    </div>
+                    <div class="profile-avatar-editor-actions">
+                        <form id="profileImageUploadForm"
+                              method="post"
+                              action="${pageContext.request.contextPath}/student/profile/avatar"
+                              enctype="multipart/form-data">
+                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                            <input class="d-none" id="profileImageInput" name="profileImage" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
+                            <button class="btn btn-warm" type="button" id="profileImageTrigger">
+                                <i class="bi bi-camera"></i>
+                                Change picture
+                            </button>
+                        </form>
+                        <c:if test="${hasProfileImage}">
+                            <form method="post" action="${pageContext.request.contextPath}/student/profile/avatar/remove">
+                                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                                <button class="btn btn-warm" type="submit">
+                                    <i class="bi bi-trash3"></i>
+                                    Remove picture
+                                </button>
+                            </form>
+                        </c:if>
+                    </div>
+                </div>
+            </div>
             <form method="post" action="${pageContext.request.contextPath}/student/profile/request-otp">
                 <div class="modal-body">
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
@@ -301,7 +356,19 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label" for="course">Program</label>
-                            <input class="form-control" id="course" name="course" value="${profileForm.course}">
+                            <select class="form-select" id="course" name="course">
+                                <option value="">Select program</option>
+                                <c:if test="${not empty profileForm.course and profileForm.course != 'Not set' and !programOptionLookup[profileForm.course]}">
+                                    <option value="${profileForm.course}" selected>${profileForm.course}</option>
+                                </c:if>
+                                <c:forEach items="${programOptionsByCollege}" var="collegeEntry">
+                                    <optgroup label="${collegeEntry.key}">
+                                        <c:forEach items="${collegeEntry.value}" var="programOption">
+                                            <option value="${programOption}" <c:if test="${profileForm.course == programOption}">selected</c:if>>${programOption}</option>
+                                        </c:forEach>
+                                    </optgroup>
+                                </c:forEach>
+                            </select>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label" for="yearLevel">Year level</label>
@@ -397,6 +464,8 @@
         var shouldOpenOtpModal = ${openOtpModal ? 'true' : 'false'};
         var otpExpiresAtEpochMs = ${empty otpExpiresAtEpochMs ? 'null' : otpExpiresAtEpochMs};
         var otpResendAvailableAtEpochMs = ${empty otpResendAvailableAtEpochMs ? 'null' : otpResendAvailableAtEpochMs};
+        var profileImageInput = document.getElementById("profileImageInput");
+        var profileImageTrigger = document.getElementById("profileImageTrigger");
 
         var editProfileModal = document.getElementById("editProfileModal");
         var verifyProfileOtpModal = document.getElementById("verifyProfileOtpModal");
@@ -447,6 +516,18 @@
 
         if (shouldOpenEditModal && editProfileModal) {
             bootstrap.Modal.getOrCreateInstance(editProfileModal).show();
+        }
+
+        if (profileImageTrigger && profileImageInput) {
+            profileImageTrigger.addEventListener("click", function () {
+                profileImageInput.click();
+            });
+
+            profileImageInput.addEventListener("change", function () {
+                if (profileImageInput.files && profileImageInput.files.length > 0) {
+                    profileImageInput.form.submit();
+                }
+            });
         }
 
         updateOtpCountdowns();

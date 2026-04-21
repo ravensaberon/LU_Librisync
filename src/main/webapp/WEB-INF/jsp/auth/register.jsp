@@ -151,7 +151,19 @@
 
                         <div class="mb-3">
                             <label class="form-label" for="program">Program</label>
-                            <input class="form-control form-control-lg" id="program" name="program" type="text" value="${programValue}" maxlength="120" placeholder="Example: BS Information Technology" required>
+                            <select class="form-select form-select-lg" id="program" name="program" required>
+                                <option value="">Select program</option>
+                                <c:if test="${not empty programValue and !programOptionLookup[programValue]}">
+                                    <option value="${programValue}" selected>${programValue}</option>
+                                </c:if>
+                                <c:forEach items="${programOptionsByCollege}" var="collegeEntry">
+                                    <optgroup label="${collegeEntry.key}">
+                                        <c:forEach items="${collegeEntry.value}" var="programOption">
+                                            <option value="${programOption}" <c:if test="${programValue == programOption}">selected</c:if>>${programOption}</option>
+                                        </c:forEach>
+                                    </optgroup>
+                                </c:forEach>
+                            </select>
                             <p class="field-error" id="programError"></p>
                         </div>
                     </div>
@@ -1004,7 +1016,7 @@
             }
         });
 
-        program.addEventListener("input", validateProgramField);
+        program.addEventListener("change", validateProgramField);
 
         email.addEventListener("input", function () {
             validateEmailField();

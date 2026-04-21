@@ -171,7 +171,16 @@
                     </div>
                     <div class="col-md-4">
                         <label class="form-label" for="createCourse">Program</label>
-                        <input class="form-control" id="createCourse" name="course" placeholder="BSIT">
+                        <select class="form-select" id="createCourse" name="course">
+                            <option value="">Select program</option>
+                            <c:forEach items="${programOptionsByCollege}" var="collegeEntry">
+                                <optgroup label="${collegeEntry.key}">
+                                    <c:forEach items="${collegeEntry.value}" var="programOption">
+                                        <option value="${programOption}">${programOption}</option>
+                                    </c:forEach>
+                                </optgroup>
+                            </c:forEach>
+                        </select>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label" for="createYearLevel">Year level</label>

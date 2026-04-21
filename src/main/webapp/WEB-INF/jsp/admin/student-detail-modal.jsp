@@ -109,7 +109,19 @@
             </div>
             <div class="col-md-4">
                 <label class="form-label" for="modalCourse">Program</label>
-                <input class="form-control" id="modalCourse" name="course" value="${student.course}">
+                <select class="form-select" id="modalCourse" name="course">
+                    <option value="">Select program</option>
+                    <c:if test="${not empty student.course and student.course != 'Not set' and !programOptionLookup[student.course]}">
+                        <option value="${student.course}" selected>${student.course}</option>
+                    </c:if>
+                    <c:forEach items="${programOptionsByCollege}" var="collegeEntry">
+                        <optgroup label="${collegeEntry.key}">
+                            <c:forEach items="${collegeEntry.value}" var="programOption">
+                                <option value="${programOption}" <c:if test="${student.course == programOption}">selected</c:if>>${programOption}</option>
+                            </c:forEach>
+                        </optgroup>
+                    </c:forEach>
+                </select>
             </div>
             <div class="col-md-4">
                 <label class="form-label" for="modalYearLevel">Year level</label>

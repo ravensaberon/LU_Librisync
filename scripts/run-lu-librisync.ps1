@@ -9,12 +9,39 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 $mavenCmd = Join-Path $projectRoot "tools\apache-maven-3.9.14\bin\mvn.cmd"
 $mysqlCli = "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe"
 $mavenRepo = Join-Path $projectRoot ".m2\repository"
+$fallbackJavaHome = Join-Path $env:USERPROFILE ".jdks\temurin-17"
+$localEnvFile = Join-Path $PSScriptRoot "local-dev-env.env"
 
 if (-not (Test-Path $mavenCmd)) {
     throw "Local Maven was not found at $mavenCmd"
 }
 
 New-Item -ItemType Directory -Force -Path $mavenRepo | Out-Null
+
+if (Test-Path (Join-Path $fallbackJavaHome "bin\java.exe")) {
+    $env:JAVA_HOME = $fallbackJavaHome
+    if (-not (($env:Path -split ';') -contains (Join-Path $fallbackJavaHome "bin"))) {
+        $env:Path = (Join-Path $fallbackJavaHome "bin") + ";" + $env:Path
+    }
+}
+
+if (Test-Path $localEnvFile) {
+    Get-Content $localEnvFile | ForEach-Object {
+        $line = $_.Trim()
+        if (-not $line -or $line.StartsWith("#")) {
+            return
+        }
+
+        $separatorIndex = $line.IndexOf("=")
+        if ($separatorIndex -lt 1) {
+            return
+        }
+
+        $name = $line.Substring(0, $separatorIndex).Trim()
+        $value = $line.Substring($separatorIndex + 1).Trim()
+        Set-Item -Path ("Env:" + $name) -Value $value
+    }
+}
 
 if (-not $PSBoundParameters.ContainsKey("DbPassword") -and -not $SkipPasswordPrompt) {
     $securePassword = Read-Host "Enter MySQL password for user '$DbUsername' (press Enter if none)" -AsSecureString

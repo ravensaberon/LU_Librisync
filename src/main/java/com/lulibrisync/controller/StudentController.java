@@ -9,8 +9,13 @@ import com.lulibrisync.model.Student;
 import com.lulibrisync.service.FineService;
 import com.lulibrisync.service.IssueService;
 import com.lulibrisync.service.ReservationService;
+import com.lulibrisync.service.StudentProfileImageService;
 import com.lulibrisync.service.StudentProfileOtpService;
 import com.lulibrisync.service.StudentService;
+import org.springframework.core.io.Resource;
+import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -19,11 +24,13 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Controller
 public class StudentController {
@@ -33,17 +40,20 @@ public class StudentController {
     private final ReservationService reservationService;
     private final StudentProfileOtpService studentProfileOtpService;
     private final FineService fineService;
+    private final StudentProfileImageService studentProfileImageService;
 
     public StudentController(StudentService studentService,
                              IssueService issueService,
                              ReservationService reservationService,
                              StudentProfileOtpService studentProfileOtpService,
-                             FineService fineService) {
+                             FineService fineService,
+                             StudentProfileImageService studentProfileImageService) {
         this.studentService = studentService;
         this.issueService = issueService;
         this.reservationService = reservationService;
         this.studentProfileOtpService = studentProfileOtpService;
         this.fineService = fineService;
+        this.studentProfileImageService = studentProfileImageService;
     }
 
     @GetMapping("/student/dashboard")
@@ -75,6 +85,41 @@ public class StudentController {
         Student student = studentService.getStudentByEmail(authentication.getName());
         populateProfilePageModel(model, student);
         return "student/profile";
+    }
+
+    @GetMapping("/student/profile/avatar")
+    public ResponseEntity<Resource> profileAvatar(Authentication authentication) {
+        Student student = studentService.getStudentByEmail(authentication.getName());
+        Resource resource = studentProfileImageService.getProfileImageResource(student);
+
+        return ResponseEntity.ok()
+                .contentType(studentProfileImageService.getProfileImageMediaType(student))
+                .cacheControl(CacheControl.maxAge(1, TimeUnit.MINUTES).cachePrivate())
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
+                .body(resource);
+    }
+
+    @PostMapping("/student/profile/avatar")
+    public String uploadProfileAvatar(Authentication authentication,
+                                      @RequestParam("profileImage") MultipartFile profileImage,
+                                      RedirectAttributes redirectAttributes) {
+        Student student = studentService.getStudentByEmail(authentication.getName());
+        try {
+            studentProfileImageService.storeProfileImage(student, profileImage);
+            redirectAttributes.addFlashAttribute("success", "Profile picture updated successfully.");
+        } catch (IllegalArgumentException exception) {
+            redirectAttributes.addFlashAttribute("error", exception.getMessage());
+        }
+        return "redirect:/student/profile";
+    }
+
+    @PostMapping("/student/profile/avatar/remove")
+    public String removeProfileAvatar(Authentication authentication,
+                                      RedirectAttributes redirectAttributes) {
+        Student student = studentService.getStudentByEmail(authentication.getName());
+        studentProfileImageService.deleteProfileImage(student);
+        redirectAttributes.addFlashAttribute("success", "Profile picture removed.");
+        return "redirect:/student/profile";
     }
 
     @PostMapping("/student/profile/request-otp")
@@ -176,6 +221,8 @@ public class StudentController {
 
         model.addAttribute("student", student);
         model.addAttribute("studentInitials", buildInitials(student.getUser().getName()));
+        model.addAttribute("hasProfileImage", studentProfileImageService.hasProfileImage(student));
+        model.addAttribute("profileImageVersion", studentProfileImageService.getProfileImageVersion(student));
         model.addAttribute("hasPendingProfileOtp", activeOtpState != null);
         model.addAttribute("borrowerStanding", studentService.getBorrowerStanding(student));
         model.addAttribute("studentFines", fineService.getStudentFines(student.getId()));

@@ -110,8 +110,20 @@
                     <input class="form-control" id="email" name="email" type="email" value="${student.user.email}" required>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label" for="course">Course</label>
-                    <input class="form-control" id="course" name="course" value="${student.course}">
+                    <label class="form-label" for="course">Program</label>
+                    <select class="form-select" id="course" name="course">
+                        <option value="">Select program</option>
+                        <c:if test="${not empty student.course and student.course != 'Not set' and !programOptionLookup[student.course]}">
+                            <option value="${student.course}" selected>${student.course}</option>
+                        </c:if>
+                        <c:forEach items="${programOptionsByCollege}" var="collegeEntry">
+                            <optgroup label="${collegeEntry.key}">
+                                <c:forEach items="${collegeEntry.value}" var="programOption">
+                                    <option value="${programOption}" <c:if test="${student.course == programOption}">selected</c:if>>${programOption}</option>
+                                </c:forEach>
+                            </optgroup>
+                        </c:forEach>
+                    </select>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label" for="yearLevel">Year level</label>

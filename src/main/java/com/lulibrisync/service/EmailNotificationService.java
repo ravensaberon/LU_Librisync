@@ -20,8 +20,10 @@ import org.springframework.util.StringUtils;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 
@@ -245,6 +247,17 @@ public class EmailNotificationService {
             writeOutboxCopy(toEmail, subject, body, htmlBody);
             return false;
         }
+        if (requiresAuthentication() && !StringUtils.hasText(smtpPassword)) {
+            writeOutboxCopy(
+                    toEmail,
+                    subject,
+                    body + System.lineSeparator() + System.lineSeparator()
+                            + "Send error:" + System.lineSeparator()
+                            + "SMTP authentication is enabled but no SMTP password is configured.",
+                    htmlBody
+            );
+            return false;
+        }
 
         String script = buildPowerShellMailScript(smtpHost, smtpPort, smtpUsername, smtpPassword, smtpFrom, smtpSsl, toEmail, subject, body, htmlBody);
         ProcessBuilder processBuilder = new ProcessBuilder("powershell", "-NoProfile", "-Command", script);
@@ -272,6 +285,10 @@ public class EmailNotificationService {
         return false;
     }
 
+    private boolean requiresAuthentication() {
+        return StringUtils.hasText(smtpUsername);
+    }
+
     private String buildPowerShellMailScript(String smtpHost,
                                              String smtpPort,
                                              String smtpUsername,
@@ -282,17 +299,20 @@ public class EmailNotificationService {
                                              String subject,
                                              String body,
                                              boolean htmlBody) {
+        String encodedSubject = encodeBase64(subject);
+        String encodedBody = encodeBase64(body);
         String credentialsBlock = "";
         if (StringUtils.hasText(smtpUsername)) {
             credentialsBlock = "$client.Credentials = New-Object System.Net.NetworkCredential('" + escapePowerShell(smtpUsername) + "', '" + escapePowerShell(smtpPassword) + "');";
         }
 
         return """
+                $utf8 = [System.Text.Encoding]::UTF8;
                 $message = New-Object System.Net.Mail.MailMessage;
                 $message.From = '%s';
                 $message.To.Add('%s');
-                $message.Subject = '%s';
-                $message.Body = '%s';
+                $message.Subject = $utf8.GetString([System.Convert]::FromBase64String('%s'));
+                $message.Body = $utf8.GetString([System.Convert]::FromBase64String('%s'));
                 $message.IsBodyHtml = [System.Convert]::ToBoolean('%s');
                 $client = New-Object System.Net.Mail.SmtpClient('%s', %s);
                 $client.EnableSsl = [System.Convert]::ToBoolean('%s');
@@ -301,8 +321,8 @@ public class EmailNotificationService {
                 """.formatted(
                 escapePowerShell(smtpFrom),
                 escapePowerShell(toEmail),
-                escapePowerShell(subject),
-                escapePowerShell(body),
+                encodedSubject,
+                encodedBody,
                 htmlBody,
                 escapePowerShell(smtpHost),
                 escapePowerShell(smtpPort),
@@ -311,11 +331,12 @@ public class EmailNotificationService {
         );
     }
 
+    private String encodeBase64(String value) {
+        return Base64.getEncoder().encodeToString((value == null ? "" : value).getBytes(StandardCharsets.UTF_8));
+    }
+
     private String escapePowerShell(String value) {
-        return (value == null ? "" : value)
-                .replace("'", "''")
-                .replace("\r", "")
-                .replace("\n", "`n");
+        return (value == null ? "" : value).replace("'", "''");
     }
 
     private void writeOutboxCopy(String toEmail, String subject, String body) {

@@ -8,3 +8,4 @@
 /.vscode/settings.json
 /tools/
 /logs/
+/scripts/local-dev-env.env
