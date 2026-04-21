@@ -121,7 +121,7 @@ public class AdminReportingService {
 
     private byte[] buildFinesCsv(List<Fine> fines) {
         StringBuilder builder = new StringBuilder();
-        builder.append("Fine ID,Student ID,Student Name,Issue Code,Book,Amount,Status,Calculated At,Paid Or Waived At\n");
+        builder.append("Fine ID,Student ID,Student Name,Issue Code,Book,Total Amount,Paid Amount,Remaining Balance,Status,Calculated At,Settled At\n");
         for (Fine fine : fines) {
             builder.append(csv(String.valueOf(fine.getId()))).append(',')
                     .append(csv(fine.getStudent().getStudentId())).append(',')
@@ -129,6 +129,8 @@ public class AdminReportingService {
                     .append(csv(fine.getIssueRecord().getQrIssueCode())).append(',')
                     .append(csv(fine.getIssueRecord().getBook().getTitle())).append(',')
                     .append(csv(String.valueOf(fine.getAmount()))).append(',')
+                    .append(csv(String.valueOf(fine.getPaidAmount()))).append(',')
+                    .append(csv(String.valueOf(fine.getRemainingAmount()))).append(',')
                     .append(csv(fine.getStatus().name())).append(',')
                     .append(csv(formatDateTime(fine.getCalculatedAt()))).append(',')
                     .append(csv(formatDateTime(fine.getPaidAt()))).append('\n');

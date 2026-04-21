@@ -36,6 +36,9 @@ public class Fine {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal amount = BigDecimal.ZERO;
 
+    @Column(name = "paid_amount", nullable = false, precision = 10, scale = 2)
+    private BigDecimal paidAmount = BigDecimal.ZERO;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private FineStatus status = FineStatus.UNPAID;
@@ -49,6 +52,9 @@ public class Fine {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @jakarta.persistence.OneToMany(mappedBy = "fine", cascade = jakarta.persistence.CascadeType.ALL, fetch = FetchType.LAZY)
+    private java.util.List<FinePayment> payments = new java.util.ArrayList<>();
+
     @PrePersist
     void onCreate() {
         LocalDateTime now = LocalDateTime.now();
@@ -59,13 +65,17 @@ public class Fine {
         if (amount == null) {
             amount = BigDecimal.ZERO;
         }
+        if (paidAmount == null) {
+            paidAmount = BigDecimal.ZERO;
+        }
         if (status == null) {
             status = FineStatus.UNPAID;
         }
     }
 
     public boolean isOutstanding() {
-        return FineStatus.UNPAID.equals(status) && amount != null && amount.compareTo(BigDecimal.ZERO) > 0;
+        return (FineStatus.UNPAID.equals(status) || FineStatus.PARTIALLY_PAID.equals(status))
+                && amount != null && amount.compareTo(paidAmount != null ? paidAmount : BigDecimal.ZERO) > 0;
     }
 
     public Long getId() {
@@ -100,6 +110,18 @@ public class Fine {
         this.amount = amount;
     }
 
+    public BigDecimal getPaidAmount() {
+        return paidAmount;
+    }
+
+    public void setPaidAmount(BigDecimal paidAmount) {
+        this.paidAmount = paidAmount;
+    }
+
+    public BigDecimal getRemainingAmount() {
+        return amount.subtract(paidAmount != null ? paidAmount : BigDecimal.ZERO);
+    }
+
     public FineStatus getStatus() {
         return status;
     }
@@ -130,5 +152,13 @@ public class Fine {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public java.util.List<FinePayment> getPayments() {
+        return payments;
+    }
+
+    public void setPayments(java.util.List<FinePayment> payments) {
+        this.payments = payments;
     }
 }

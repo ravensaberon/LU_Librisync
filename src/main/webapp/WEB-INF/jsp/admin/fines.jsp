@@ -59,11 +59,11 @@
     <section class="stat-grid mb-4">
         <div class="metric-card">
             <div class="metric-value">${outstandingFineCount}</div>
-            <div class="metric-label">Unpaid fine records</div>
+            <div class="metric-label">Outstanding records</div>
         </div>
         <div class="metric-card">
             <div class="metric-value">${outstandingFineTotal}</div>
-            <div class="metric-label">Outstanding balance</div>
+            <div class="metric-label">Remaining balance</div>
         </div>
         <div class="metric-card">
             <div class="metric-value">${paidFineCount}</div>
@@ -131,10 +131,9 @@
                 <tr>
                     <th>Student</th>
                     <th>Book / Issue</th>
-                    <th>Amount</th>
+                    <th>Ledger</th>
                     <th>Status</th>
-                    <th>Calculated</th>
-                    <th>Paid or Waived</th>
+                    <th>Dates</th>
                     <th>Actions</th>
                 </tr>
                 </thead>
@@ -144,17 +143,23 @@
                         <td>
                             <strong>${fine.student.user.name}</strong>
                             <div class="muted-text">${fine.student.studentId}</div>
-                            <div class="muted-text">${fine.student.user.email}</div>
                         </td>
                         <td>
                             <strong>${fine.issueRecord.book.title}</strong>
-                            <div class="muted-text">${fine.issueRecord.qrIssueCode}</div>
+                            <div class="muted-text text-truncate" style="max-width: 150px;">${fine.issueRecord.qrIssueCode}</div>
                         </td>
-                        <td>${fine.amount}</td>
+                        <td>
+                            <div class="fw-bold">Total: ${fine.amount}</div>
+                            <div class="text-success small">Paid: ${fine.paidAmount}</div>
+                            <div class="text-danger small">Rem: ${fine.remainingAmount}</div>
+                        </td>
                         <td>
                             <c:choose>
                                 <c:when test="${fine.status.name() == 'UNPAID'}">
                                     <span class="tag-chip warn">UNPAID</span>
+                                </c:when>
+                                <c:when test="${fine.status.name() == 'PARTIALLY_PAID'}">
+                                    <span class="tag-chip info">PARTIAL</span>
                                 </c:when>
                                 <c:when test="${fine.status.name() == 'PAID'}">
                                     <span class="tag-chip">PAID</span>
@@ -164,45 +169,145 @@
                                 </c:otherwise>
                             </c:choose>
                         </td>
-                        <td>${fine.calculatedAt}</td>
-                        <td>
-                            <c:choose>
-                                <c:when test="${not empty fine.paidAt}">
-                                    ${fine.paidAt}
-                                </c:when>
-                                <c:otherwise>
-                                    <span class="muted-text">Pending</span>
-                                </c:otherwise>
-                            </c:choose>
+                        <td class="small">
+                            <div>Calc: ${fine.calculatedAt}</div>
+                            <c:if test="${not empty fine.paidAt}">
+                                <div class="text-success">Settled: ${fine.paidAt}</div>
+                            </c:if>
                         </td>
                         <td class="table-actions">
-                            <c:if test="${fine.status.name() == 'UNPAID'}">
-                                <form method="post"
-                                      action="${pageContext.request.contextPath}/admin/fines/${fine.id}/pay"
-                                      data-confirm-title="Mark this fine as paid?"
-                                      data-confirm-text="This will record the selected overdue penalty as settled."
-                                      data-confirm-button-text="Yes, mark as paid"
-                                      data-confirm-cancel-text="Review first">
-                                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                                    <button class="icon-action" type="submit" title="Mark as paid">
-                                        <i class="bi bi-cash-coin"></i>
-                                    </button>
-                                </form>
-                                <form method="post"
+                            <c:if test="${fine.status.name() == 'UNPAID' || fine.status.name() == 'PARTIALLY_PAID'}">
+                                <button class="icon-action" type="button" title="Record payment"
+                                        data-bs-toggle="modal" data-bs-target="#paymentModal${fine.id}">
+                                    <i class="bi bi-cash-coin"></i>
+                                </button>
+                                <form method="post" class="d-inline"
                                       action="${pageContext.request.contextPath}/admin/fines/${fine.id}/waive"
-                                      data-confirm-title="Waive this fine?"
-                                      data-confirm-text="Only waive a penalty when there is a valid admin decision for the borrower."
+                                      data-confirm-title="Waive remaining fine?"
+                                      data-confirm-text="This will cancel the remaining balance for this penalty."
                                       data-confirm-button-text="Yes, waive fine"
-                                      data-confirm-cancel-text="Keep unpaid">
+                                      data-confirm-cancel-text="Keep as is">
                                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
                                     <button class="icon-action" type="submit" title="Waive fine">
                                         <i class="bi bi-receipt-cutoff"></i>
                                     </button>
                                 </form>
                             </c:if>
-                            <c:if test="${fine.status.name() != 'UNPAID'}">
-                                <span class="muted-text">Recorded</span>
-                            </c:if>
+                            <button class="icon-action" type="button" title="View history"
+                                    data-bs-toggle="modal" data-bs-target="#historyModal${fine.id}">
+                                <i class="bi bi-clock-history"></i>
+                            </button>
+
+                            <!-- Payment Modal -->
+                            <div class="modal fade" id="paymentModal${fine.id}" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <form method="post" action="${pageContext.request.contextPath}/admin/fines/${fine.id}/pay-partial">
+                                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Record Fine Payment</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body text-start">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Remaining Balance</label>
+                                                    <input type="text" class="form-control" value="${fine.remainingAmount}" readonly disabled>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label" for="amount${fine.id}">Payment Amount</label>
+                                                    <input type="number" step="0.01" class="form-control" id="amount${fine.id}" name="amount"
+                                                           max="${fine.remainingAmount}" min="0.01" value="${fine.remainingAmount}" required>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label" for="paymentMethod${fine.id}">Payment Method</label>
+                                                    <select class="form-select" id="paymentMethod${fine.id}" name="paymentMethod" required>
+                                                        <option value="CASH">Cash</option>
+                                                        <option value="GCASH">GCash</option>
+                                                        <option value="MAYA">Maya</option>
+                                                        <option value="BANK_TRANSFER">Bank Transfer</option>
+                                                    </select>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label" for="receiptNumber${fine.id}">Receipt / Reference Number</label>
+                                                    <input type="text" class="form-control" id="receiptNumber${fine.id}" name="receiptNumber" placeholder="OR-XXXXXX" required>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label" for="remarks${fine.id}">Remarks</label>
+                                                    <textarea class="form-control" id="remarks${fine.id}" name="remarks" rows="2"></textarea>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                <button type="submit" class="btn btn-brand">Post Payment</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- History Modal -->
+                            <div class="modal fade" id="historyModal${fine.id}" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog modal-lg">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Payment History - ${fine.issueRecord.book.title}</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body text-start">
+                                            <div class="mb-4">
+                                                <h6>Fine Details</h6>
+                                                <div class="row g-3">
+                                                    <div class="col-sm-4">
+                                                        <div class="small muted-text">Original Amount</div>
+                                                        <div class="fw-bold">${fine.amount}</div>
+                                                    </div>
+                                                    <div class="col-sm-4">
+                                                        <div class="small muted-text">Total Paid</div>
+                                                        <div class="fw-bold text-success">${fine.paidAmount}</div>
+                                                    </div>
+                                                    <div class="col-sm-4">
+                                                        <div class="small muted-text">Outstanding</div>
+                                                        <div class="fw-bold text-danger">${fine.remainingAmount}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <h6>Transactions</h6>
+                                            <div class="table-responsive">
+                                                <table class="table table-sm align-middle">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Date</th>
+                                                            <th>Amount</th>
+                                                            <th>Method</th>
+                                                            <th>Receipt</th>
+                                                            <th>Notes</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <c:forEach items="${fine.payments}" var="payment">
+                                                            <tr>
+                                                                <td>${payment.paymentDate}</td>
+                                                                <td class="fw-bold">${payment.amount}</td>
+                                                                <td>${payment.paymentMethod}</td>
+                                                                <td>${payment.receiptNumber}</td>
+                                                                <td class="small">${payment.remarks}</td>
+                                                            </tr>
+                                                        </c:forEach>
+                                                        <c:if test="${empty fine.payments}">
+                                                            <tr>
+                                                                <td colspan="5" class="text-center muted-text">No payments recorded yet.</td>
+                                                            </tr>
+                                                        </c:if>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </td>
                     </tr>
                 </c:forEach>
@@ -216,6 +321,7 @@
         </div>
     </section>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="${pageContext.request.contextPath}/js/app.js"></script>
 </body>

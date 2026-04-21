@@ -27,18 +27,25 @@ public interface FineRepository extends JpaRepository<Fine, Long> {
     long countByStudent_IdAndStatus(Long studentId, FineStatus status);
 
     @Query("""
-            select coalesce(sum(f.amount), 0)
+            select coalesce(sum(f.amount - f.paidAmount), 0)
             from Fine f
-            where f.status = :status
+            where f.status in (:statuses)
             """)
-    BigDecimal sumAmountByStatus(@Param("status") FineStatus status);
+    BigDecimal sumOutstandingAmount(@Param("statuses") List<FineStatus> statuses);
+
+    @Query("""
+            select coalesce(sum(f.amount - f.paidAmount), 0)
+            from Fine f
+            where f.student.id = :studentId
+              and f.status in (:statuses)
+            """)
+    BigDecimal sumOutstandingAmountByStudentId(@Param("studentId") Long studentId,
+                                               @Param("statuses") List<FineStatus> statuses);
 
     @Query("""
             select coalesce(sum(f.amount), 0)
             from Fine f
-            where f.student.id = :studentId
-              and f.status = :status
+            where f.status = :status
             """)
-    BigDecimal sumAmountByStudentIdAndStatus(@Param("studentId") Long studentId,
-                                             @Param("status") FineStatus status);
+    BigDecimal sumTotalAmountByStatus(@Param("status") FineStatus status);
 }

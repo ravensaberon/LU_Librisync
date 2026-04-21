@@ -37,23 +37,40 @@ public class FineController {
                 .toList();
 
         BigDecimal filteredOutstandingTotal = fineRecords.stream()
-                .filter(fine -> FineStatus.UNPAID.equals(fine.getStatus()))
-                .map(Fine::getAmount)
+                .filter(fine -> FineStatus.UNPAID.equals(fine.getStatus()) || FineStatus.PARTIALLY_PAID.equals(fine.getStatus()))
+                .map(Fine::getRemainingAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         model.addAttribute("fines", fineRecords);
         model.addAttribute("selectedStatus", status);
         model.addAttribute("studentKeyword", studentKeyword);
         model.addAttribute("fineStatuses", FineStatus.values());
-        model.addAttribute("outstandingFineCount", fineService.countByStatus(FineStatus.UNPAID));
+        model.addAttribute("outstandingFineCount", fineService.countOutstandingFines());
         model.addAttribute("paidFineCount", fineService.countByStatus(FineStatus.PAID));
         model.addAttribute("waivedFineCount", fineService.countByStatus(FineStatus.WAIVED));
-        model.addAttribute("outstandingFineTotal", fineService.getTotalAmountByStatus(FineStatus.UNPAID));
+        model.addAttribute("outstandingFineTotal", fineService.getOutstandingFineTotal());
         model.addAttribute("paidFineTotal", fineService.getTotalAmountByStatus(FineStatus.PAID));
         model.addAttribute("waivedFineTotal", fineService.getTotalAmountByStatus(FineStatus.WAIVED));
         model.addAttribute("filteredOutstandingTotal", filteredOutstandingTotal);
         model.addAttribute("filteredFineCount", fineRecords.size());
         return "admin/fines";
+    }
+
+    @PostMapping("/{fineId}/pay-partial")
+    public String recordPartialPayment(@PathVariable Long fineId,
+                                       @RequestParam BigDecimal amount,
+                                       @RequestParam String paymentMethod,
+                                       @RequestParam String receiptNumber,
+                                       @RequestParam(required = false) String remarks,
+                                       Authentication authentication,
+                                       RedirectAttributes redirectAttributes) {
+        try {
+            fineService.recordPayment(fineId, amount, paymentMethod, receiptNumber, authentication.getName(), remarks);
+            redirectAttributes.addFlashAttribute("success", "Fine payment recorded successfully.");
+        } catch (IllegalArgumentException exception) {
+            redirectAttributes.addFlashAttribute("error", exception.getMessage());
+        }
+        return "redirect:/admin/fines";
     }
 
     @PostMapping("/{fineId}/pay")
