@@ -10,6 +10,7 @@ import com.lulibrisync.model.UserStatus;
 import com.lulibrisync.repository.IssueRecordRepository;
 import com.lulibrisync.repository.StudentRepository;
 import com.lulibrisync.repository.UserRepository;
+import com.lulibrisync.util.YearLevelOptions;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -96,7 +97,7 @@ public class StudentService {
 
         String normalizedName = normalizeRequiredText(request.getName(), "Name", 100);
         String normalizedCourse = normalizeOptionalText(request.getCourse(), "Course", 120, "Not set");
-        String normalizedYearLevel = normalizeOptionalText(request.getYearLevel(), "Year level", 60, "Not set");
+        String normalizedYearLevel = normalizeOptionalYearLevel(request.getYearLevel());
         String normalizedPhone = normalizeOptionalPhone(request.getPhone());
         String normalizedAddress = normalizeOptionalText(request.getAddress(), "Address", 255, null);
         LocalDate normalizedDateOfBirth = request.getDateOfBirth();
@@ -184,7 +185,7 @@ public class StudentService {
         user.setStatus(status == null ? UserStatus.ACTIVE : status);
 
         student.setCourse(defaultText(course, "Not set"));
-        student.setYearLevel(defaultText(yearLevel, "Not set"));
+        student.setYearLevel(normalizeOptionalYearLevel(yearLevel));
         student.setPhone(normalizedPhone);
         student.setAddress(blankToNull(address));
         student.setDateOfBirth(dateOfBirth);
@@ -215,6 +216,38 @@ public class StudentService {
         }
 
         user.setPasswordHash(passwordEncoder.encode(normalizedPassword));
+        userRepository.save(user);
+    }
+
+    @Transactional
+    public void changePassword(String email,
+                               String currentPassword,
+                               String newPassword,
+                               String confirmPassword) {
+        User user = userRepository.findByEmailIgnoreCase(required(email, "User not found."))
+                .orElseThrow(() -> new IllegalArgumentException("User not found."));
+
+        String normalizedCurrentPassword = required(currentPassword, "Current password is required.");
+        String normalizedNewPassword = required(newPassword, "New password is required.");
+        String normalizedConfirmPassword = required(confirmPassword, "Confirm password is required.");
+
+        if (!passwordEncoder.matches(normalizedCurrentPassword, user.getPasswordHash())) {
+            throw new IllegalArgumentException("Current password is incorrect.");
+        }
+        if (!normalizedNewPassword.equals(normalizedConfirmPassword)) {
+            throw new IllegalArgumentException("Password and confirmation do not match.");
+        }
+        if (normalizedNewPassword.length() < 12) {
+            throw new IllegalArgumentException("Password must be at least 12 characters.");
+        }
+        if (!PASSWORD_PATTERN.matcher(normalizedNewPassword).matches()) {
+            throw new IllegalArgumentException("Password must include uppercase, lowercase, number, and special character.");
+        }
+        if (passwordEncoder.matches(normalizedNewPassword, user.getPasswordHash())) {
+            throw new IllegalArgumentException("Choose a different password from the current one.");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(normalizedNewPassword));
         userRepository.save(user);
     }
 
@@ -266,6 +299,17 @@ public class StudentService {
         }
         if (normalized.length() > maxLength) {
             throw new IllegalArgumentException(label + " is too long.");
+        }
+        return normalized;
+    }
+
+    private String normalizeOptionalYearLevel(String value) {
+        String normalized = value == null ? "" : value.trim().replaceAll("\\s+", " ");
+        if (normalized.isBlank()) {
+            return "Not set";
+        }
+        if (!YearLevelOptions.isSupported(normalized)) {
+            throw new IllegalArgumentException("Select a valid year level.");
         }
         return normalized;
     }

@@ -127,7 +127,15 @@
                 </div>
                 <div class="col-md-4">
                     <label class="form-label" for="yearLevel">Year level</label>
-                    <input class="form-control" id="yearLevel" name="yearLevel" value="${student.yearLevel}">
+                    <select class="form-select" id="yearLevel" name="yearLevel">
+                        <option value="">Select year level</option>
+                        <c:if test="${not empty student.yearLevel and student.yearLevel != 'Not set' and !yearLevelOptionLookup[student.yearLevel]}">
+                            <option value="${student.yearLevel}" selected>${student.yearLevel}</option>
+                        </c:if>
+                        <c:forEach items="${yearLevelOptions}" var="yearLevelOption">
+                            <option value="${yearLevelOption}" <c:if test="${student.yearLevel == yearLevelOption}">selected</c:if>>${yearLevelOption}</option>
+                        </c:forEach>
+                    </select>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label" for="phone">Phone</label>
@@ -145,9 +153,47 @@
                         </c:forEach>
                     </select>
                 </div>
-                <div class="col-12">
-                    <label class="form-label" for="address">Address</label>
-                    <textarea class="form-control" id="address" name="address" rows="3">${student.address}</textarea>
+                <div class="col-md-4">
+                    <label class="form-label" for="province">Province</label>
+                    <select class="form-select" id="province" name="province">
+                        <option value="Laguna" <c:if test="${empty studentAddressProvinceValue or studentAddressProvinceValue == 'Laguna'}">selected</c:if>>Laguna</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="cityMunicipality">City / Municipality</label>
+                    <select class="form-select" id="cityMunicipality" name="cityMunicipality">
+                        <option value="">Select city / municipality</option>
+                        <c:forEach items="${registrationCityZipCodes}" var="entry">
+                            <option value="${entry.key}" <c:if test="${studentAddressCityMunicipalityValue == entry.key}">selected</c:if>>${entry.key}</option>
+                        </c:forEach>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="barangay">Barangay</label>
+                    <select class="form-select"
+                            id="barangay"
+                            name="barangay"
+                            data-selected-barangay="<c:out value='${studentAddressBarangayValue}'/>"
+                            <c:if test="${empty studentAddressCityMunicipalityValue}">disabled</c:if>>
+                        <option value="">
+                            <c:choose>
+                                <c:when test="${not empty studentAddressCityMunicipalityValue and not empty studentAddressBarangayValue}">${studentAddressBarangayValue}</c:when>
+                                <c:when test="${not empty studentAddressCityMunicipalityValue}">Loading barangays...</c:when>
+                                <c:otherwise>Select city / municipality first</c:otherwise>
+                            </c:choose>
+                        </option>
+                        <c:if test="${not empty studentAddressBarangayValue}">
+                            <option value="${studentAddressBarangayValue}" selected>${studentAddressBarangayValue}</option>
+                        </c:if>
+                    </select>
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label" for="street">Street / House No.</label>
+                    <input class="form-control" id="street" name="street" value="${studentAddressStreetValue}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="zipcode">Zip code</label>
+                    <input class="form-control" id="zipcode" name="zipcode" value="${studentAddressZipcodeValue}" readonly>
                 </div>
                 <div class="col-12 d-flex flex-wrap gap-2">
                     <button class="btn btn-brand" type="submit">Save student details</button>
@@ -289,5 +335,24 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="${pageContext.request.contextPath}/js/app.js"></script>
+<script>
+    (function () {
+        if (!window.LuLibrisyncAddress) {
+            return;
+        }
+
+        window.LuLibrisyncAddress.initForm({
+            cityMunicipality: document.getElementById("cityMunicipality"),
+            barangay: document.getElementById("barangay"),
+            zipcode: document.getElementById("zipcode"),
+            endpoint: "${pageContext.request.contextPath}/register/barangays",
+            cityZipCodes: {
+                <c:forEach items="${registrationCityZipCodes}" var="entry" varStatus="status">
+                "${entry.key}": "${entry.value}"<c:if test="${!status.last}">,</c:if>
+                </c:forEach>
+            }
+        });
+    })();
+</script>
 </body>
 </html>

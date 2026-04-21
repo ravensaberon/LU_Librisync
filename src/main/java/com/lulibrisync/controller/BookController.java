@@ -2,17 +2,25 @@ package com.lulibrisync.controller;
 
 import com.lulibrisync.service.BookService;
 import com.lulibrisync.service.AuditLogService;
+import com.lulibrisync.service.CirculationPolicyService;
 import com.lulibrisync.service.DigitalLibraryService;
+import com.lulibrisync.service.IssueService;
 import com.lulibrisync.service.ReservationService;
+import com.lulibrisync.service.StudentService;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.util.StringUtils;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @Controller
 public class BookController {
@@ -21,15 +29,24 @@ public class BookController {
     private final ReservationService reservationService;
     private final DigitalLibraryService digitalLibraryService;
     private final AuditLogService auditLogService;
+    private final IssueService issueService;
+    private final StudentService studentService;
+    private final CirculationPolicyService circulationPolicyService;
 
     public BookController(BookService bookService,
                           ReservationService reservationService,
                           DigitalLibraryService digitalLibraryService,
-                          AuditLogService auditLogService) {
+                          AuditLogService auditLogService,
+                          IssueService issueService,
+                          StudentService studentService,
+                          CirculationPolicyService circulationPolicyService) {
         this.bookService = bookService;
         this.reservationService = reservationService;
         this.digitalLibraryService = digitalLibraryService;
         this.auditLogService = auditLogService;
+        this.issueService = issueService;
+        this.studentService = studentService;
+        this.circulationPolicyService = circulationPolicyService;
     }
 
     @GetMapping("/admin/books")
@@ -162,7 +179,17 @@ public class BookController {
                                  @RequestParam(defaultValue = "false") boolean availableOnly,
                                  Authentication authentication,
                                  Model model) {
-        model.addAttribute("books", bookService.searchBooks(keyword, categoryId, authorId, isbn, availableOnly));
+        reservationService.syncReadyReservations();
+        var books = bookService.searchBooks(keyword, categoryId, authorId, isbn, availableOnly);
+        Map<Long, Integer> readyReservationCountsByBook = reservationService.getReadyReservationCountsByBook();
+        Map<Long, Integer> walkInBorrowableCopyCountByBook = new LinkedHashMap<>();
+        for (var book : books) {
+            int availableCopies = book.getAvailableQuantity() == null ? 0 : Math.max(0, book.getAvailableQuantity());
+            int readyReservations = readyReservationCountsByBook.getOrDefault(book.getId(), 0);
+            walkInBorrowableCopyCountByBook.put(book.getId(), Math.max(0, availableCopies - readyReservations));
+        }
+
+        model.addAttribute("books", books);
         model.addAttribute("categories", bookService.getAllCategories());
         model.addAttribute("authors", bookService.getAllAuthors());
         model.addAttribute("keyword", keyword);
@@ -170,9 +197,37 @@ public class BookController {
         model.addAttribute("selectedAuthorId", authorId);
         model.addAttribute("isbnValue", isbn);
         model.addAttribute("availableOnly", availableOnly);
+        model.addAttribute("studentActiveIssueStatusByBookId", issueService.getActiveIssueStatusesForStudentBooks(authentication.getName()));
         model.addAttribute("studentReservationStatusByBookId", reservationService.getReservationStatusesForStudentBooks(authentication.getName()));
         model.addAttribute("reservationQueueSizes", reservationService.getActiveQueueSizesByBook());
+        model.addAttribute("readyReservationCountsByBook", readyReservationCountsByBook);
+        model.addAttribute("walkInBorrowableCopyCountByBook", walkInBorrowableCopyCountByBook);
+        model.addAttribute("defaultBorrowDueDate", LocalDate.now().plusDays(circulationPolicyService.getMaxLoanDays()));
+        model.addAttribute("maxLoanDays", circulationPolicyService.getMaxLoanDays());
         return "student/catalog";
+    }
+
+    @PostMapping("/student/catalog/{bookId}/borrow")
+    public String borrowFromCatalog(@PathVariable Long bookId,
+                                    Authentication authentication,
+                                    RedirectAttributes redirectAttributes) {
+        try {
+            var student = studentService.getStudentByEmail(authentication.getName());
+            LocalDate dueDate = LocalDate.now().plusDays(circulationPolicyService.getMaxLoanDays());
+            var issueRecord = issueService.issueBook(bookId, student.getId(), dueDate, authentication.getName(), "Self-service catalog checkout");
+            auditLogService.log(
+                    authentication.getName(),
+                    "SELF_SERVICE_BORROW",
+                    "ISSUE_RECORD",
+                    issueRecord.getId().toString(),
+                    "Student borrowed a book",
+                    "Issue code: " + issueRecord.getQrIssueCode() + " | Book: " + issueRecord.getBook().getTitle()
+            );
+            redirectAttributes.addFlashAttribute("success", "Book borrowed successfully. Due on " + dueDate + ".");
+        } catch (IllegalArgumentException exception) {
+            redirectAttributes.addFlashAttribute("error", exception.getMessage());
+        }
+        return "redirect:/student/catalog";
     }
 
     private void populateBookManagementModel(Model model) {

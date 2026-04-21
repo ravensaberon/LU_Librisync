@@ -31,6 +31,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 @Controller
 @RequestMapping("/admin")
@@ -103,17 +104,33 @@ public class AdminController {
                            @RequestParam(required = false) String modalStudentId,
                            Model model) {
         List<Student> students = studentService.searchStudents(studentId);
-        model.addAttribute("students", students);
-        model.addAttribute("studentIdFilter", studentId);
-        model.addAttribute("userStatuses", studentService.getAvailableStatuses());
-        model.addAttribute("modalStudentId", modalStudentId);
-        model.addAttribute("borrowerStandingByStudentId", students.stream()
+        Map<String, BorrowerStanding> borrowerStandingByStudentId = students.stream()
                 .collect(java.util.stream.Collectors.toMap(
                         Student::getStudentId,
                         studentService::getBorrowerStanding,
                         (left, right) -> left,
                         java.util.LinkedHashMap::new
-                )));
+                ));
+        long blockedStudentCount = borrowerStandingByStudentId.values().stream()
+                .filter(BorrowerStanding::isBlocked)
+                .count();
+        long borrowingClearedCount = borrowerStandingByStudentId.values().stream()
+                .filter(BorrowerStanding::isEligibleToBorrow)
+                .count();
+        long activeAccountCount = students.stream()
+                .filter(student -> UserStatus.ACTIVE.equals(student.getUser().getStatus()))
+                .count();
+
+        model.addAttribute("students", students);
+        model.addAttribute("studentIdFilter", studentId);
+        model.addAttribute("userStatuses", studentService.getAvailableStatuses());
+        model.addAttribute("modalStudentId", modalStudentId);
+        model.addAttribute("borrowerStandingByStudentId", borrowerStandingByStudentId);
+        model.addAttribute("studentDirectoryTotalCount", userRepository.countByRole(Role.STUDENT));
+        model.addAttribute("studentDirectoryFilteredCount", students.size());
+        model.addAttribute("studentDirectoryActiveCount", activeAccountCount);
+        model.addAttribute("studentDirectoryBlockedCount", blockedStudentCount);
+        model.addAttribute("studentDirectoryClearedCount", borrowingClearedCount);
         return "admin/students";
     }
 
@@ -124,12 +141,17 @@ public class AdminController {
                                 @RequestParam(required = false) String course,
                                 @RequestParam(required = false) String yearLevel,
                                 @RequestParam(required = false) String phone,
-                                @RequestParam(required = false) String address,
+                                @RequestParam(required = false) String province,
+                                @RequestParam(required = false) String cityMunicipality,
+                                @RequestParam(required = false) String barangay,
+                                @RequestParam(required = false) String street,
+                                @RequestParam(required = false) String zipcode,
                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateOfBirth,
                                 @RequestParam(defaultValue = "ACTIVE") UserStatus status,
                                 Authentication authentication,
                                 RedirectAttributes redirectAttributes) {
         try {
+            String address = authService.normalizeAndBuildOptionalAddress(province, cityMunicipality, barangay, street, zipcode);
             Student student = authService.createStudentByAdmin(name, email, password, course, yearLevel, phone, address, dateOfBirth, status);
             auditLogService.log(
                     authentication.getName(),
@@ -184,6 +206,7 @@ public class AdminController {
         model.addAttribute("userStatuses", studentService.getAvailableStatuses());
         model.addAttribute("borrowerStanding", borrowerStanding);
         model.addAttribute("studentFines", studentFines);
+        populateAddressModelAttributes("studentAddress", student.getAddress(), model);
     }
 
     @PostMapping("/students/{studentId}/update")
@@ -193,12 +216,17 @@ public class AdminController {
                                 @RequestParam(required = false) String course,
                                 @RequestParam(required = false) String yearLevel,
                                 @RequestParam(required = false) String phone,
-                                @RequestParam(required = false) String address,
+                                @RequestParam(required = false) String province,
+                                @RequestParam(required = false) String cityMunicipality,
+                                @RequestParam(required = false) String barangay,
+                                @RequestParam(required = false) String street,
+                                @RequestParam(required = false) String zipcode,
                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateOfBirth,
                                 @RequestParam(defaultValue = "ACTIVE") UserStatus status,
                                 Authentication authentication,
                                 RedirectAttributes redirectAttributes) {
         try {
+            String address = authService.normalizeAndBuildOptionalAddress(province, cityMunicipality, barangay, street, zipcode);
             Student student = studentService.updateStudentByAdmin(studentId, name, email, course, yearLevel, phone, address, dateOfBirth, status);
             auditLogService.log(
                     authentication.getName(),
@@ -213,6 +241,15 @@ public class AdminController {
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
         }
         return "redirect:/admin/students?modalStudentId=" + studentId;
+    }
+
+    private void populateAddressModelAttributes(String prefix, String address, Model model) {
+        com.lulibrisync.util.AddressFormValue addressFormValue = authService.parseAddress(address);
+        model.addAttribute(prefix + "ProvinceValue", addressFormValue.getProvince());
+        model.addAttribute(prefix + "CityMunicipalityValue", addressFormValue.getCityMunicipality());
+        model.addAttribute(prefix + "BarangayValue", addressFormValue.getBarangay());
+        model.addAttribute(prefix + "StreetValue", addressFormValue.getStreet());
+        model.addAttribute(prefix + "ZipcodeValue", addressFormValue.getZipcode());
     }
 
     @PostMapping("/students/{studentId}/password")

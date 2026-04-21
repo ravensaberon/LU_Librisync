@@ -16,7 +16,7 @@
         <div>
             <span class="tag-chip">Student Portal</span>
             <div class="brand-title mt-2">My profile</div>
-            <p class="muted-text mt-2 mb-0">Review your student details and verify any profile changes with a one-time code.</p>
+            <p class="muted-text mt-2 mb-0">Review and update your student details.</p>
         </div>
         <div class="nav-links">
             <a class="nav-pill" href="${pageContext.request.contextPath}/student/dashboard">Dashboard</a>
@@ -83,10 +83,6 @@
                         Enter OTP
                     </button>
                 </c:if>
-                <div class="profile-security-note">
-                    <i class="bi bi-patch-check-fill"></i>
-                    Profile updates require OTP verification before they are saved.
-                </div>
             </div>
         </div>
     </section>
@@ -121,37 +117,46 @@
             </div>
         </article>
 
-        <article class="panel-card profile-security-card">
-            <div class="section-title mb-2">Update security</div>
-            <p class="muted-text mb-3">When you edit your details, the system creates a one-time passcode that must be entered before the new information is saved.</p>
-            <div class="profile-security-list">
-                <div class="profile-security-item">
-                    <i class="bi bi-1-circle-fill"></i>
-                    <span>Open the edit profile form and update your details.</span>
-                </div>
-                <div class="profile-security-item">
-                    <i class="bi bi-2-circle-fill"></i>
-                    <span>Request the verification code for your profile update.</span>
-                </div>
-                <div class="profile-security-item">
-                    <i class="bi bi-3-circle-fill"></i>
-                    <span>Enter the OTP to complete and save the changes.</span>
-                </div>
-            </div>
-            <c:if test="${hasPendingProfileOtp}">
-                <div class="profile-pending-otp">
-                    <i class="bi bi-hourglass-split"></i>
-                    <div>
-                        <strong>Pending verification</strong>
-                        <p class="mb-1">You still have a profile update waiting for OTP confirmation.</p>
-                        <div class="small muted-text">
-                            OTP expires in <strong id="profileOtpExpiryCountdown">calculating...</strong>
-                            <span class="mx-1">|</span>
-                            New OTP in <strong id="profileOtpResendCountdown">calculating...</strong>
+        <article class="panel-card profile-security-card" id="password-security">
+            <div class="section-title mb-3">Account security</div>
+            <c:choose>
+                <c:when test="${hasPendingProfileOtp}">
+                    <div class="profile-pending-otp mb-4">
+                        <i class="bi bi-hourglass-split"></i>
+                        <div>
+                            <strong>Pending verification</strong>
+                            <p class="mb-1">You still have a profile update waiting for OTP confirmation.</p>
+                            <div class="small muted-text">
+                                OTP expires in <strong id="profileOtpExpiryCountdown">calculating...</strong>
+                                <span class="mx-1">|</span>
+                                New OTP in <strong id="profileOtpResendCountdown">calculating...</strong>
+                            </div>
                         </div>
                     </div>
+                </c:when>
+                <c:otherwise>
+                    <p class="muted-text mb-4">No pending verification.</p>
+                </c:otherwise>
+            </c:choose>
+
+            <form method="post" action="${pageContext.request.contextPath}/student/profile/password" class="row g-3">
+                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                <div class="col-12">
+                    <label class="form-label" for="studentCurrentPassword">Current password</label>
+                    <input class="form-control" id="studentCurrentPassword" name="currentPassword" type="password" required>
                 </div>
-            </c:if>
+                <div class="col-12">
+                    <label class="form-label" for="studentNewPassword">New password</label>
+                    <input class="form-control" id="studentNewPassword" name="newPassword" type="password" required>
+                </div>
+                <div class="col-12">
+                    <label class="form-label" for="studentConfirmPassword">Confirm new password</label>
+                    <input class="form-control" id="studentConfirmPassword" name="confirmPassword" type="password" required>
+                </div>
+                <div class="col-12">
+                    <button class="btn btn-warm" type="submit">Update password</button>
+                </div>
+            </form>
         </article>
     </section>
 
@@ -294,7 +299,6 @@
                 <div>
                     <div class="modal-kicker">Profile Update</div>
                     <h2 class="modal-title h4 mb-1" id="editProfileModalLabel">Edit your profile</h2>
-                    <p class="modal-subtitle mb-0">Update your details below. An OTP will be required before the changes are saved.</p>
                 </div>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -372,7 +376,15 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label" for="yearLevel">Year level</label>
-                            <input class="form-control" id="yearLevel" name="yearLevel" value="${profileForm.yearLevel}">
+                            <select class="form-select" id="yearLevel" name="yearLevel">
+                                <option value="">Select year level</option>
+                                <c:if test="${not empty profileForm.yearLevel and profileForm.yearLevel != 'Not set' and !yearLevelOptionLookup[profileForm.yearLevel]}">
+                                    <option value="${profileForm.yearLevel}" selected>${profileForm.yearLevel}</option>
+                                </c:if>
+                                <c:forEach items="${yearLevelOptions}" var="yearLevelOption">
+                                    <option value="${yearLevelOption}" <c:if test="${profileForm.yearLevel == yearLevelOption}">selected</c:if>>${yearLevelOption}</option>
+                                </c:forEach>
+                            </select>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label" for="phone">Phone</label>
@@ -382,9 +394,47 @@
                             <label class="form-label" for="dateOfBirth">Date of birth</label>
                             <input class="form-control" id="dateOfBirth" name="dateOfBirth" type="date" value="${profileForm.dateOfBirth}">
                         </div>
-                        <div class="col-12">
-                            <label class="form-label" for="address">Address</label>
-                            <textarea class="form-control" id="address" name="address" rows="3">${profileForm.address}</textarea>
+                        <div class="col-md-6">
+                            <label class="form-label" for="profileProvince">Province</label>
+                            <select class="form-select" id="profileProvince" name="province">
+                                <option value="Laguna" <c:if test="${empty profileProvinceValue or profileProvinceValue == 'Laguna'}">selected</c:if>>Laguna</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="profileCityMunicipality">City / Municipality</label>
+                            <select class="form-select" id="profileCityMunicipality" name="cityMunicipality">
+                                <option value="">Select city / municipality</option>
+                                <c:forEach items="${registrationCityZipCodes}" var="entry">
+                                    <option value="${entry.key}" <c:if test="${profileCityMunicipalityValue == entry.key}">selected</c:if>>${entry.key}</option>
+                                </c:forEach>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="profileBarangay">Barangay</label>
+                            <select class="form-select"
+                                    id="profileBarangay"
+                                    name="barangay"
+                                    data-selected-barangay="<c:out value='${profileBarangayValue}'/>"
+                                    <c:if test="${empty profileCityMunicipalityValue}">disabled</c:if>>
+                                <option value="">
+                                    <c:choose>
+                                        <c:when test="${not empty profileCityMunicipalityValue and not empty profileBarangayValue}">${profileBarangayValue}</c:when>
+                                        <c:when test="${not empty profileCityMunicipalityValue}">Loading barangays...</c:when>
+                                        <c:otherwise>Select city / municipality first</c:otherwise>
+                                    </c:choose>
+                                </option>
+                                <c:if test="${not empty profileBarangayValue}">
+                                    <option value="${profileBarangayValue}" selected>${profileBarangayValue}</option>
+                                </c:if>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="profileStreet">Street / House No.</label>
+                            <input class="form-control" id="profileStreet" name="street" value="${profileStreetValue}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="profileZipcode">Zip code</label>
+                            <input class="form-control" id="profileZipcode" name="zipcode" value="${profileZipcodeValue}" readonly>
                         </div>
                     </div>
                 </div>
@@ -407,7 +457,6 @@
                 <div>
                     <div class="modal-kicker">OTP Verification</div>
                     <h2 class="modal-title h4 mb-1" id="verifyProfileOtpModalLabel">Confirm profile update</h2>
-                    <p class="modal-subtitle mb-0">Enter the one-time passcode for your pending profile update.</p>
                 </div>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -417,8 +466,7 @@
                     <div class="otp-panel">
                         <div class="otp-panel-icon"><i class="bi bi-envelope-paper"></i></div>
                         <div>
-                            <strong>Verification destination</strong>
-                            <p class="mb-1">Use the code assigned to <span class="otp-destination">${empty otpMaskedEmail ? 'your registered email' : otpMaskedEmail}</span>.</p>
+                            <strong>${empty otpMaskedEmail ? 'Registered email' : otpMaskedEmail}</strong>
                             <div class="small muted-text">
                                 Expires in <strong id="modalOtpExpiryCountdown">calculating...</strong>
                                 <span class="mx-1">|</span>
@@ -430,10 +478,6 @@
                     <div class="mt-3">
                         <label class="form-label" for="otpCode">One-time passcode</label>
                         <input class="form-control form-control-lg otp-input" id="otpCode" name="otpCode" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" placeholder="Enter 6-digit OTP" required>
-                    </div>
-                    <div class="otp-preview-card">
-                        <span class="otp-preview-label">Email delivery note</span>
-                        <p class="mb-0">The system sends OTPs to your registered email. If Gmail SMTP is still being configured locally, a fallback copy is written to <strong>storage/email-outbox</strong>.</p>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -470,6 +514,9 @@
         var editProfileModal = document.getElementById("editProfileModal");
         var verifyProfileOtpModal = document.getElementById("verifyProfileOtpModal");
         var resendOtpButton = document.getElementById("resendOtpButton");
+        var profileCityMunicipality = document.getElementById("profileCityMunicipality");
+        var profileBarangay = document.getElementById("profileBarangay");
+        var profileZipcode = document.getElementById("profileZipcode");
 
         function formatCountdown(targetEpochMs) {
             if (!targetEpochMs) {
@@ -526,6 +573,20 @@
             profileImageInput.addEventListener("change", function () {
                 if (profileImageInput.files && profileImageInput.files.length > 0) {
                     profileImageInput.form.submit();
+                }
+            });
+        }
+
+        if (window.LuLibrisyncAddress) {
+            window.LuLibrisyncAddress.initForm({
+                cityMunicipality: profileCityMunicipality,
+                barangay: profileBarangay,
+                zipcode: profileZipcode,
+                endpoint: "${pageContext.request.contextPath}/register/barangays",
+                cityZipCodes: {
+                    <c:forEach items="${registrationCityZipCodes}" var="entry" varStatus="status">
+                    "${entry.key}": "${entry.value}"<c:if test="${!status.last}">,</c:if>
+                    </c:forEach>
                 }
             });
         }

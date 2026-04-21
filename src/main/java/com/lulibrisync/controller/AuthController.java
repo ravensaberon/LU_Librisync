@@ -88,6 +88,7 @@ public class AuthController {
                            @RequestParam(required = false) String middleName,
                            @RequestParam(required = false) String lastName,
                            @RequestParam(required = false) String program,
+                           @RequestParam(required = false) String yearLevel,
                            @RequestParam(required = false) String email,
                            @RequestParam(required = false) String contactNumber,
                            @RequestParam(required = false) String birthDate,
@@ -106,6 +107,7 @@ public class AuthController {
                     middleName,
                     lastName,
                     program,
+                    yearLevel,
                     email,
                     contactNumber,
                     birthDate,
@@ -126,6 +128,7 @@ public class AuthController {
                     middleName,
                     lastName,
                     program,
+                    yearLevel,
                     email,
                     contactNumber,
                     birthDate,
@@ -151,11 +154,11 @@ public class AuthController {
             applyPasswordResetStateFlashAttributes(dispatchResult.getOtpState(), redirectAttributes);
             redirectAttributes.addFlashAttribute("openResetPanel", true);
             if (dispatchResult.isCooldownActive()) {
-                redirectAttributes.addFlashAttribute("info", "A new OTP can only be sent every 3 minutes. Your current password reset OTP is still active.");
+                redirectAttributes.addFlashAttribute("info", "A password reset OTP is already active.");
             } else if (dispatchResult.isDelivered()) {
                 redirectAttributes.addFlashAttribute("success", "A password reset OTP has been sent to your email.");
             } else {
-                redirectAttributes.addFlashAttribute("info", "OTP generated. If Gmail SMTP is not fully configured yet, check storage/email-outbox for the fallback copy.");
+                redirectAttributes.addFlashAttribute("error", "Unable to send OTP email right now.");
             }
             return "redirect:/forgot-password?email=" + dispatchResult.getOtpState().getEmail();
         } catch (IllegalArgumentException exception) {
@@ -173,11 +176,11 @@ public class AuthController {
             applyPasswordResetStateFlashAttributes(dispatchResult.getOtpState(), redirectAttributes);
             redirectAttributes.addFlashAttribute("openResetPanel", true);
             if (dispatchResult.isCooldownActive()) {
-                redirectAttributes.addFlashAttribute("info", "Please wait for the 3-minute resend countdown to finish before requesting another OTP.");
+                redirectAttributes.addFlashAttribute("info", "Please wait before requesting another OTP.");
             } else if (dispatchResult.isDelivered()) {
                 redirectAttributes.addFlashAttribute("success", "A fresh password reset OTP has been sent to your email.");
             } else {
-                redirectAttributes.addFlashAttribute("info", "A fresh OTP was generated. If Gmail SMTP is not fully configured yet, check storage/email-outbox.");
+                redirectAttributes.addFlashAttribute("error", "Unable to send OTP email right now.");
             }
             return "redirect:/forgot-password?email=" + dispatchResult.getOtpState().getEmail();
         } catch (IllegalArgumentException exception) {
@@ -216,6 +219,7 @@ public class AuthController {
                                        String middleName,
                                        String lastName,
                                        String program,
+                                       String yearLevel,
                                        String email,
                                        String contactNumber,
                                        String birthDate,
@@ -230,6 +234,7 @@ public class AuthController {
         model.addAttribute("middleNameValue", middleName);
         model.addAttribute("lastNameValue", lastName);
         model.addAttribute("programValue", program);
+        model.addAttribute("yearLevelValue", yearLevel);
         model.addAttribute("emailValue", email);
         model.addAttribute("contactNumberValue", contactNumber);
         model.addAttribute("birthDateValue", birthDate);

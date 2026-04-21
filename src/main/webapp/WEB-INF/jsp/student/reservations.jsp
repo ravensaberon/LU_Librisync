@@ -38,7 +38,7 @@
 
     <section class="hero-card mb-4">
         <h1 class="fw-bold mb-2">Reservation queue status</h1>
-        <p class="muted-text mb-0">Track your pending and ready-to-claim holds, then cancel them if your plans change.</p>
+        <p class="muted-text mb-0">Track your pending holds and borrow ready reservations as soon as a copy is released to you.</p>
     </section>
 
     <section class="panel-card">
@@ -64,12 +64,21 @@
                         <td>${reservation.reservedAt}</td>
                         <td>${reservation.expiresAt}</td>
                         <td>
-                            <c:if test="${reservation.active}">
-                                <form method="post" action="${pageContext.request.contextPath}/student/reservations/${reservation.id}/cancel">
-                                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                                    <button class="btn btn-warm" type="submit">Cancel</button>
-                                </form>
-                            </c:if>
+                            <div class="d-flex flex-wrap gap-2">
+                                <c:if test="${reservation.status.name() == 'READY'}">
+                                    <form method="post" action="${pageContext.request.contextPath}/student/reservations/${reservation.id}/claim">
+                                        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                                        <button class="btn btn-brand" type="submit">Borrow now</button>
+                                    </form>
+                                    <span class="muted-text align-self-center">Due date: ${defaultBorrowDueDate}</span>
+                                </c:if>
+                                <c:if test="${reservation.active}">
+                                    <form method="post" action="${pageContext.request.contextPath}/student/reservations/${reservation.id}/cancel">
+                                        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                                        <button class="btn btn-warm" type="submit">Cancel</button>
+                                    </form>
+                                </c:if>
+                            </div>
                         </td>
                     </tr>
                 </c:forEach>

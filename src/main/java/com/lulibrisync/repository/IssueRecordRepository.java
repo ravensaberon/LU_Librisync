@@ -29,6 +29,8 @@ public interface IssueRecordRepository extends JpaRepository<IssueRecord, Long> 
 
     long countByStudent_IdAndStatusIn(Long studentId, Collection<IssueStatus> statuses);
 
+    boolean existsByBook_IdAndStudent_IdAndStatusIn(Long bookId, Long studentId, Collection<IssueStatus> statuses);
+
     @Query("""
             select ir.book.title as title, count(ir) as borrowCount
             from IssueRecord ir

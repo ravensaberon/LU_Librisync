@@ -125,7 +125,15 @@
             </div>
             <div class="col-md-4">
                 <label class="form-label" for="modalYearLevel">Year level</label>
-                <input class="form-control" id="modalYearLevel" name="yearLevel" value="${student.yearLevel}">
+                <select class="form-select" id="modalYearLevel" name="yearLevel">
+                    <option value="">Select year level</option>
+                    <c:if test="${not empty student.yearLevel and student.yearLevel != 'Not set' and !yearLevelOptionLookup[student.yearLevel]}">
+                        <option value="${student.yearLevel}" selected>${student.yearLevel}</option>
+                    </c:if>
+                    <c:forEach items="${yearLevelOptions}" var="yearLevelOption">
+                        <option value="${yearLevelOption}" <c:if test="${student.yearLevel == yearLevelOption}">selected</c:if>>${yearLevelOption}</option>
+                    </c:forEach>
+                </select>
             </div>
             <div class="col-md-4">
                 <label class="form-label" for="modalPhone">Phone</label>
@@ -143,9 +151,47 @@
                     </c:forEach>
                 </select>
             </div>
-            <div class="col-12">
-                <label class="form-label" for="modalAddress">Address</label>
-                <textarea class="form-control" id="modalAddress" name="address" rows="3">${student.address}</textarea>
+            <div class="col-md-4">
+                <label class="form-label" for="modalProvince">Province</label>
+                <select class="form-select" id="modalProvince" name="province">
+                    <option value="Laguna" <c:if test="${empty studentAddressProvinceValue or studentAddressProvinceValue == 'Laguna'}">selected</c:if>>Laguna</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="modalCityMunicipality">City / Municipality</label>
+                <select class="form-select" id="modalCityMunicipality" name="cityMunicipality">
+                    <option value="">Select city / municipality</option>
+                    <c:forEach items="${registrationCityZipCodes}" var="entry">
+                        <option value="${entry.key}" <c:if test="${studentAddressCityMunicipalityValue == entry.key}">selected</c:if>>${entry.key}</option>
+                    </c:forEach>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="modalBarangay">Barangay</label>
+                <select class="form-select"
+                        id="modalBarangay"
+                        name="barangay"
+                        data-selected-barangay="<c:out value='${studentAddressBarangayValue}'/>"
+                        <c:if test="${empty studentAddressCityMunicipalityValue}">disabled</c:if>>
+                    <option value="">
+                        <c:choose>
+                            <c:when test="${not empty studentAddressCityMunicipalityValue and not empty studentAddressBarangayValue}">${studentAddressBarangayValue}</c:when>
+                            <c:when test="${not empty studentAddressCityMunicipalityValue}">Loading barangays...</c:when>
+                            <c:otherwise>Select city / municipality first</c:otherwise>
+                        </c:choose>
+                    </option>
+                    <c:if test="${not empty studentAddressBarangayValue}">
+                        <option value="${studentAddressBarangayValue}" selected>${studentAddressBarangayValue}</option>
+                    </c:if>
+                </select>
+            </div>
+            <div class="col-md-8">
+                <label class="form-label" for="modalStreet">Street / House No.</label>
+                <input class="form-control" id="modalStreet" name="street" value="${studentAddressStreetValue}">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="modalZipcode">Zip code</label>
+                <input class="form-control" id="modalZipcode" name="zipcode" value="${studentAddressZipcodeValue}" readonly>
             </div>
             <div class="col-12 d-flex flex-wrap gap-2">
                 <button class="btn btn-brand" type="submit">Save changes</button>

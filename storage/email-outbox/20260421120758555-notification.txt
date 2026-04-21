@@ -1,0 +1,44 @@
+To: jhonravensaberon@gmail.com
+Subject: LU Librisync Verification Code | Profile Update
+Content-Type: text/html
+
+<div style="margin:0;padding:24px;background:#f4faf6;font-family:Segoe UI,Arial,sans-serif;color:#163322;">
+  <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #d5eadc;border-radius:24px;overflow:hidden;box-shadow:0 18px 44px rgba(18,77,47,0.12);">
+    <div style="padding:24px 32px;background:linear-gradient(135deg,#0f7a36,#34c66a);color:#ffffff;">
+      <div style="font-size:13px;letter-spacing:0.12em;text-transform:uppercase;opacity:0.88;">LU Librisync</div>
+      <h1 style="margin:10px 0 4px;font-size:28px;line-height:1.2;">Profile Update Verification</h1>
+      <p style="margin:0;font-size:15px;opacity:0.92;">Use the one-time verification code below to confirm the changes to your student profile.</p>
+    </div>
+    <div style="padding:32px;">
+      <p style="margin:0 0 16px;font-size:15px;line-height:1.7;">Hello Jhon Raven Saberon,</p>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.7;">We received a request to update your LU Librisync student profile. Enter this code in the system to continue. For your security, do not share this code with anyone.</p>
+      <div style="margin:0 0 24px;padding:18px 20px;border-radius:20px;background:#effaf2;border:1px solid #c9ead1;text-align:center;">
+        <div style="font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#2f7d49;">Verification Code</div>
+        <div style="margin-top:8px;font-size:34px;font-weight:800;letter-spacing:0.34em;color:#0f7a36;">983482</div>
+      </div>
+      <div style="margin:0 0 24px;padding:20px;border-radius:18px;background:#fbfefd;border:1px solid #e0efe4;">
+        <div style="font-size:15px;font-weight:700;color:#18452d;margin-bottom:12px;">Request Details</div>
+        <table style="width:100%;border-collapse:collapse;font-size:14px;line-height:1.6;">
+          <tr><td style="padding:6px 0;color:#5f7b69;">Student ID</td><td style="padding:6px 0;text-align:right;font-weight:600;color:#173522;">2026-0001</td></tr>
+          <tr><td style="padding:6px 0;color:#5f7b69;">Registered Email</td><td style="padding:6px 0;text-align:right;font-weight:600;color:#173522;">jhonravensaberon@gmail.com</td></tr>
+          <tr><td style="padding:6px 0;color:#5f7b69;">Code Expires</td><td style="padding:6px 0;text-align:right;font-weight:600;color:#173522;">April 21, 2026 12:17 PM</td></tr>
+          <tr><td style="padding:6px 0;color:#5f7b69;">Resend Available</td><td style="padding:6px 0;text-align:right;font-weight:600;color:#173522;">April 21, 2026 12:10 PM</td></tr>
+        </table>
+      </div>
+      <div style="margin:0 0 24px;padding:20px;border-radius:18px;background:#ffffff;border:1px solid #e0efe4;">
+        <div style="font-size:15px;font-weight:700;color:#18452d;margin-bottom:10px;">Requested Profile Changes</div>
+        <ul style="margin:0;padding-left:18px;color:#2b4936;font-size:14px;line-height:1.7;"><li><strong>Name:</strong> Jhon Raven Saberon</li><li><strong>Program:</strong> Not set</li><li><strong>Year Level:</strong> Not set</li><li><strong>Contact Number:</strong> +639091119608</li><li><strong>Birth Date:</strong> 2003-09-01</li></ul>
+      </div>
+      <div style="padding:16px 18px;border-radius:16px;background:#fff8ea;border:1px solid #f1ddb1;color:#6b5112;font-size:13px;line-height:1.7;">
+        If you did not request this profile update, you can safely ignore this email. No changes will be applied unless the correct verification code is entered before it expires.
+      </div>
+    </div>
+    <div style="padding:18px 32px;background:#f6fbf7;border-top:1px solid #e1efe5;font-size:12px;line-height:1.7;color:#6c8375;">
+      This is an automated message from LU Librisync. Please do not reply to this email.
+    </div>
+  </div>
+</div>
+
+
+Send error:
+SMTP authentication is enabled but no SMTP password is configured.

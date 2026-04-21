@@ -6,6 +6,7 @@ import com.lulibrisync.dto.StudentProfileUpdateRequest;
 import com.lulibrisync.model.IssueRecord;
 import com.lulibrisync.model.IssueStatus;
 import com.lulibrisync.model.Student;
+import com.lulibrisync.service.AuthService;
 import com.lulibrisync.service.FineService;
 import com.lulibrisync.service.IssueService;
 import com.lulibrisync.service.ReservationService;
@@ -41,19 +42,22 @@ public class StudentController {
     private final StudentProfileOtpService studentProfileOtpService;
     private final FineService fineService;
     private final StudentProfileImageService studentProfileImageService;
+    private final AuthService authService;
 
     public StudentController(StudentService studentService,
                              IssueService issueService,
                              ReservationService reservationService,
                              StudentProfileOtpService studentProfileOtpService,
                              FineService fineService,
-                             StudentProfileImageService studentProfileImageService) {
+                             StudentProfileImageService studentProfileImageService,
+                             AuthService authService) {
         this.studentService = studentService;
         this.issueService = issueService;
         this.reservationService = reservationService;
         this.studentProfileOtpService = studentProfileOtpService;
         this.fineService = fineService;
         this.studentProfileImageService = studentProfileImageService;
+        this.authService = authService;
     }
 
     @GetMapping("/student/dashboard")
@@ -128,25 +132,31 @@ public class StudentController {
                                           @RequestParam(required = false) String course,
                                           @RequestParam(required = false) String yearLevel,
                                           @RequestParam(required = false) String phone,
-                                          @RequestParam(required = false) String address,
+                                          @RequestParam(required = false) String province,
+                                          @RequestParam(required = false) String cityMunicipality,
+                                          @RequestParam(required = false) String barangay,
+                                          @RequestParam(required = false) String street,
+                                          @RequestParam(required = false) String zipcode,
                                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateOfBirth,
                                           RedirectAttributes redirectAttributes) {
         Student student = studentService.getStudentByEmail(authentication.getName());
-        StudentProfileUpdateRequest submittedRequest = new StudentProfileUpdateRequest(name, course, yearLevel, phone, address, dateOfBirth);
+        StudentProfileUpdateRequest submittedRequest = new StudentProfileUpdateRequest(name, course, yearLevel, phone, null, dateOfBirth);
 
         try {
+            submittedRequest.setAddress(authService.normalizeAndBuildOptionalAddress(province, cityMunicipality, barangay, street, zipcode));
             StudentProfileOtpDispatchResult dispatchResult = studentProfileOtpService.requestOtp(student, submittedRequest);
             applyOtpStateFlashAttributes(dispatchResult.getOtpState(), redirectAttributes);
             redirectAttributes.addFlashAttribute("openOtpModal", true);
             if (dispatchResult.isCooldownActive()) {
-                redirectAttributes.addFlashAttribute("info", "A new OTP can only be sent every 3 minutes. Your current OTP is still active.");
+                redirectAttributes.addFlashAttribute("info", "A profile OTP is already active.");
             } else if (dispatchResult.isDelivered()) {
                 redirectAttributes.addFlashAttribute("success", "An OTP has been sent to your registered email.");
             } else {
-                redirectAttributes.addFlashAttribute("info", "OTP generated. If Gmail SMTP is not fully configured yet, check storage/email-outbox for the fallback copy.");
+                redirectAttributes.addFlashAttribute("error", "Unable to send OTP email right now.");
             }
         } catch (IllegalArgumentException exception) {
             redirectAttributes.addFlashAttribute("profileForm", submittedRequest);
+            applyAddressFlashAttributes("profile", province, cityMunicipality, barangay, street, zipcode, redirectAttributes);
             redirectAttributes.addFlashAttribute("openEditModal", true);
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
         }
@@ -162,11 +172,11 @@ public class StudentController {
             applyOtpStateFlashAttributes(dispatchResult.getOtpState(), redirectAttributes);
             redirectAttributes.addFlashAttribute("openOtpModal", true);
             if (dispatchResult.isCooldownActive()) {
-                redirectAttributes.addFlashAttribute("info", "Please wait until the resend countdown finishes before requesting another OTP.");
+                redirectAttributes.addFlashAttribute("info", "Please wait before requesting another OTP.");
             } else if (dispatchResult.isDelivered()) {
                 redirectAttributes.addFlashAttribute("success", "A new OTP has been sent to your registered email.");
             } else {
-                redirectAttributes.addFlashAttribute("info", "A new OTP was created. If Gmail SMTP is not fully configured yet, check storage/email-outbox.");
+                redirectAttributes.addFlashAttribute("error", "Unable to send OTP email right now.");
             }
         } catch (IllegalArgumentException exception) {
             redirectAttributes.addFlashAttribute("openEditModal", true);
@@ -199,6 +209,21 @@ public class StudentController {
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
         }
         return "redirect:/student/profile";
+    }
+
+    @PostMapping("/student/profile/password")
+    public String changePassword(Authentication authentication,
+                                 @RequestParam String currentPassword,
+                                 @RequestParam String newPassword,
+                                 @RequestParam String confirmPassword,
+                                 RedirectAttributes redirectAttributes) {
+        try {
+            studentService.changePassword(authentication.getName(), currentPassword, newPassword, confirmPassword);
+            redirectAttributes.addFlashAttribute("success", "Password changed successfully.");
+        } catch (IllegalArgumentException exception) {
+            redirectAttributes.addFlashAttribute("error", exception.getMessage());
+        }
+        return "redirect:/student/profile#password-security";
     }
 
     @GetMapping("/student/history")
@@ -234,6 +259,9 @@ public class StudentController {
                     : studentService.createProfileUpdateRequest(student));
         }
 
+        StudentProfileUpdateRequest profileForm = (StudentProfileUpdateRequest) model.getAttribute("profileForm");
+        populateAddressModelAttributes("profile", profileForm == null ? null : profileForm.getAddress(), model);
+
         if (!model.containsAttribute("otpMaskedEmail") && activeOtpState != null) {
             model.addAttribute("otpMaskedEmail", maskEmail(activeOtpState.getDestinationEmail()));
         }
@@ -257,9 +285,58 @@ public class StudentController {
             return;
         }
         redirectAttributes.addFlashAttribute("profileForm", otpState.getUpdateRequest());
+        applyAddressFlashAttributesFromAddress("profile", otpState.getUpdateRequest().getAddress(), redirectAttributes);
         redirectAttributes.addFlashAttribute("otpMaskedEmail", maskEmail(otpState.getDestinationEmail()));
         redirectAttributes.addFlashAttribute("otpExpiresAtEpochMs", toEpochMillis(otpState.getExpiresAt()));
         redirectAttributes.addFlashAttribute("otpResendAvailableAtEpochMs", toEpochMillis(otpState.getResendAvailableAt()));
+    }
+
+    private void populateAddressModelAttributes(String prefix, String address, Model model) {
+        com.lulibrisync.util.AddressFormValue addressFormValue = authService.parseAddress(address);
+        if (!model.containsAttribute(prefix + "ProvinceValue")) {
+            model.addAttribute(prefix + "ProvinceValue", addressFormValue.getProvince());
+        }
+        if (!model.containsAttribute(prefix + "CityMunicipalityValue")) {
+            model.addAttribute(prefix + "CityMunicipalityValue", addressFormValue.getCityMunicipality());
+        }
+        if (!model.containsAttribute(prefix + "BarangayValue")) {
+            model.addAttribute(prefix + "BarangayValue", addressFormValue.getBarangay());
+        }
+        if (!model.containsAttribute(prefix + "StreetValue")) {
+            model.addAttribute(prefix + "StreetValue", addressFormValue.getStreet());
+        }
+        if (!model.containsAttribute(prefix + "ZipcodeValue")) {
+            model.addAttribute(prefix + "ZipcodeValue", addressFormValue.getZipcode());
+        }
+    }
+
+    private void applyAddressFlashAttributes(String prefix,
+                                             String province,
+                                             String cityMunicipality,
+                                             String barangay,
+                                             String street,
+                                             String zipcode,
+                                             RedirectAttributes redirectAttributes) {
+        redirectAttributes.addFlashAttribute(prefix + "ProvinceValue", province);
+        redirectAttributes.addFlashAttribute(prefix + "CityMunicipalityValue", cityMunicipality);
+        redirectAttributes.addFlashAttribute(prefix + "BarangayValue", barangay);
+        redirectAttributes.addFlashAttribute(prefix + "StreetValue", street);
+        redirectAttributes.addFlashAttribute(prefix + "ZipcodeValue", zipcode);
+    }
+
+    private void applyAddressFlashAttributesFromAddress(String prefix,
+                                                        String address,
+                                                        RedirectAttributes redirectAttributes) {
+        com.lulibrisync.util.AddressFormValue addressFormValue = authService.parseAddress(address);
+        applyAddressFlashAttributes(
+                prefix,
+                addressFormValue.getProvince(),
+                addressFormValue.getCityMunicipality(),
+                addressFormValue.getBarangay(),
+                addressFormValue.getStreet(),
+                addressFormValue.getZipcode(),
+                redirectAttributes
+        );
     }
 
     private String buildInitials(String fullName) {

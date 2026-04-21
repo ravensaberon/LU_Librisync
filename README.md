@@ -105,6 +105,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run-lu-librisync.ps1
 http://localhost:8080
 ```
 
+If the connected database is missing the documented demo records, the app now auto-seeds the demo admin and sample student data on startup. Set `LU_LIBRISYNC_DEMO_DATA_ENABLED=false` if you want to disable that behavior.
+
 Manual alternative:
 
 1. Set your database environment variables in PowerShell:
@@ -144,4 +146,5 @@ http://localhost:8080
 - If SMTP is not configured, reminder content is still generated and written to `storage/email-outbox` for local review.
 - Student profile OTPs are persisted in the database with a 3-minute resend cooldown, so they remain active even after logout/login until they expire or are used.
 - Forgot password now uses persistent OTP records in `password_reset_tokens`, with the same 3-minute resend countdown and database-backed recovery flow.
+- Demo admin, student accounts, and starter catalog data are auto-seeded at startup when `admin@lulibrisync.edu` is missing from the connected database. Disable this by setting `LU_LIBRISYNC_DEMO_DATA_ENABLED=false`.
 - Re-run `database/schema.sql` after pulling the latest changes so the `audit_logs` table, `student_profile_otp_requests` table, and contact-number uniqueness rules are available in MySQL.

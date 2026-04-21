@@ -1,5 +1,3 @@
-USE lu_librisync;
-
 INSERT INTO users (name, email, password, role, student_id, status)
 SELECT 'LU Admin', 'admin@lulibrisync.edu', 'Admin1234', 'ADMIN', NULL, 'ACTIVE'
 WHERE NOT EXISTS (

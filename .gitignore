@@ -9,3 +9,4 @@
 /tools/
 /logs/
 /scripts/local-dev-env.env
+/scripts/local-dev.properties

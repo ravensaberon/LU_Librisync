@@ -63,7 +63,7 @@ public class IssueService {
     }
 
     @Transactional
-    public IssueRecord issueBook(Long bookId, Long studentId, LocalDate dueDate, String adminEmail, String remarks) {
+    public IssueRecord issueBook(Long bookId, Long studentId, LocalDate dueDate, String issuerEmail, String remarks) {
         if (bookId == null) {
             throw new IllegalArgumentException("Book is required.");
         }
@@ -91,15 +91,18 @@ public class IssueService {
         if (!UserStatus.ACTIVE.equals(student.getUser().getStatus())) {
             throw new IllegalArgumentException("This student account is inactive and cannot borrow items.");
         }
+        if (issueRecordRepository.existsByBook_IdAndStudent_IdAndStatusIn(bookId, studentId, List.of(IssueStatus.ISSUED, IssueStatus.OVERDUE))) {
+            throw new IllegalArgumentException("This student already has an active loan for the selected book.");
+        }
         circulationPolicyService.validateBorrowingEligibility(student);
-        User admin = userRepository.findByEmailIgnoreCase(adminEmail)
-                .orElseThrow(() -> new IllegalArgumentException("Admin user not found."));
+        User issuedBy = userRepository.findByEmailIgnoreCase(issuerEmail)
+                .orElseThrow(() -> new IllegalArgumentException("Issuing user not found."));
         reservationService.beforeIssueValidation(bookId, studentId);
 
         IssueRecord issueRecord = new IssueRecord();
         issueRecord.setBook(book);
         issueRecord.setStudent(student);
-        issueRecord.setIssuedBy(admin);
+        issueRecord.setIssuedBy(issuedBy);
         issueRecord.setIssueDate(LocalDateTime.now());
         issueRecord.setDueDate(dueDate.atTime(17, 0));
         issueRecord.setStatus(IssueStatus.ISSUED);
@@ -193,6 +196,16 @@ public class IssueService {
         refreshOverdueStatuses();
         Student student = studentService.getStudentByStudentId(studentId);
         return issueRecordRepository.findByStudent_IdOrderByIssueDateDesc(student.getId());
+    }
+
+    public Map<Long, String> getActiveIssueStatusesForStudentBooks(String email) {
+        Map<Long, String> activeIssueStatuses = new LinkedHashMap<>();
+        for (IssueRecord issueRecord : getStudentIssues(email)) {
+            if (!issueRecord.isReturned() && !activeIssueStatuses.containsKey(issueRecord.getBook().getId())) {
+                activeIssueStatuses.put(issueRecord.getBook().getId(), issueRecord.getStatus().name());
+            }
+        }
+        return activeIssueStatuses;
     }
 
     public List<BookBorrowStat> getMostBorrowedBooks() {

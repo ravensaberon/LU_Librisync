@@ -97,7 +97,7 @@
             </form>
         </div>
 
-        <div class="panel-card">
+        <div class="panel-card" id="password-security">
             <div class="section-title">Change password</div>
             <p class="helper-copy mb-4">This secures your admin access and protects book circulation, student records, and catalog updates.</p>
             <form method="post" action="${pageContext.request.contextPath}/admin/profile/password">

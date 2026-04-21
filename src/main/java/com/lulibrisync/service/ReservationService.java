@@ -4,7 +4,9 @@ import com.lulibrisync.model.Book;
 import com.lulibrisync.model.Reservation;
 import com.lulibrisync.model.ReservationStatus;
 import com.lulibrisync.model.Student;
+import com.lulibrisync.model.IssueStatus;
 import com.lulibrisync.repository.BookRepository;
+import com.lulibrisync.repository.IssueRecordRepository;
 import com.lulibrisync.repository.ReservationRepository;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -12,8 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class ReservationService {
@@ -22,6 +26,7 @@ public class ReservationService {
 
     private final ReservationRepository reservationRepository;
     private final BookRepository bookRepository;
+    private final IssueRecordRepository issueRecordRepository;
     private final StudentService studentService;
     private final EmailNotificationService emailNotificationService;
     private final CirculationPolicyService circulationPolicyService;
@@ -29,12 +34,14 @@ public class ReservationService {
 
     public ReservationService(ReservationRepository reservationRepository,
                               BookRepository bookRepository,
+                              IssueRecordRepository issueRecordRepository,
                               StudentService studentService,
                               EmailNotificationService emailNotificationService,
                               CirculationPolicyService circulationPolicyService,
                               @org.springframework.beans.factory.annotation.Value("${lulibrisync.reservations.claim-hours:48}") int claimWindowHours) {
         this.reservationRepository = reservationRepository;
         this.bookRepository = bookRepository;
+        this.issueRecordRepository = issueRecordRepository;
         this.studentService = studentService;
         this.emailNotificationService = emailNotificationService;
         this.circulationPolicyService = circulationPolicyService;
@@ -75,6 +82,15 @@ public class ReservationService {
         return queueSizes;
     }
 
+    public Map<Long, Integer> getReadyReservationCountsByBook() {
+        Map<Long, Integer> readyCounts = new LinkedHashMap<>();
+        for (Reservation reservation : reservationRepository.findByStatusInOrderByReservedAtAsc(List.of(ReservationStatus.READY))) {
+            Long bookId = reservation.getBook().getId();
+            readyCounts.put(bookId, readyCounts.getOrDefault(bookId, 0) + 1);
+        }
+        return readyCounts;
+    }
+
     public Map<Long, String> getReservationStatusesForStudentBooks(String email) {
         Student student = studentService.getStudentByEmail(email);
         Map<Long, String> statuses = new LinkedHashMap<>();
@@ -92,12 +108,16 @@ public class ReservationService {
             throw new IllegalArgumentException("Book is required.");
         }
 
+        promoteReservationsForBook(bookId);
         Book book = bookRepository.findById(bookId)
                 .orElseThrow(() -> new IllegalArgumentException("Book not found."));
         Student student = studentService.getStudentByEmail(email);
         circulationPolicyService.validateBorrowingEligibility(student);
+        if (issueRecordRepository.existsByBook_IdAndStudent_IdAndStatusIn(bookId, student.getId(), List.of(IssueStatus.ISSUED, IssueStatus.OVERDUE))) {
+            throw new IllegalArgumentException("You already have this book on loan.");
+        }
 
-        if (book.getAvailableQuantity() != null && book.getAvailableQuantity() > 0) {
+        if (getWalkInBorrowableCopyCount(book) > 0) {
             throw new IllegalArgumentException("This book is currently available. You can borrow it directly from the library.");
         }
         if (reservationRepository.existsByBook_IdAndStudent_IdAndStatusIn(bookId, student.getId(), ACTIVE_STATUSES)) {
@@ -135,16 +155,35 @@ public class ReservationService {
     public void beforeIssueValidation(Long bookId, Long studentId) {
         promoteReservationsForBook(bookId);
 
-        Reservation firstActiveReservation = reservationRepository
-                .findFirstByBook_IdAndStatusInOrderByQueuePositionAscReservedAtAsc(bookId, ACTIVE_STATUSES)
-                .orElse(null);
-
-        if (firstActiveReservation == null) {
+        List<Reservation> activeReservations = reservationRepository.findByBook_IdAndStatusInOrderByQueuePositionAscReservedAtAsc(bookId, ACTIVE_STATUSES);
+        if (activeReservations.isEmpty()) {
             return;
         }
 
-        if (ReservationStatus.READY.equals(firstActiveReservation.getStatus())
-                && !firstActiveReservation.getStudent().getId().equals(studentId)) {
+        Book book = bookRepository.findById(bookId).orElse(null);
+        if (book == null) {
+            return;
+        }
+
+        boolean studentHasReadyReservation = activeReservations.stream()
+                .anyMatch(reservation -> ReservationStatus.READY.equals(reservation.getStatus())
+                        && reservation.getStudent().getId().equals(studentId));
+        if (studentHasReadyReservation) {
+            return;
+        }
+
+        int freeWalkInCopies = Math.max(0, getAvailableCopyCount(book) - (int) activeReservations.stream()
+                .filter(reservation -> ReservationStatus.READY.equals(reservation.getStatus()))
+                .count());
+        if (freeWalkInCopies > 0) {
+            return;
+        }
+
+        Reservation firstReadyReservation = activeReservations.stream()
+                .filter(reservation -> ReservationStatus.READY.equals(reservation.getStatus()))
+                .findFirst()
+                .orElse(null);
+        if (firstReadyReservation != null && !firstReadyReservation.getStudent().getId().equals(studentId)) {
             throw new IllegalArgumentException("This copy is reserved for the next student in the queue.");
         }
     }
@@ -220,6 +259,16 @@ public class ReservationService {
         }
     }
 
+    @Transactional
+    public void syncReadyReservations() {
+        Set<Long> processedBookIds = new LinkedHashSet<>();
+        for (Reservation reservation : reservationRepository.findByStatusInOrderByReservedAtAsc(ACTIVE_STATUSES)) {
+            if (processedBookIds.add(reservation.getBook().getId())) {
+                promoteReservationsForBook(reservation.getBook().getId());
+            }
+        }
+    }
+
     private void cancelReservation(Reservation reservation) {
         if (!reservation.isActive()) {
             throw new IllegalArgumentException("Only active reservations can be cancelled.");
@@ -242,5 +291,17 @@ public class ReservationService {
         if (!activeReservations.isEmpty()) {
             reservationRepository.saveAll(activeReservations);
         }
+    }
+
+    private int getWalkInBorrowableCopyCount(Book book) {
+        if (book == null || book.getId() == null) {
+            return 0;
+        }
+        int readyReservationCount = (int) reservationRepository.countByBook_IdAndStatusIn(book.getId(), List.of(ReservationStatus.READY));
+        return Math.max(0, getAvailableCopyCount(book) - readyReservationCount);
+    }
+
+    private int getAvailableCopyCount(Book book) {
+        return book == null || book.getAvailableQuantity() == null ? 0 : Math.max(0, book.getAvailableQuantity());
     }
 }

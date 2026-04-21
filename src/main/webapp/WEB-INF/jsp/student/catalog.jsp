@@ -84,12 +84,24 @@
 
     <section class="catalog-grid">
         <c:forEach items="${books}" var="book">
+            <c:set var="reservationStatus" value="${studentReservationStatusByBookId[book.id]}"/>
+            <c:set var="activeIssueStatus" value="${studentActiveIssueStatusByBookId[book.id]}"/>
+            <c:set var="walkInBorrowableCopies" value="${walkInBorrowableCopyCountByBook[book.id]}"/>
             <article class="catalog-card">
                 <div class="d-flex justify-content-between align-items-start mb-2">
                     <h5 class="mb-0">${book.title}</h5>
                     <c:choose>
-                        <c:when test="${book.available}">
+                        <c:when test="${not empty activeIssueStatus}">
+                            <span class="tag-chip">Borrowed by you</span>
+                        </c:when>
+                        <c:when test="${reservationStatus == 'READY'}">
+                            <span class="tag-chip">Ready for claim</span>
+                        </c:when>
+                        <c:when test="${walkInBorrowableCopies > 0}">
                             <span class="tag-chip">Available</span>
+                        </c:when>
+                        <c:when test="${book.availableQuantity > 0}">
+                            <span class="tag-chip warn">On hold</span>
                         </c:when>
                         <c:otherwise>
                             <span class="tag-chip warn">Checked out</span>
@@ -107,20 +119,35 @@
                     <c:if test="${book.digital and not empty book.ebookPath}">
                         <a class="btn btn-warm" href="${pageContext.request.contextPath}/student/ebooks/${book.id}">Read e-book</a>
                     </c:if>
-                    <c:if test="${not book.available}">
-                        <c:choose>
-                            <c:when test="${not empty studentReservationStatusByBookId[book.id]}">
-                                <span class="tag-chip warn">Reservation: ${studentReservationStatusByBookId[book.id]}</span>
-                            </c:when>
-                            <c:otherwise>
-                                <form method="post" action="${pageContext.request.contextPath}/student/reservations">
-                                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                                    <input type="hidden" name="bookId" value="${book.id}">
-                                    <button class="btn btn-brand" type="submit">Reserve this book</button>
-                                </form>
-                            </c:otherwise>
-                        </c:choose>
-                    </c:if>
+                    <c:choose>
+                        <c:when test="${not empty activeIssueStatus}">
+                            <span class="tag-chip">Active loan: ${activeIssueStatus}</span>
+                        </c:when>
+                        <c:when test="${reservationStatus == 'READY'}">
+                            <form method="post" action="${pageContext.request.contextPath}/student/catalog/${book.id}/borrow">
+                                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                                <button class="btn btn-brand" type="submit">Borrow reserved copy</button>
+                            </form>
+                            <span class="muted-text">Due date: ${defaultBorrowDueDate}</span>
+                        </c:when>
+                        <c:when test="${walkInBorrowableCopies > 0}">
+                            <form method="post" action="${pageContext.request.contextPath}/student/catalog/${book.id}/borrow">
+                                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                                <button class="btn btn-brand" type="submit">Borrow now</button>
+                            </form>
+                            <span class="muted-text">Loan period: ${maxLoanDays} days</span>
+                        </c:when>
+                        <c:when test="${not empty reservationStatus}">
+                            <span class="tag-chip warn">Reservation: ${reservationStatus}</span>
+                        </c:when>
+                        <c:otherwise>
+                            <form method="post" action="${pageContext.request.contextPath}/student/reservations">
+                                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                                <input type="hidden" name="bookId" value="${book.id}">
+                                <button class="btn btn-brand" type="submit">Reserve this book</button>
+                            </form>
+                        </c:otherwise>
+                    </c:choose>
                 </div>
             </article>
         </c:forEach>

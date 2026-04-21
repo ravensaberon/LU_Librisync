@@ -36,110 +36,140 @@
     </div>
 
     <section class="hero-card mb-4">
-        <h1 class="fw-bold mb-2">Library overview</h1>
-        <p class="muted-text mb-0">Monitor circulation, identify overdue trends, and keep the collection updated from one place.</p>
+        <div class="hero-card-grid">
+            <div>
+                <span class="tag-chip">Library Health</span>
+                <h1 class="fw-bold mt-3 mb-2">Library overview</h1>
+                <p class="muted-text mb-0">Monitor circulation, student demand, and account risk from one clearer dashboard.</p>
+            </div>
+            <div class="hero-side-note">
+                <div class="hero-side-title">Needs attention</div>
+                <strong class="hero-side-value">${overdueCount + blockedBorrowerCount}</strong>
+                <span class="hero-side-caption">${overdueCount} overdue case(s) and ${blockedBorrowerCount} blocked borrower(s) currently need follow-up.</span>
+            </div>
+        </div>
     </section>
 
-    <section class="stat-grid mb-4">
-        <div class="metric-card">
-            <div class="metric-value">${bookCount}</div>
-            <div class="metric-label">Books in catalog</div>
-        </div>
-        <div class="metric-card">
-            <div class="metric-value">${availableCount}</div>
-            <div class="metric-label">Available for issue</div>
-        </div>
-        <div class="metric-card">
-            <div class="metric-value">${studentCount}</div>
-            <div class="metric-label">Registered students</div>
-        </div>
-        <div class="metric-card">
-            <div class="metric-value">${issuedCount}</div>
-            <div class="metric-label">Active issued books</div>
-        </div>
-        <div class="metric-card">
-            <div class="metric-value">${overdueCount}</div>
-            <div class="metric-label">Overdue cases</div>
-        </div>
-        <div class="metric-card">
-            <div class="metric-value">${overdueRate}%</div>
-            <div class="metric-label">Overdue rate</div>
-        </div>
-        <div class="metric-card">
-            <div class="metric-value">${pendingReservationCount}</div>
-            <div class="metric-label">Pending reservations</div>
-        </div>
-        <div class="metric-card">
-            <div class="metric-value">${readyReservationCount}</div>
-            <div class="metric-label">Ready for claim</div>
-        </div>
-        <div class="metric-card">
-            <div class="metric-value">${outstandingFineCount}</div>
-            <div class="metric-label">Outstanding fines</div>
-        </div>
-        <div class="metric-card">
-            <div class="metric-value">${outstandingFineTotal}</div>
-            <div class="metric-label">Unpaid balance</div>
-        </div>
-        <div class="metric-card">
-            <div class="metric-value">${blockedBorrowerCount}</div>
-            <div class="metric-label">Blocked borrowers</div>
+    <section class="dashboard-kpi-grid mb-4">
+        <article class="panel-card dashboard-kpi-card dashboard-kpi-card-feature">
+            <span class="dashboard-kpi-label">Active circulation</span>
+            <strong class="dashboard-kpi-value">${issuedCount}</strong>
+            <p class="dashboard-kpi-copy">Books currently issued to borrowers.</p>
+        </article>
+        <article class="panel-card dashboard-kpi-card">
+            <span class="dashboard-kpi-label">Overdue cases</span>
+            <strong class="dashboard-kpi-value">${overdueCount}</strong>
+            <p class="dashboard-kpi-copy">${overdueRate}% of active desk records are overdue.</p>
+        </article>
+        <article class="panel-card dashboard-kpi-card">
+            <span class="dashboard-kpi-label">Pending reservations</span>
+            <strong class="dashboard-kpi-value">${pendingReservationCount}</strong>
+            <p class="dashboard-kpi-copy">${readyReservationCount} reservation(s) already ready for claim.</p>
+        </article>
+        <article class="panel-card dashboard-kpi-card">
+            <span class="dashboard-kpi-label">Unpaid balance</span>
+            <strong class="dashboard-kpi-value">${outstandingFineTotal}</strong>
+            <p class="dashboard-kpi-copy">${outstandingFineCount} open fine record(s) still unpaid.</p>
+        </article>
+    </section>
+
+    <section class="panel-card mb-4">
+        <div class="dashboard-summary-grid">
+            <div class="dashboard-summary-item">
+                <span class="dashboard-summary-label">Catalog</span>
+                <strong class="dashboard-summary-value">${bookCount}</strong>
+                <span class="dashboard-summary-copy">${availableCount} available for issue</span>
+            </div>
+            <div class="dashboard-summary-item">
+                <span class="dashboard-summary-label">Borrowers</span>
+                <strong class="dashboard-summary-value">${studentCount}</strong>
+                <span class="dashboard-summary-copy">${blockedBorrowerCount} blocked account(s)</span>
+            </div>
+            <div class="dashboard-summary-item">
+                <span class="dashboard-summary-label">Reservations</span>
+                <strong class="dashboard-summary-value">${pendingReservationCount + readyReservationCount}</strong>
+                <span class="dashboard-summary-copy">${readyReservationCount} ready for claim</span>
+            </div>
+            <div class="dashboard-summary-item">
+                <span class="dashboard-summary-label">Risk level</span>
+                <strong class="dashboard-summary-value">${overdueRate}%</strong>
+                <span class="dashboard-summary-copy">Overdue rate across active circulation</span>
+            </div>
         </div>
     </section>
 
     <section class="panel-card mb-4">
-        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
             <div>
                 <div class="section-title mb-2">Admin operations center</div>
-                <p class="helper-copy">Organize the core staff workflows commonly expected in a library system: catalog control, circulation, borrower accounts, analytics, and admin security.</p>
+                <p class="helper-copy">Jump straight into the main staff workspaces without digging through long descriptions.</p>
             </div>
         </div>
-        <div class="module-grid">
-            <div class="module-card">
-                <h3>Catalog and Inventory</h3>
-                <p>Create, edit, and remove book records while keeping ISBN, barcode, quantity, and shelf location accurate.</p>
-                <a class="action-link" href="${pageContext.request.contextPath}/admin/books">Manage books</a>
-            </div>
-            <div class="module-card">
-                <h3>Circulation Desk</h3>
-                <p>Issue books, adjust due dates, mark returns, and review circulation history from one workspace.</p>
-                <a class="action-link" href="${pageContext.request.contextPath}/admin/issues">Open circulation</a>
-            </div>
-            <div class="module-card">
-                <h3>Borrower Accounts</h3>
-                <p>Create student accounts, update profiles, reset passwords, deactivate access, and review borrower history.</p>
-                <a class="action-link" href="${pageContext.request.contextPath}/admin/students">Manage students</a>
-            </div>
-            <div class="module-card">
-                <h3>Reservation Queue</h3>
-                <p>Track pending holds, release ready reservations, and keep queue order fair when books become available again.</p>
-                <a class="action-link" href="${pageContext.request.contextPath}/admin/reservations">Manage reservations</a>
-            </div>
-            <div class="module-card">
-                <h3>Fine Ledger</h3>
-                <p>Review unpaid balances, settle penalties, waive approved charges, and keep financial actions inside the audit trail.</p>
-                <a class="action-link" href="${pageContext.request.contextPath}/admin/fines">Manage fines</a>
-            </div>
-            <div class="module-card">
-                <h3>Reports and Exports</h3>
-                <p>Generate circulation, overdue, reservation, fine, and audit CSV reports for review or formal submission.</p>
-                <a class="action-link" href="${pageContext.request.contextPath}/admin/reports">Open reports</a>
-            </div>
-            <div class="module-card">
-                <h3>Reference Data</h3>
-                <p>Maintain authors and categories so searching, filtering, and reporting stay organized across the catalog.</p>
-                <a class="action-link" href="${pageContext.request.contextPath}/admin/references">Manage references</a>
-            </div>
-            <div class="module-card">
-                <h3>Analytics</h3>
-                <p>Track recent activity, overdue patterns, and top-borrowed books to support better library decisions.</p>
-                <a class="action-link" href="${pageContext.request.contextPath}/admin/dashboard">View analytics</a>
-            </div>
-            <div class="module-card">
-                <h3>Admin Security</h3>
-                <p>Keep the admin account updated and change your password to protect the staff-side control panel.</p>
-                <a class="action-link" href="${pageContext.request.contextPath}/admin/profile">Open profile</a>
-            </div>
+        <div class="dashboard-action-grid">
+            <a class="dashboard-action-card" href="${pageContext.request.contextPath}/admin/books">
+                <span class="dashboard-action-icon"><i class="bi bi-journals"></i></span>
+                <div class="dashboard-action-copy">
+                    <h3>Catalog and inventory</h3>
+                    <p>Books, ISBN, copies, and shelf records.</p>
+                </div>
+                <span class="dashboard-action-meta">${bookCount} books</span>
+            </a>
+            <a class="dashboard-action-card" href="${pageContext.request.contextPath}/admin/issues">
+                <span class="dashboard-action-icon"><i class="bi bi-arrow-left-right"></i></span>
+                <div class="dashboard-action-copy">
+                    <h3>Circulation desk</h3>
+                    <p>Issue, return, and due date handling.</p>
+                </div>
+                <span class="dashboard-action-meta">${issuedCount} active</span>
+            </a>
+            <a class="dashboard-action-card" href="${pageContext.request.contextPath}/admin/students">
+                <span class="dashboard-action-icon"><i class="bi bi-people"></i></span>
+                <div class="dashboard-action-copy">
+                    <h3>Borrower accounts</h3>
+                    <p>Student records, status, and password resets.</p>
+                </div>
+                <span class="dashboard-action-meta">${studentCount} students</span>
+            </a>
+            <a class="dashboard-action-card" href="${pageContext.request.contextPath}/admin/reservations">
+                <span class="dashboard-action-icon"><i class="bi bi-bookmark-check"></i></span>
+                <div class="dashboard-action-copy">
+                    <h3>Reservation queue</h3>
+                    <p>Pending holds and release-ready pickups.</p>
+                </div>
+                <span class="dashboard-action-meta">${pendingReservationCount} pending</span>
+            </a>
+            <a class="dashboard-action-card" href="${pageContext.request.contextPath}/admin/fines">
+                <span class="dashboard-action-icon"><i class="bi bi-receipt"></i></span>
+                <div class="dashboard-action-copy">
+                    <h3>Fine ledger</h3>
+                    <p>Payments, waivers, and open balances.</p>
+                </div>
+                <span class="dashboard-action-meta">${outstandingFineTotal} unpaid</span>
+            </a>
+            <a class="dashboard-action-card" href="${pageContext.request.contextPath}/admin/reports">
+                <span class="dashboard-action-icon"><i class="bi bi-bar-chart"></i></span>
+                <div class="dashboard-action-copy">
+                    <h3>Reports and exports</h3>
+                    <p>Analytics, summaries, and CSV output.</p>
+                </div>
+                <span class="dashboard-action-meta">Open reports</span>
+            </a>
+            <a class="dashboard-action-card" href="${pageContext.request.contextPath}/admin/references">
+                <span class="dashboard-action-icon"><i class="bi bi-tags"></i></span>
+                <div class="dashboard-action-copy">
+                    <h3>Categories and authors</h3>
+                    <p>Reference data for cleaner catalog search.</p>
+                </div>
+                <span class="dashboard-action-meta">Maintain data</span>
+            </a>
+            <a class="dashboard-action-card" href="${pageContext.request.contextPath}/admin/profile">
+                <span class="dashboard-action-icon"><i class="bi bi-shield-lock"></i></span>
+                <div class="dashboard-action-copy">
+                    <h3>Admin security</h3>
+                    <p>Profile settings and password protection.</p>
+                </div>
+                <span class="dashboard-action-meta">Account settings</span>
+            </a>
         </div>
     </section>
 

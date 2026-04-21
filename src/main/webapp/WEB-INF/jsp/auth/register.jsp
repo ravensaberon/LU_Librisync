@@ -103,18 +103,7 @@
             <section class="auth-story register-story">
                 <span class="tag-chip warn">Student Registration</span>
                 <h1 class="mt-3 mb-3 fw-bold">Create your LU Librisync account</h1>
-                <p class="fs-5 mb-3">Register using your real student details so borrowing records, student ID generation, and library transactions stay accurate.</p>
-                <ul class="mb-0">
-                    <li>Student ID is generated automatically after successful registration</li>
-                    <li>Program, contact number, and full address are stored in your student profile</li>
-                    <li>Password must be strong and must not contain personal details</li>
-                </ul>
-
-                <div class="register-note">
-                    <strong class="d-block mb-2">What happens after registration</strong>
-                    <p class="mb-2">You can immediately sign in as a student and access your dashboard, profile, catalog, and borrowing history.</p>
-                    <p class="mb-0">Your program and address are saved during registration so your library record is more complete from the start.</p>
-                </div>
+                <p class="fs-5 mb-0">Complete the form below to create your account.</p>
             </section>
 
             <section class="auth-form-wrap register-form-wrap">
@@ -166,6 +155,20 @@
                             </select>
                             <p class="field-error" id="programError"></p>
                         </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="yearLevel">Year level</label>
+                        <select class="form-select form-select-lg" id="yearLevel" name="yearLevel" required>
+                            <option value="">Select year level</option>
+                            <c:if test="${not empty yearLevelValue and yearLevelValue != 'Not set' and !yearLevelOptionLookup[yearLevelValue]}">
+                                <option value="${yearLevelValue}" selected>${yearLevelValue}</option>
+                            </c:if>
+                            <c:forEach items="${yearLevelOptions}" var="yearLevelOption">
+                                <option value="${yearLevelOption}" <c:if test="${yearLevelValue == yearLevelOption}">selected</c:if>>${yearLevelOption}</option>
+                            </c:forEach>
+                        </select>
+                        <p class="field-error" id="yearLevelError"></p>
                     </div>
 
                     <div class="mb-3">
@@ -294,6 +297,7 @@
         var middleName = document.getElementById("middleName");
         var lastName = document.getElementById("lastName");
         var program = document.getElementById("program");
+        var yearLevel = document.getElementById("yearLevel");
         var email = document.getElementById("email");
         var contactNumber = document.getElementById("contactNumber");
         var birthDate = document.getElementById("birthDate");
@@ -331,6 +335,11 @@
         var EMAIL_REGEX = /^[a-z0-9+_.-]+@[a-z0-9.-]+\.[a-z]{2,}$/;
         var CONTACT_REGEX = /^\+?\d{10,15}$/;
         var PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d\s]).{12,100}$/;
+        var YEAR_LEVEL_OPTIONS = {
+            <c:forEach items="${yearLevelOptions}" var="yearLevelOption" varStatus="status">
+            "${yearLevelOption}": true<c:if test="${!status.last}">,</c:if>
+            </c:forEach>
+        };
         var ALLOWED_EMAIL_DOMAINS = {
             "gmail.com": true,
             "yahoo.com": true,
@@ -374,6 +383,7 @@
             middleName: document.getElementById("middleNameError"),
             lastName: document.getElementById("lastNameError"),
             program: document.getElementById("programError"),
+            yearLevel: document.getElementById("yearLevelError"),
             email: document.getElementById("emailError"),
             contactNumber: document.getElementById("contactNumberError"),
             birthDate: document.getElementById("birthDateError"),
@@ -669,6 +679,21 @@
             }
 
             setFieldState(program, errors.program, "");
+            return true;
+        }
+
+        function validateYearLevelField() {
+            var value = (yearLevel.value || "").trim().replace(/\s+/g, " ");
+            if (!value) {
+                setFieldState(yearLevel, errors.yearLevel, "Year level is required.");
+                return false;
+            }
+            if (!YEAR_LEVEL_OPTIONS[value]) {
+                setFieldState(yearLevel, errors.yearLevel, "Select a valid year level.");
+                return false;
+            }
+
+            setFieldState(yearLevel, errors.yearLevel, "");
             return true;
         }
 
@@ -970,6 +995,7 @@
             middleName.value = normalizeName(middleName.value);
             lastName.value = normalizeName(lastName.value);
             program.value = (program.value || "").trim().replace(/\s+/g, " ");
+            yearLevel.value = (yearLevel.value || "").trim().replace(/\s+/g, " ");
             email.value = (email.value || "").trim();
             contactNumber.value = normalizeContact(contactNumber.value);
             street.value = (street.value || "").trim().replace(/\s+/g, " ");
@@ -982,6 +1008,7 @@
             valid = validateNameField(middleName, errors.middleName, "Middle name", true) && valid;
             valid = validateNameField(lastName, errors.lastName, "Last name", false) && valid;
             valid = validateProgramField() && valid;
+            valid = validateYearLevelField() && valid;
             valid = validateEmailField() && valid;
             valid = validateContactField() && valid;
             valid = computeAge(true) && valid;
@@ -1017,6 +1044,7 @@
         });
 
         program.addEventListener("change", validateProgramField);
+        yearLevel.addEventListener("change", validateYearLevelField);
 
         email.addEventListener("input", function () {
             validateEmailField();

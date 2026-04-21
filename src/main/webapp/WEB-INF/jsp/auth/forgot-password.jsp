@@ -16,19 +16,7 @@
         <section class="auth-story">
             <span class="tag-chip warn">Account Recovery</span>
             <h1 class="mt-3 mb-3 fw-bold">Reset your LU Librisync password</h1>
-            <p class="fs-5">Request a one-time passcode, wait for the email, then set a new password with the same secure countdown behavior.</p>
-            <div class="mt-4">
-                <p class="mb-2">This recovery flow now includes:</p>
-                <ul class="mb-0">
-                    <li>OTP delivery to your registered email</li>
-                    <li>Persistent 3-minute resend cooldown</li>
-                    <li>OTP state that stays active even after logout or browser refresh</li>
-                </ul>
-            </div>
-            <div class="mt-4">
-                <p class="mb-1">Default sender: <strong>lulibrisync@gmail.com</strong></p>
-                <p class="mb-0">If SMTP is still being configured, a fallback copy is written to <strong>storage/email-outbox</strong>.</p>
-            </div>
+            <p class="fs-5 mb-0">Enter your registered email to continue.</p>
         </section>
 
         <section class="auth-form-wrap">
@@ -63,8 +51,7 @@
                         <div class="otp-panel mb-3">
                             <div class="otp-panel-icon"><i class="bi bi-envelope-paper"></i></div>
                             <div>
-                                <strong>OTP delivery status</strong>
-                                <p class="mb-1">Use the code sent to <span class="otp-destination">${empty maskedResetEmail ? 'your registered email' : maskedResetEmail}</span>.</p>
+                                <strong>${empty maskedResetEmail ? 'Registered email' : maskedResetEmail}</strong>
                                 <div class="small muted-text">
                                     OTP expires in <strong id="resetOtpExpiryCountdown">calculating...</strong>
                                     <span class="mx-1">|</span>

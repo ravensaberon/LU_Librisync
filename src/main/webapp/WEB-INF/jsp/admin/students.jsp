@@ -14,8 +14,8 @@
 <div class="page-shell">
     <div class="app-nav">
         <div>
-            <span class="tag-chip">Student Search</span>
-            <div class="brand-title mt-2">Find students by ID</div>
+            <span class="tag-chip">Student Directory</span>
+            <div class="brand-title mt-2">Manage borrower accounts</div>
         </div>
         <div class="nav-links">
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/dashboard">Dashboard</a>
@@ -41,56 +41,89 @@
         <div class="alert alert-danger">${error}</div>
     </c:if>
 
-    <section class="panel-grid mb-4">
-        <div class="panel-card">
-            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
-                <div>
-                    <div class="section-title mb-2">Student account controls</div>
-                    <p class="helper-copy">Open student details in a popup window, update records faster, and keep the directory page visible while you work.</p>
+    <section class="hero-card mb-4">
+        <div class="hero-card-grid">
+            <div>
+                <span class="tag-chip">Borrower Accounts</span>
+                <h1 class="fw-bold mt-3 mb-2">Student directory</h1>
+                <p class="muted-text mb-0">Search, review, and manage student borrower records from one clean workspace.</p>
+            </div>
+            <div class="hero-side-note">
+                <c:choose>
+                    <c:when test="${not empty studentIdFilter}">
+                        <div class="hero-side-title">Search matches</div>
+                        <strong class="hero-side-value">${studentDirectoryFilteredCount}</strong>
+                        <span class="hero-side-caption">Student ID filter: ${studentIdFilter}</span>
+                    </c:when>
+                    <c:otherwise>
+                        <div class="hero-side-title">Registered students</div>
+                        <strong class="hero-side-value">${studentDirectoryTotalCount}</strong>
+                        <span class="hero-side-caption">${studentDirectoryBlockedCount} blocked borrowers need follow-up.</span>
+                    </c:otherwise>
+                </c:choose>
+            </div>
+        </div>
+    </section>
+
+    <section class="stat-grid mb-4">
+        <div class="metric-card">
+            <div class="metric-value">${studentDirectoryTotalCount}</div>
+            <div class="metric-label">Total student accounts</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">${studentDirectoryFilteredCount}</div>
+            <div class="metric-label">Shown in current view</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">${studentDirectoryClearedCount}</div>
+            <div class="metric-label">Borrowing cleared</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">${studentDirectoryActiveCount}</div>
+            <div class="metric-label">Active accounts</div>
+        </div>
+    </section>
+
+    <section class="panel-card directory-workspace">
+        <div class="directory-toolbar">
+            <div class="directory-toolbar-copy">
+                <div class="section-title mb-2">Student directory</div>
+                <div class="directory-toolbar-meta">
+                    <span class="directory-meta-pill">${studentDirectoryFilteredCount} results</span>
+                    <c:if test="${not empty studentIdFilter}">
+                        <span class="directory-meta-pill subtle">ID: ${studentIdFilter}</span>
+                    </c:if>
+                    <span class="directory-meta-text">${studentDirectoryBlockedCount} blocked borrower<c:if test="${studentDirectoryBlockedCount != 1}">s</c:if> in this view</span>
                 </div>
+            </div>
+            <div class="directory-toolbar-actions">
+                <form method="get" action="${pageContext.request.contextPath}/admin/students" class="directory-search-form">
+                    <label class="visually-hidden" for="studentId">Search by student ID</label>
+                    <div class="directory-search-input">
+                        <i class="bi bi-search" aria-hidden="true"></i>
+                        <input class="form-control"
+                               id="studentId"
+                               name="studentId"
+                               value="${studentIdFilter}"
+                               placeholder="Search by student ID">
+                    </div>
+                    <button class="btn btn-brand" type="submit">Search</button>
+                    <c:if test="${not empty studentIdFilter}">
+                        <a class="btn btn-warm" href="${pageContext.request.contextPath}/admin/students">Clear</a>
+                    </c:if>
+                </form>
                 <button class="btn btn-brand" type="button" data-bs-toggle="modal" data-bs-target="#createStudentModal">
                     <i class="bi bi-person-plus me-2"></i>Create student
                 </button>
             </div>
-            <div class="support-list">
-                <div class="support-item">
-                    <strong>Modal-based account review</strong>
-                    <span>View borrower details, active loans, borrowing history, password reset, and account status in one popup instead of opening another page.</span>
-                </div>
-                <div class="support-item">
-                    <strong>Quick admin actions</strong>
-                    <span>Use icon buttons in the directory to open accounts faster and keep circulation work moving without losing context.</span>
-                </div>
-            </div>
         </div>
 
-        <div class="panel-card">
-            <div class="section-title">Search student directory</div>
-            <form method="get" action="${pageContext.request.contextPath}/admin/students" class="row g-3 align-items-end">
-                <div class="col-md-9">
-                    <label class="form-label" for="studentId">Student ID</label>
-                    <input class="form-control" id="studentId" name="studentId" value="${studentIdFilter}" placeholder="Example: 261-0003">
-                </div>
-                <div class="col-md-3 d-grid">
-                    <button class="btn btn-brand" type="submit">
-                        <i class="bi bi-search me-2"></i>Search
-                    </button>
-                </div>
-            </form>
-        </div>
-    </section>
-
-    <section class="panel-card">
-        <div class="section-title">Student directory</div>
-        <div class="table-responsive">
-            <table class="table align-middle">
+        <div class="table-responsive directory-table-wrap">
+            <table class="table align-middle directory-table">
                 <thead>
                 <tr>
-                    <th>Student ID</th>
-                    <th>Name</th>
-                    <th>Email</th>
+                    <th>Student</th>
                     <th>Program</th>
-                    <th>Year level</th>
                     <th>Standing</th>
                     <th>Outstanding</th>
                     <th>Phone</th>
@@ -102,11 +135,19 @@
                 <c:forEach items="${students}" var="student">
                     <c:set var="standing" value="${borrowerStandingByStudentId[student.studentId]}"/>
                     <tr>
-                        <td>${student.studentId}</td>
-                        <td>${student.user.name}</td>
-                        <td>${student.user.email}</td>
-                        <td>${student.course}</td>
-                        <td>${student.yearLevel}</td>
+                        <td>
+                            <div class="directory-student-cell">
+                                <strong>${student.user.name}</strong>
+                                <span>${student.studentId}</span>
+                                <span>${student.user.email}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="directory-student-cell">
+                                <strong>${empty student.course ? 'Not set' : student.course}</strong>
+                                <span>${empty student.yearLevel ? 'Not set' : student.yearLevel}</span>
+                            </div>
+                        </td>
                         <td>
                             <c:choose>
                                 <c:when test="${standing.eligibleToBorrow}">
@@ -117,15 +158,16 @@
                                 </c:otherwise>
                             </c:choose>
                         </td>
-                        <td>${standing.outstandingFineAmount}</td>
-                        <td>${student.phone}</td>
-                        <td><span class="tag-chip">${student.user.status}</span></td>
+                        <td class="directory-amount">${standing.outstandingFineAmount}</td>
+                        <td>${empty student.phone ? 'Not provided' : student.phone}</td>
+                        <td><span class="tag-chip subtle">${student.user.status}</span></td>
                         <td class="table-actions">
                             <button class="icon-action"
                                     type="button"
                                     data-student-id="${student.studentId}"
                                     data-student-label="${student.user.name}"
-                                    title="Open student details">
+                                    title="Open student details"
+                                    aria-label="Open student details for ${student.user.name}">
                                 <i class="bi bi-eye"></i>
                             </button>
                         </td>
@@ -133,7 +175,7 @@
                 </c:forEach>
                 <c:if test="${empty students}">
                     <tr>
-                        <td colspan="10" class="text-center muted-text">No student matched the entered ID.</td>
+                        <td colspan="7" class="text-center muted-text">No student matched the current student ID search.</td>
                     </tr>
                 </c:if>
                 </tbody>
@@ -184,7 +226,12 @@
                     </div>
                     <div class="col-md-4">
                         <label class="form-label" for="createYearLevel">Year level</label>
-                        <input class="form-control" id="createYearLevel" name="yearLevel" placeholder="1st Year">
+                        <select class="form-select" id="createYearLevel" name="yearLevel" required>
+                            <option value="">Select year level</option>
+                            <c:forEach items="${yearLevelOptions}" var="yearLevelOption">
+                                <option value="${yearLevelOption}">${yearLevelOption}</option>
+                            </c:forEach>
+                        </select>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label" for="createPhone">Phone</label>
@@ -202,9 +249,34 @@
                             </c:forEach>
                         </select>
                     </div>
-                    <div class="col-12">
-                        <label class="form-label" for="createAddress">Address</label>
-                        <textarea class="form-control" id="createAddress" name="address" rows="3" placeholder="Optional address or admin note"></textarea>
+                    <div class="col-md-4">
+                        <label class="form-label" for="createProvince">Province</label>
+                        <select class="form-select" id="createProvince" name="province">
+                            <option value="Laguna" selected>Laguna</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="createCityMunicipality">City / Municipality</label>
+                        <select class="form-select" id="createCityMunicipality" name="cityMunicipality">
+                            <option value="">Select city / municipality</option>
+                            <c:forEach items="${registrationCityZipCodes}" var="entry">
+                                <option value="${entry.key}">${entry.key}</option>
+                            </c:forEach>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="createBarangay">Barangay</label>
+                        <select class="form-select" id="createBarangay" name="barangay" data-selected-barangay="" disabled>
+                            <option value="">Select city / municipality first</option>
+                        </select>
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label" for="createStreet">Street / House No.</label>
+                        <input class="form-control" id="createStreet" name="street" placeholder="Block, lot, street">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="createZipcode">Zip code</label>
+                        <input class="form-control" id="createZipcode" name="zipcode" readonly>
                     </div>
                     <div class="col-12 d-flex flex-wrap gap-2">
                         <button class="btn btn-brand" type="submit">
@@ -239,6 +311,33 @@
         var studentButtons = document.querySelectorAll("[data-student-id]");
         var bootstrapModal = modalElement ? new bootstrap.Modal(modalElement) : null;
         var autoOpenStudentId = "${modalStudentId}";
+        var cityZipCodes = {
+            <c:forEach items="${registrationCityZipCodes}" var="entry" varStatus="status">
+            "${entry.key}": "${entry.value}"<c:if test="${!status.last}">,</c:if>
+            </c:forEach>
+        };
+
+        function initAddressForms(root) {
+            if (!window.LuLibrisyncAddress) {
+                return;
+            }
+
+            var scope = root || document;
+            window.LuLibrisyncAddress.initForm({
+                cityMunicipality: scope.querySelector("#createCityMunicipality"),
+                barangay: scope.querySelector("#createBarangay"),
+                zipcode: scope.querySelector("#createZipcode"),
+                endpoint: "${pageContext.request.contextPath}/register/barangays",
+                cityZipCodes: cityZipCodes
+            });
+            window.LuLibrisyncAddress.initForm({
+                cityMunicipality: scope.querySelector("#modalCityMunicipality"),
+                barangay: scope.querySelector("#modalBarangay"),
+                zipcode: scope.querySelector("#modalZipcode"),
+                endpoint: "${pageContext.request.contextPath}/register/barangays",
+                cityZipCodes: cityZipCodes
+            });
+        }
 
         function showLoadingState() {
             modalContent.innerHTML = '' +
@@ -289,6 +388,7 @@
                 })
                 .then(function (html) {
                     modalContent.innerHTML = html;
+                    initAddressForms(modalContent);
                 })
                 .catch(function () {
                     showErrorState();
@@ -304,6 +404,8 @@
         if (autoOpenStudentId) {
             openStudentModal(autoOpenStudentId);
         }
+
+        initAddressForms(document);
     })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>

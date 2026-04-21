@@ -59,7 +59,7 @@ public class EmailNotificationService {
         this.smtpHost = smtpHost;
         this.smtpPort = smtpPort;
         this.smtpUsername = smtpUsername;
-        this.smtpPassword = smtpPassword;
+        this.smtpPassword = smtpPassword == null ? "" : smtpPassword.replaceAll("\\s+", "");
         this.smtpFrom = smtpFrom;
         this.smtpSsl = smtpSsl;
         this.outboxRoot = Path.of(outboxRootPath).toAbsolutePath().normalize();

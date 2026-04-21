@@ -8,6 +8,8 @@ import com.lulibrisync.model.User;
 import com.lulibrisync.model.UserStatus;
 import com.lulibrisync.repository.StudentRepository;
 import com.lulibrisync.repository.UserRepository;
+import com.lulibrisync.util.AddressFormValue;
+import com.lulibrisync.util.YearLevelOptions;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
@@ -32,6 +34,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 @Service
 public class AuthService {
@@ -41,6 +44,7 @@ public class AuthService {
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[a-z0-9+_.-]+@[a-z0-9.-]+\\.[a-z]{2,}$");
     private static final Pattern CONTACT_PATTERN = Pattern.compile("^\\+?\\d{10,15}$");
     private static final Pattern PASSWORD_PATTERN = Pattern.compile("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z\\d\\s]).{12,100}$");
+    private static final Pattern ADDRESS_SUFFIX_PATTERN = Pattern.compile("^(.+?)\\s+(\\d{4})$");
     private static final int MAX_NAME_TOKEN_LENGTH = 12;
     private static final Map<String, String> LAGUNA_CITY_ZIP_CODES = createLagunaCityZipCodes();
     private static final Map<String, String> LAGUNA_CITY_CODES = createLagunaCityCodes();
@@ -101,6 +105,7 @@ public class AuthService {
                                    String middleName,
                                    String lastName,
                                    String program,
+                                   String yearLevel,
                                    String email,
                                    String contactNumber,
                                    String birthDate,
@@ -117,6 +122,7 @@ public class AuthService {
         String normalizedLastName = normalizeAndValidateName(lastName, "Last name", false);
         String normalizedFullName = buildFullName(normalizedFirstName, normalizedMiddleName, normalizedLastName);
         String normalizedProgram = normalizeAndValidateProgram(program);
+        String normalizedYearLevel = validateRequiredYearLevel(yearLevel);
         String normalizedEmail = normalizeAndValidateEmail(email);
         String normalizedContactNumber = normalizeAndValidateContact(contactNumber);
         LocalDate parsedBirthDate = parseAndValidateBirthDate(birthDate);
@@ -143,7 +149,7 @@ public class AuthService {
         student.setUser(user);
         student.setStudentId(generatedStudentId);
         student.setCourse(normalizedProgram);
-        student.setYearLevel("Not set");
+        student.setYearLevel(normalizedYearLevel);
         student.setPhone(normalizedContactNumber);
         student.setAddress(buildAddress(normalizedStreet, normalizedBarangay, normalizedCityMunicipality, normalizedProvince, normalizedZipCode));
         student.setDateOfBirth(parsedBirthDate);
@@ -168,6 +174,7 @@ public class AuthService {
 
         String normalizedEmail = normalizeAndValidateEmail(email);
         String normalizedPassword = validateAdminPassword(password);
+        String normalizedYearLevel = validateRequiredYearLevel(yearLevel);
         if (dateOfBirth != null) {
             validateBirthDate(dateOfBirth);
         }
@@ -187,7 +194,7 @@ public class AuthService {
         student.setUser(user);
         student.setStudentId(generatedStudentId);
         student.setCourse(defaultText(course, "Not set"));
-        student.setYearLevel(defaultText(yearLevel, "Not set"));
+        student.setYearLevel(normalizedYearLevel);
         student.setPhone(blankToNull(phone));
         student.setAddress(blankToNull(address));
         student.setDateOfBirth(dateOfBirth);
@@ -234,6 +241,51 @@ public class AuthService {
         } catch (IllegalArgumentException exception) {
             return new RegistrationAvailabilityResult(false, false, value == null ? "" : value.trim(), exception.getMessage());
         }
+    }
+
+    public String normalizeAndBuildOptionalAddress(String province,
+                                                   String cityMunicipality,
+                                                   String barangay,
+                                                   String street,
+                                                   String zipcode) {
+        boolean hasAddressInput = hasText(cityMunicipality)
+                || hasText(barangay)
+                || hasText(street)
+                || hasText(zipcode);
+        if (!hasAddressInput) {
+            return null;
+        }
+
+        String normalizedProvince = validateProvince(hasText(province) ? province : "Laguna");
+        String normalizedCityMunicipality = validateCityMunicipality(cityMunicipality);
+        String normalizedBarangay = validateBarangayForCityMunicipality(normalizedCityMunicipality, barangay);
+        String normalizedStreet = normalizeAndValidateAddressPart(street, "Street", 180);
+        String normalizedZipCode = validateZipCode(zipcode, normalizedCityMunicipality);
+        return buildAddress(normalizedStreet, normalizedBarangay, normalizedCityMunicipality, normalizedProvince, normalizedZipCode);
+    }
+
+    public AddressFormValue parseAddress(String address) {
+        AddressFormValue formValue = new AddressFormValue();
+        if (!hasText(address)) {
+            return formValue;
+        }
+
+        String[] segments = address.trim().split("\\s*,\\s*");
+        if (segments.length >= 4) {
+            String suffix = segments[segments.length - 1].trim();
+            Matcher matcher = ADDRESS_SUFFIX_PATTERN.matcher(suffix);
+            if (matcher.matches()) {
+                formValue.setProvince(matcher.group(1).trim());
+                formValue.setZipcode(matcher.group(2).trim());
+                formValue.setCityMunicipality(segments[segments.length - 2].trim());
+                formValue.setBarangay(segments[segments.length - 3].trim());
+                formValue.setStreet(String.join(", ", java.util.Arrays.copyOfRange(segments, 0, segments.length - 3)).trim());
+                return formValue;
+            }
+        }
+
+        formValue.setStreet(address.trim());
+        return formValue;
     }
 
     private String generateStudentId() {
@@ -303,6 +355,15 @@ public class AuthService {
             throw new IllegalArgumentException("Program is too long.");
         }
         return normalizedProgram;
+    }
+
+    private String validateRequiredYearLevel(String yearLevel) {
+        String normalizedYearLevel = required(yearLevel, "Year level is required.")
+                .replaceAll("\\s+", " ");
+        if (!YearLevelOptions.isSupported(normalizedYearLevel)) {
+            throw new IllegalArgumentException("Select a valid year level.");
+        }
+        return normalizedYearLevel;
     }
 
     private String normalizeAndValidateContact(String contactNumber) {
@@ -565,6 +626,10 @@ public class AuthService {
                                 String province,
                                 String zipcode) {
         return street + ", " + barangay + ", " + cityMunicipality + ", " + province + " " + zipcode;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isBlank();
     }
 
     private boolean hasRepeatedSequence(String value, int minLength) {
