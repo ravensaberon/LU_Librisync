@@ -1,110 +1,44 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 920" preserveAspectRatio="xMidYMid slice">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-label="Colorful library shelves placeholder">
   <defs>
-    <linearGradient id="bgShade" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#040406"/>
-      <stop offset="100%" stop-color="#0f1016"/>
-    </linearGradient>
-    <linearGradient id="railTop" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#ffc7bd"/>
-      <stop offset="45%" stop-color="#ff9fba"/>
-      <stop offset="100%" stop-color="#ff648f"/>
-    </linearGradient>
-    <linearGradient id="railShadow" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#ff92b0"/>
-      <stop offset="100%" stop-color="#ff4d84"/>
-    </linearGradient>
-    <linearGradient id="violetWave" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#5541be"/>
-      <stop offset="100%" stop-color="#312379"/>
-    </linearGradient>
-
-    <g id="bookSetA">
-      <rect x="0" y="16" width="15" height="86" fill="#2fc876"/>
-      <rect x="18" y="6" width="12" height="96" fill="#59cff9"/>
-      <rect x="34" y="14" width="14" height="88" fill="#5944d6"/>
-      <rect x="52" y="0" width="13" height="102" fill="#ff6668"/>
-      <rect x="69" y="8" width="14" height="94" fill="#ffd857"/>
-      <rect x="87" y="12" width="13" height="90" fill="#ee74e2"/>
-      <rect x="104" y="4" width="16" height="98" fill="#ffb85d"/>
-      <rect x="124" y="18" width="13" height="84" fill="#27b3f6"/>
-      <rect x="141" y="10" width="12" height="92" fill="#43ce88"/>
-    </g>
-
-    <g id="bookSetB">
-      <rect x="0" y="10" width="17" height="92" fill="#ff8b49"/>
-      <rect x="21" y="4" width="13" height="98" fill="#33ca78"/>
-      <rect x="38" y="18" width="12" height="84" fill="#5a4ed8"/>
-      <rect x="54" y="8" width="15" height="94" fill="#5fcefb"/>
-      <rect x="73" y="0" width="14" height="102" fill="#ff5a66"/>
-      <rect x="91" y="14" width="12" height="88" fill="#ffd151"/>
-      <rect x="107" y="6" width="15" height="96" fill="#ef70d8"/>
-      <rect x="126" y="12" width="14" height="90" fill="#33beff"/>
-      <rect x="144" y="4" width="16" height="98" fill="#f6b764"/>
-    </g>
-
-    <g id="bookSetC">
-      <rect x="0" y="8" width="16" height="94" fill="#39c47b"/>
-      <rect x="20" y="16" width="11" height="86" fill="#ffcb50"/>
-      <rect x="35" y="2" width="15" height="100" fill="#ff6d8c"/>
-      <rect x="54" y="10" width="13" height="92" fill="#58d2fb"/>
-      <rect x="71" y="0" width="14" height="102" fill="#5a43cd"/>
-      <rect x="89" y="14" width="12" height="88" fill="#f376de"/>
-      <rect x="105" y="6" width="15" height="96" fill="#ffac58"/>
-      <rect x="124" y="18" width="11" height="84" fill="#1db9ff"/>
-      <rect x="139" y="4" width="16" height="98" fill="#31cb70"/>
-    </g>
-
-    <pattern id="shelfBooksA" width="155" height="112" patternUnits="userSpaceOnUse">
-      <use href="#bookSetA"/>
+    <pattern id="books" x="0" y="0" width="240" height="230" patternUnits="userSpaceOnUse">
+      <rect width="240" height="230" fill="#06080e"/>
+      <rect x="0" y="44" width="14" height="186" fill="#36c6ff"/>
+      <rect x="14" y="58" width="12" height="172" fill="#3c2dc9"/>
+      <rect x="26" y="38" width="16" height="192" fill="#f6db74"/>
+      <rect x="42" y="52" width="11" height="178" fill="#ff5f6f"/>
+      <rect x="53" y="30" width="15" height="200" fill="#1dc58a"/>
+      <rect x="68" y="60" width="11" height="170" fill="#7b4dff"/>
+      <rect x="79" y="48" width="16" height="182" fill="#fff389"/>
+      <rect x="95" y="54" width="10" height="176" fill="#f57f3e"/>
+      <rect x="105" y="34" width="15" height="196" fill="#49b4ee"/>
+      <rect x="120" y="46" width="13" height="184" fill="#30d078"/>
+      <rect x="133" y="60" width="10" height="170" fill="#d966d6"/>
+      <rect x="143" y="42" width="14" height="188" fill="#4d43db"/>
+      <rect x="157" y="52" width="12" height="178" fill="#ffd56e"/>
+      <rect x="169" y="32" width="15" height="198" fill="#ff666d"/>
+      <rect x="184" y="58" width="10" height="172" fill="#9be89e"/>
+      <rect x="194" y="45" width="16" height="185" fill="#2ea8df"/>
+      <rect x="210" y="55" width="11" height="175" fill="#503de0"/>
+      <rect x="221" y="38" width="14" height="192" fill="#f2c85f"/>
+      <rect x="235" y="64" width="5" height="166" fill="#2bcf67"/>
     </pattern>
-    <pattern id="shelfBooksB" width="162" height="112" patternUnits="userSpaceOnUse">
-      <use href="#bookSetB"/>
-    </pattern>
-    <pattern id="shelfBooksC" width="158" height="112" patternUnits="userSpaceOnUse">
-      <use href="#bookSetC"/>
-    </pattern>
+    <linearGradient id="shelfEdge" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffd8a1"/>
+      <stop offset="100%" stop-color="#ff5e96"/>
+    </linearGradient>
   </defs>
 
-  <rect width="1600" height="920" fill="#ffffff"/>
-  <rect x="500" y="0" width="1100" height="920" fill="url(#bgShade)"/>
+  <rect width="1600" height="900" fill="#05070c"/>
 
-  <g transform="rotate(14 1120 110)">
-    <rect x="520" y="-10" width="1180" height="122" rx="62" fill="url(#railTop)"/>
-    <rect x="540" y="15" width="1140" height="90" rx="42" fill="#030406"/>
-    <rect x="560" y="18" width="1100" height="84" fill="url(#shelfBooksA)"/>
-    <rect x="520" y="92" width="1180" height="20" rx="10" fill="url(#railShadow)"/>
-  </g>
+  <path d="M0 116 C450 30 1090 34 1600 108 L1600 258 C1090 186 450 194 0 282 Z" fill="url(#books)"/>
+  <path d="M0 294 C450 214 1090 220 1600 292 L1600 450 C1090 380 450 390 0 470 Z" fill="url(#books)"/>
+  <path d="M0 480 C450 410 1090 416 1600 486 L1600 646 C1090 576 450 586 0 664 Z" fill="url(#books)"/>
+  <path d="M0 676 C450 614 1090 620 1600 684 L1600 860 C1090 790 450 804 0 880 Z" fill="url(#books)"/>
 
-  <g transform="rotate(11 1140 270)">
-    <rect x="470" y="130" width="1240" height="124" rx="64" fill="url(#railTop)"/>
-    <rect x="492" y="156" width="1196" height="90" rx="42" fill="#040507"/>
-    <rect x="512" y="159" width="1156" height="84" fill="url(#shelfBooksB)"/>
-    <rect x="470" y="236" width="1240" height="20" rx="10" fill="url(#railShadow)"/>
-  </g>
+  <path d="M0 274 C450 186 1090 194 1600 266" fill="none" stroke="url(#shelfEdge)" stroke-width="18"/>
+  <path d="M0 462 C450 374 1090 382 1600 454" fill="none" stroke="url(#shelfEdge)" stroke-width="18"/>
+  <path d="M0 658 C450 570 1090 578 1600 650" fill="none" stroke="url(#shelfEdge)" stroke-width="18"/>
+  <path d="M0 874 C450 786 1090 794 1600 864" fill="none" stroke="url(#shelfEdge)" stroke-width="18"/>
 
-  <g transform="rotate(8.5 1130 448)">
-    <rect x="410" y="310" width="1295" height="126" rx="64" fill="url(#railTop)"/>
-    <rect x="432" y="336" width="1251" height="92" rx="42" fill="#040507"/>
-    <rect x="452" y="339" width="1211" height="86" fill="url(#shelfBooksC)"/>
-    <rect x="410" y="418" width="1295" height="20" rx="10" fill="url(#railShadow)"/>
-  </g>
-
-  <g transform="rotate(5.5 1100 646)">
-    <rect x="315" y="500" width="1340" height="128" rx="64" fill="url(#railTop)"/>
-    <rect x="337" y="526" width="1296" height="94" rx="42" fill="#040507"/>
-    <rect x="357" y="529" width="1256" height="88" fill="url(#shelfBooksA)"/>
-    <rect x="315" y="610" width="1340" height="20" rx="10" fill="url(#railShadow)"/>
-  </g>
-
-  <g transform="rotate(3.2 1100 832)">
-    <rect x="220" y="700" width="1455" height="130" rx="66" fill="url(#railTop)"/>
-    <rect x="244" y="726" width="1407" height="96" rx="44" fill="#040507"/>
-    <rect x="264" y="729" width="1367" height="90" fill="url(#shelfBooksB)"/>
-    <rect x="220" y="812" width="1455" height="20" rx="10" fill="url(#railShadow)"/>
-  </g>
-
-  <path d="M0 920h575c-44-90-151-150-280-150C170 770 61 829 0 920Z" fill="url(#violetWave)"/>
-  <path d="M0 920h190c34-38 46-93 40-144-71 23-139 72-190 144Z" fill="#3d2d98" opacity="0.84"/>
-
-  <ellipse cx="1180" cy="86" rx="240" ry="58" fill="#ffffff" opacity="0.05"/>
+  <path d="M0 900 L0 790 C230 708 504 714 808 812 C1122 914 1344 918 1600 852 L1600 900 Z" fill="#312c8f"/>
 </svg>
