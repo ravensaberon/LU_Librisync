@@ -60,7 +60,7 @@
         </div>
         <div class="metric-card">
             <div class="metric-value">${outstandingFineTotal}</div>
-            <div class="metric-label">Outstanding fines</div>
+            <div class="metric-label">Remaining balance</div>
         </div>
         <div class="metric-card">
             <div class="metric-value">${borrowerStanding.remainingLoanSlots}</div>
@@ -95,9 +95,12 @@
             <div class="section-title">Recent fine activity</div>
             <ul class="list-clean">
                 <c:forEach items="${studentFines}" var="fine" end="4">
-                    <li class="d-flex justify-content-between align-items-center">
-                        <span>${fine.issueRecord.book.title}</span>
-                        <span class="tag-chip">${fine.amount} | ${fine.status}</span>
+                    <li class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <div class="fw-bold">${fine.issueRecord.book.title}</div>
+                            <div class="small muted-text">Rem: ${fine.remainingAmount} / Total: ${fine.amount}</div>
+                        </div>
+                        <span class="tag-chip">${fine.status}</span>
                     </li>
                 </c:forEach>
                 <c:if test="${empty studentFines}">

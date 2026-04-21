@@ -1,8 +1,10 @@
 package com.lulibrisync.service;
 
 import com.lulibrisync.model.Fine;
+import com.lulibrisync.model.FinePayment;
 import com.lulibrisync.model.FineStatus;
 import com.lulibrisync.model.IssueRecord;
+import com.lulibrisync.repository.FinePaymentRepository;
 import com.lulibrisync.repository.FineRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,11 +17,14 @@ import java.util.List;
 public class FineService {
 
     private final FineRepository fineRepository;
+    private final FinePaymentRepository finePaymentRepository;
     private final AuditLogService auditLogService;
 
     public FineService(FineRepository fineRepository,
+                       FinePaymentRepository finePaymentRepository,
                        AuditLogService auditLogService) {
         this.fineRepository = fineRepository;
+        this.finePaymentRepository = finePaymentRepository;
         this.auditLogService = auditLogService;
     }
 
@@ -44,11 +49,11 @@ public class FineService {
     }
 
     public long countOutstandingFines() {
-        return fineRepository.countByStatus(FineStatus.UNPAID);
+        return fineRepository.countByStatus(FineStatus.UNPAID) + fineRepository.countByStatus(FineStatus.PARTIALLY_PAID);
     }
 
     public BigDecimal getOutstandingFineTotal() {
-        return normalizeAmount(fineRepository.sumAmountByStatus(FineStatus.UNPAID));
+        return normalizeAmount(fineRepository.sumOutstandingAmount(List.of(FineStatus.UNPAID, FineStatus.PARTIALLY_PAID)));
     }
 
     public long countByStatus(FineStatus status) {
@@ -62,7 +67,10 @@ public class FineService {
         if (status == null) {
             return BigDecimal.ZERO;
         }
-        return normalizeAmount(fineRepository.sumAmountByStatus(status));
+        if (FineStatus.UNPAID.equals(status) || FineStatus.PARTIALLY_PAID.equals(status)) {
+            return normalizeAmount(fineRepository.sumOutstandingAmount(List.of(status)));
+        }
+        return normalizeAmount(fineRepository.sumTotalAmountByStatus(status));
     }
 
     public boolean hasOutstandingFine(Long studentId) {
@@ -73,14 +81,15 @@ public class FineService {
         if (studentId == null) {
             return 0L;
         }
-        return fineRepository.countByStudent_IdAndStatus(studentId, FineStatus.UNPAID);
+        return fineRepository.countByStudent_IdAndStatus(studentId, FineStatus.UNPAID)
+                + fineRepository.countByStudent_IdAndStatus(studentId, FineStatus.PARTIALLY_PAID);
     }
 
     public BigDecimal getOutstandingFineTotalByStudent(Long studentId) {
         if (studentId == null) {
             return BigDecimal.ZERO;
         }
-        return normalizeAmount(fineRepository.sumAmountByStudentIdAndStatus(studentId, FineStatus.UNPAID));
+        return normalizeAmount(fineRepository.sumOutstandingAmountByStudentId(studentId, List.of(FineStatus.UNPAID, FineStatus.PARTIALLY_PAID)));
     }
 
     @Transactional
@@ -152,19 +161,55 @@ public class FineService {
     @Transactional
     public Fine markFinePaid(Long fineId, String actorEmail) {
         Fine fine = getFineById(fineId);
-        if (!FineStatus.UNPAID.equals(fine.getStatus())) {
-            throw new IllegalArgumentException("Only unpaid fines can be marked as paid.");
+        if (!FineStatus.UNPAID.equals(fine.getStatus()) && !FineStatus.PARTIALLY_PAID.equals(fine.getStatus())) {
+            throw new IllegalArgumentException("Only unpaid or partially paid fines can be marked as paid.");
         }
-        fine.setStatus(FineStatus.PAID);
-        fine.setPaidAt(LocalDateTime.now());
+
+        BigDecimal remaining = fine.getRemainingAmount();
+        return recordPayment(fineId, remaining, "CASH", "FULL-PAY-" + System.currentTimeMillis(), actorEmail, "Full payment settlement.");
+    }
+
+    @Transactional
+    public Fine recordPayment(Long fineId, BigDecimal amount, String method, String receiptNumber, String actorEmail, String remarks) {
+        Fine fine = getFineById(fineId);
+        if (!FineStatus.UNPAID.equals(fine.getStatus()) && !FineStatus.PARTIALLY_PAID.equals(fine.getStatus())) {
+            throw new IllegalArgumentException("Payments can only be recorded for unpaid or partially paid fines.");
+        }
+
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Payment amount must be greater than zero.");
+        }
+
+        BigDecimal remaining = fine.getRemainingAmount();
+        if (amount.compareTo(remaining) > 0) {
+            throw new IllegalArgumentException("Payment amount exceeds the remaining fine balance of " + remaining);
+        }
+
+        FinePayment payment = new FinePayment();
+        payment.setFine(fine);
+        payment.setAmount(amount);
+        payment.setPaymentMethod(method);
+        payment.setReceiptNumber(receiptNumber);
+        payment.setRemarks(remarks);
+        payment.setPaymentDate(LocalDateTime.now());
+        finePaymentRepository.save(payment);
+
+        fine.setPaidAmount(fine.getPaidAmount().add(amount));
+        if (fine.getPaidAmount().compareTo(fine.getAmount()) >= 0) {
+            fine.setStatus(FineStatus.PAID);
+            fine.setPaidAt(LocalDateTime.now());
+        } else {
+            fine.setStatus(FineStatus.PARTIALLY_PAID);
+        }
+
         Fine savedFine = fineRepository.save(fine);
         auditLogService.log(
                 actorEmail,
-                "FINE_PAID",
+                "FINE_PAYMENT",
                 "FINE",
                 savedFine.getId().toString(),
-                "Fine marked as paid",
-                "Issue record: " + savedFine.getIssueRecord().getId() + " | Amount: " + savedFine.getAmount()
+                "Fine payment recorded",
+                "Amount: " + amount + " | Receipt: " + receiptNumber + " | Status: " + savedFine.getStatus()
         );
         return savedFine;
     }
@@ -172,8 +217,8 @@ public class FineService {
     @Transactional
     public Fine waiveFine(Long fineId, String actorEmail) {
         Fine fine = getFineById(fineId);
-        if (!FineStatus.UNPAID.equals(fine.getStatus())) {
-            throw new IllegalArgumentException("Only unpaid fines can be waived.");
+        if (!FineStatus.UNPAID.equals(fine.getStatus()) && !FineStatus.PARTIALLY_PAID.equals(fine.getStatus())) {
+            throw new IllegalArgumentException("Only unpaid or partially paid fines can be waived.");
         }
         fine.setStatus(FineStatus.WAIVED);
         fine.setPaidAt(LocalDateTime.now());
