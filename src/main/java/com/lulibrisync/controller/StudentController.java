@@ -81,6 +81,7 @@ public class StudentController {
         model.addAttribute("borrowerStanding", studentService.getBorrowerStanding(student));
         model.addAttribute("outstandingFineTotal", fineService.getOutstandingFineTotalByStudent(student.getId()));
         model.addAttribute("studentFines", fineService.getStudentFines(student.getId()));
+        model.addAttribute("popularBooks", issueService.getMostBorrowedBooks());
         return "student/dashboard";
     }
 

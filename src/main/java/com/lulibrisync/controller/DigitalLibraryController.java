@@ -1,6 +1,7 @@
 package com.lulibrisync.controller;
 
 import com.lulibrisync.model.Book;
+import com.lulibrisync.service.AuditLogService;
 import com.lulibrisync.service.BookService;
 import com.lulibrisync.service.DigitalLibraryService;
 import org.springframework.core.io.Resource;
@@ -8,6 +9,7 @@ import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,20 +20,33 @@ public class DigitalLibraryController {
 
     private final BookService bookService;
     private final DigitalLibraryService digitalLibraryService;
+    private final AuditLogService auditLogService;
 
     public DigitalLibraryController(BookService bookService,
-                                    DigitalLibraryService digitalLibraryService) {
+                                    DigitalLibraryService digitalLibraryService,
+                                    AuditLogService auditLogService) {
         this.bookService = bookService;
         this.digitalLibraryService = digitalLibraryService;
+        this.auditLogService = auditLogService;
     }
 
     @GetMapping("/student/ebooks/{bookId}")
-    public String ebookReader(@PathVariable Long bookId, Model model) {
+    public String ebookReader(@PathVariable Long bookId, Authentication authentication, Model model) {
         Book book = bookService.getBookById(bookId);
         if (!book.isDigital() || !digitalLibraryService.hasReadableEbook(book)) {
             throw new IllegalArgumentException("This title does not have a readable digital copy yet.");
         }
 
+        if (authentication != null) {
+            auditLogService.log(
+                    authentication.getName(),
+                    "DIGITAL_BOOK_OPENED",
+                    "BOOK",
+                    book.getId().toString(),
+                    "Digital book opened",
+                    "Opened e-book reader for " + book.getTitle()
+            );
+        }
         model.addAttribute("book", book);
         return "student/ebook-reader";
     }

@@ -208,6 +208,43 @@ public class IssueService {
         return activeIssueStatuses;
     }
 
+    public Map<Long, Long> getActiveIssueIdsForStudentBooks(String email) {
+        Map<Long, Long> activeIssueIds = new LinkedHashMap<>();
+        for (IssueRecord issueRecord : getStudentIssues(email)) {
+            if (!issueRecord.isReturned() && !activeIssueIds.containsKey(issueRecord.getBook().getId())) {
+                activeIssueIds.put(issueRecord.getBook().getId(), issueRecord.getId());
+            }
+        }
+        return activeIssueIds;
+    }
+
+    public Map<Long, LocalDate> getActiveIssueDueDatesForStudentBooks(String email) {
+        Map<Long, LocalDate> activeIssueDueDates = new LinkedHashMap<>();
+        for (IssueRecord issueRecord : getStudentIssues(email)) {
+            if (!issueRecord.isReturned() && !activeIssueDueDates.containsKey(issueRecord.getBook().getId()) && issueRecord.getDueDate() != null) {
+                activeIssueDueDates.put(issueRecord.getBook().getId(), issueRecord.getDueDate().toLocalDate());
+            }
+        }
+        return activeIssueDueDates;
+    }
+
+    public Map<Long, LocalDate> getNextAvailableDatesByBookIds(List<Long> bookIds) {
+        if (bookIds == null || bookIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, LocalDate> nextAvailableDates = new LinkedHashMap<>();
+        for (IssueRecord issueRecord : issueRecordRepository.findByBook_IdInAndStatusInOrderByDueDateAsc(
+                bookIds,
+                List.of(IssueStatus.ISSUED, IssueStatus.OVERDUE))) {
+            Long bookId = issueRecord.getBook().getId();
+            if (!nextAvailableDates.containsKey(bookId) && issueRecord.getDueDate() != null) {
+                nextAvailableDates.put(bookId, issueRecord.getDueDate().toLocalDate());
+            }
+        }
+        return nextAvailableDates;
+    }
+
     public List<BookBorrowStat> getMostBorrowedBooks() {
         return issueRecordRepository.findMostBorrowedBooks(PageRequest.of(0, 5));
     }
@@ -222,6 +259,16 @@ public class IssueService {
         }
         return issueRecordRepository.findById(issueId)
                 .orElseThrow(() -> new IllegalArgumentException("Issue record not found."));
+    }
+
+    @Transactional
+    public IssueRecord returnBookByStudent(Long issueId, String email) {
+        Student student = studentService.getStudentByEmail(email);
+        IssueRecord issueRecord = getIssueById(issueId);
+        if (!issueRecord.getStudent().getId().equals(student.getId())) {
+            throw new IllegalArgumentException("You can only return books issued to your account.");
+        }
+        return returnBook(issueId);
     }
 
     @Transactional

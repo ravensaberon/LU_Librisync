@@ -129,6 +129,28 @@ public class IssueController {
         return "redirect:/admin/issues";
     }
 
+    @PostMapping("/student/issues/{issueId}/return")
+    public String returnBookByStudent(@PathVariable Long issueId,
+                                      @RequestParam(defaultValue = "/student/history") String redirectTo,
+                                      Authentication authentication,
+                                      RedirectAttributes redirectAttributes) {
+        try {
+            var issueRecord = issueService.returnBookByStudent(issueId, authentication.getName());
+            auditLogService.log(
+                    authentication.getName(),
+                    "SELF_SERVICE_RETURN",
+                    "ISSUE_RECORD",
+                    issueId.toString(),
+                    "Student returned a borrowed book",
+                    "Issue code: " + issueRecord.getQrIssueCode() + " | Fine: " + issueRecord.getFineAmount()
+            );
+            redirectAttributes.addFlashAttribute("success", "Book returned successfully.");
+        } catch (IllegalArgumentException exception) {
+            redirectAttributes.addFlashAttribute("error", exception.getMessage());
+        }
+        return "redirect:" + resolveStudentRedirect(redirectTo);
+    }
+
     @PostMapping("/admin/issues/{issueId}/delete")
     public String deleteIssue(@PathVariable Long issueId,
                               Authentication authentication,
@@ -149,5 +171,15 @@ public class IssueController {
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
         }
         return "redirect:/admin/issues";
+    }
+
+    private String resolveStudentRedirect(String redirectTo) {
+        if (redirectTo == null || redirectTo.isBlank()) {
+            return "/student/history";
+        }
+        if (redirectTo.startsWith("/student/")) {
+            return redirectTo;
+        }
+        return "/student/history";
     }
 }

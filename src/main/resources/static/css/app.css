@@ -1303,6 +1303,18 @@ body.shell-nav-collapsed .app-nav {
     color: var(--ink);
 }
 
+.modal-backdrop {
+    z-index: 1295;
+}
+
+.modal {
+    z-index: 1305;
+}
+
+.swal2-container {
+    z-index: 1500;
+}
+
 .modal-panel-grid {
     display: grid;
     gap: 18px;
@@ -1340,6 +1352,149 @@ body.shell-nav-collapsed .app-nav {
     box-shadow: var(--shadow-soft);
     position: relative;
     overflow: hidden;
+}
+
+.catalog-card-button {
+    width: 100%;
+    display: flex;
+    align-items: stretch;
+    gap: 18px;
+    text-align: left;
+    cursor: pointer;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.catalog-card-button:hover,
+.catalog-card-button:focus-visible {
+    transform: translateY(-3px);
+    box-shadow: 0 18px 36px rgba(15, 127, 52, 0.12);
+    border-color: rgba(15, 127, 52, 0.22);
+}
+
+.reservation-pickup-form {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 10px 12px;
+}
+
+.reservation-pickup-form .form-label {
+    margin-right: 2px;
+}
+
+.reservation-pickup-form .form-control {
+    max-width: 190px;
+}
+
+.catalog-cover {
+    flex: 0 0 92px;
+    min-height: 126px;
+    border-radius: 20px;
+    display: grid;
+    place-items: center;
+    background:
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.18), transparent 34%),
+        linear-gradient(160deg, var(--primary-900), var(--primary-700));
+    color: #fff;
+    font-size: 2.2rem;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.catalog-cover-large {
+    width: min(100%, 180px);
+    min-height: 220px;
+    font-size: 3rem;
+}
+
+.catalog-summary {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 10px;
+}
+
+.catalog-title {
+    color: var(--ink);
+    font-size: 1.08rem;
+    font-weight: 800;
+    line-height: 1.4;
+    font-family: "Poppins", "Manrope", sans-serif;
+}
+
+.catalog-author,
+.catalog-year {
+    color: var(--muted);
+    line-height: 1.55;
+}
+
+.popular-book-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+}
+
+.ebook-reader-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.ebook-reader-toolbar {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 16px 18px;
+    border-radius: 22px;
+    border: 1px solid var(--line);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), var(--primary-050));
+}
+
+.ebook-reader-toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.ebook-reader-label {
+    color: var(--muted);
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.ebook-reader-page-input {
+    width: 88px;
+    text-align: center;
+}
+
+.ebook-reader-status {
+    color: var(--muted);
+    font-size: 0.96rem;
+}
+
+.ebook-reader-stage {
+    min-height: 78vh;
+    padding: 22px;
+    border-radius: 24px;
+    border: 1px solid var(--line);
+    background:
+        radial-gradient(circle at top, rgba(15, 127, 52, 0.04), transparent 34%),
+        linear-gradient(180deg, #ffffff, var(--primary-050));
+    display: grid;
+    place-items: center;
+    overflow: auto;
+}
+
+.ebook-reader-stage canvas {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 18px 42px rgba(17, 24, 39, 0.12);
 }
 
 .catalog-card::before,
@@ -1441,6 +1596,42 @@ body.shell-nav-collapsed .app-nav {
 
 .nav-links form {
     width: 100%;
+}
+
+@media (max-width: 768px) {
+    .catalog-card-button {
+        flex-direction: column;
+    }
+
+    .catalog-cover {
+        width: 100%;
+        min-height: 180px;
+    }
+
+    .catalog-cover-large {
+        width: 100%;
+    }
+
+    .ebook-reader-toolbar,
+    .ebook-reader-toolbar-group {
+        align-items: stretch;
+    }
+
+    .ebook-reader-toolbar-group {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .ebook-reader-page-input {
+        width: 100%;
+        max-width: 120px;
+    }
+
+    .reservation-pickup-form .form-control,
+    .reservation-pickup-form .btn {
+        width: 100%;
+        max-width: none;
+    }
 }
 
 .nav-links form .nav-pill {

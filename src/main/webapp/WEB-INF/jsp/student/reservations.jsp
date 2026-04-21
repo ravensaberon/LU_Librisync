@@ -48,6 +48,7 @@
                 <thead>
                 <tr>
                     <th>Book</th>
+                    <th>Preferred pickup</th>
                     <th>Queue position</th>
                     <th>Status</th>
                     <th>Reserved at</th>
@@ -59,6 +60,7 @@
                 <c:forEach items="${reservations}" var="reservation">
                     <tr>
                         <td>${reservation.book.title}</td>
+                        <td>${reservation.preferredPickupDate}</td>
                         <td>${reservation.queuePosition}</td>
                         <td><span class="tag-chip">${reservation.status}</span></td>
                         <td>${reservation.reservedAt}</td>
@@ -84,7 +86,7 @@
                 </c:forEach>
                 <c:if test="${empty reservations}">
                     <tr>
-                        <td colspan="6" class="text-center muted-text">You do not have any reservations yet.</td>
+                        <td colspan="7" class="text-center muted-text">You do not have any reservations yet.</td>
                     </tr>
                 </c:if>
                 </tbody>

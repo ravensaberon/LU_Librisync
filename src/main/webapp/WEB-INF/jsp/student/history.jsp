@@ -29,6 +29,13 @@
         </div>
     </div>
 
+    <c:if test="${not empty success}">
+        <div class="alert alert-success">${success}</div>
+    </c:if>
+    <c:if test="${not empty error}">
+        <div class="alert alert-danger">${error}</div>
+    </c:if>
+
     <section class="panel-card">
         <div class="section-title">Reading history overview</div>
         <div class="info-grid mb-4">
@@ -64,6 +71,7 @@
                     <th>Return date</th>
                     <th>Status</th>
                     <th>Fine</th>
+                    <th>Action</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -75,11 +83,25 @@
                         <td>${issue.returnDate}</td>
                         <td><span class="tag-chip">${issue.status}</span></td>
                         <td>${issue.fineAmount}</td>
+                        <td>
+                            <c:choose>
+                                <c:when test="${issue.returned}">
+                                    <span class="muted-text">Completed</span>
+                                </c:when>
+                                <c:otherwise>
+                                    <form method="post" action="${pageContext.request.contextPath}/student/issues/${issue.id}/return">
+                                        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                                        <input type="hidden" name="redirectTo" value="/student/history">
+                                        <button class="btn btn-warm" type="submit">Return book</button>
+                                    </form>
+                                </c:otherwise>
+                            </c:choose>
+                        </td>
                     </tr>
                 </c:forEach>
                 <c:if test="${empty issueRecords}">
                     <tr>
-                        <td colspan="6" class="text-center muted-text">No history available yet.</td>
+                        <td colspan="7" class="text-center muted-text">No history available yet.</td>
                     </tr>
                 </c:if>
                 </tbody>

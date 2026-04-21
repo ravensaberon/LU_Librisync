@@ -183,10 +183,12 @@ public class BookController {
         var books = bookService.searchBooks(keyword, categoryId, authorId, isbn, availableOnly);
         Map<Long, Integer> readyReservationCountsByBook = reservationService.getReadyReservationCountsByBook();
         Map<Long, Integer> walkInBorrowableCopyCountByBook = new LinkedHashMap<>();
+        Map<Long, Boolean> readableEbookByBookId = new LinkedHashMap<>();
         for (var book : books) {
             int availableCopies = book.getAvailableQuantity() == null ? 0 : Math.max(0, book.getAvailableQuantity());
             int readyReservations = readyReservationCountsByBook.getOrDefault(book.getId(), 0);
             walkInBorrowableCopyCountByBook.put(book.getId(), Math.max(0, availableCopies - readyReservations));
+            readableEbookByBookId.put(book.getId(), digitalLibraryService.hasReadableEbook(book));
         }
 
         model.addAttribute("books", books);
@@ -198,10 +200,16 @@ public class BookController {
         model.addAttribute("isbnValue", isbn);
         model.addAttribute("availableOnly", availableOnly);
         model.addAttribute("studentActiveIssueStatusByBookId", issueService.getActiveIssueStatusesForStudentBooks(authentication.getName()));
+        model.addAttribute("studentActiveIssueIdByBookId", issueService.getActiveIssueIdsForStudentBooks(authentication.getName()));
+        model.addAttribute("studentActiveIssueDueDateByBookId", issueService.getActiveIssueDueDatesForStudentBooks(authentication.getName()));
         model.addAttribute("studentReservationStatusByBookId", reservationService.getReservationStatusesForStudentBooks(authentication.getName()));
         model.addAttribute("reservationQueueSizes", reservationService.getActiveQueueSizesByBook());
         model.addAttribute("readyReservationCountsByBook", readyReservationCountsByBook);
         model.addAttribute("walkInBorrowableCopyCountByBook", walkInBorrowableCopyCountByBook);
+        model.addAttribute("readableEbookByBookId", readableEbookByBookId);
+        model.addAttribute("nextAvailableDateByBookId", issueService.getNextAvailableDatesByBookIds(books.stream().map(book -> book.getId()).toList()));
+        model.addAttribute("todayDate", LocalDate.now());
+        model.addAttribute("reservationScheduleMaxDate", LocalDate.now().plusDays(reservationService.getMaxPreferredPickupDays()));
         model.addAttribute("defaultBorrowDueDate", LocalDate.now().plusDays(circulationPolicyService.getMaxLoanDays()));
         model.addAttribute("maxLoanDays", circulationPolicyService.getMaxLoanDays());
         return "student/catalog";

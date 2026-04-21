@@ -92,19 +92,40 @@
         </div>
 
         <div class="panel-card">
-            <div class="section-title">Recent fine activity</div>
+            <div class="section-title">Popular books</div>
             <ul class="list-clean">
-                <c:forEach items="${studentFines}" var="fine" end="4">
-                    <li class="d-flex justify-content-between align-items-center">
-                        <span>${fine.issueRecord.book.title}</span>
-                        <span class="tag-chip">${fine.amount} | ${fine.status}</span>
+                <c:forEach items="${popularBooks}" var="bookStat">
+                    <li class="popular-book-item">
+                        <div>
+                            <strong>${bookStat.title}</strong>
+                            <div class="muted-text">Most borrowed in the current catalog</div>
+                        </div>
+                        <span class="tag-chip">${bookStat.borrowCount} borrow(s)</span>
                     </li>
                 </c:forEach>
-                <c:if test="${empty studentFines}">
-                    <li class="muted-text">No fines are currently recorded for your account.</li>
+                <c:if test="${empty popularBooks}">
+                    <li class="muted-text">Popular titles will appear here once circulation activity builds up.</li>
                 </c:if>
             </ul>
         </div>
+    </section>
+
+    <section class="panel-card mb-4">
+        <div class="section-title">Recent fine activity</div>
+        <ul class="list-clean">
+            <c:forEach items="${studentFines}" var="fine" end="4">
+                <li class="popular-book-item">
+                    <div>
+                        <strong>${fine.issueRecord.book.title}</strong>
+                        <div class="muted-text">${fine.status}</div>
+                    </div>
+                    <span class="tag-chip">${fine.amount}</span>
+                </li>
+            </c:forEach>
+            <c:if test="${empty studentFines}">
+                <li class="muted-text">No fines are currently recorded for your account.</li>
+            </c:if>
+        </ul>
     </section>
 
     <section class="panel-card">

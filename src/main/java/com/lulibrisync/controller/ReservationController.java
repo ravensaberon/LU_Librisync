@@ -46,24 +46,32 @@ public class ReservationController {
         model.addAttribute("reservations", reservationService.getStudentReservations(authentication.getName()));
         model.addAttribute("defaultBorrowDueDate", LocalDate.now().plusDays(circulationPolicyService.getMaxLoanDays()));
         model.addAttribute("maxLoanDays", circulationPolicyService.getMaxLoanDays());
+        model.addAttribute("reservationScheduleMaxDate", LocalDate.now().plusDays(reservationService.getMaxPreferredPickupDays()));
         return "student/reservations";
     }
 
     @PostMapping("/student/reservations")
     public String placeReservation(@RequestParam Long bookId,
+                                   @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate preferredPickupDate,
                                    Authentication authentication,
                                    RedirectAttributes redirectAttributes) {
         try {
-            var reservation = reservationService.placeReservation(bookId, authentication.getName());
+            var reservation = reservationService.placeReservation(bookId, authentication.getName(), preferredPickupDate);
             auditLogService.log(
                     authentication.getName(),
                     "RESERVATION_CREATED",
                     "RESERVATION",
                     reservation.getId().toString(),
                     "Reservation placed",
-                    "Book: " + reservation.getBook().getTitle() + " | Queue: " + reservation.getQueuePosition()
+                    "Book: " + reservation.getBook().getTitle()
+                            + " | Queue: " + reservation.getQueuePosition()
+                            + " | Preferred pickup: " + reservation.getPreferredPickupDate()
             );
-            redirectAttributes.addFlashAttribute("success", "Book reserved successfully. You will be notified once it becomes available.");
+            if (ReservationStatus.READY.equals(reservation.getStatus())) {
+                redirectAttributes.addFlashAttribute("success", "Reservation placed. Your pickup hold is already ready to borrow.");
+            } else {
+                redirectAttributes.addFlashAttribute("success", "Reservation placed for " + reservation.getPreferredPickupDate() + ".");
+            }
         } catch (IllegalArgumentException exception) {
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
         }

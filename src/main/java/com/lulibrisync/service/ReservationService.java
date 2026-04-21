@@ -12,7 +12,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -31,6 +33,7 @@ public class ReservationService {
     private final EmailNotificationService emailNotificationService;
     private final CirculationPolicyService circulationPolicyService;
     private final int claimWindowHours;
+    private final int maxPreferredPickupDays;
 
     public ReservationService(ReservationRepository reservationRepository,
                               BookRepository bookRepository,
@@ -38,7 +41,8 @@ public class ReservationService {
                               StudentService studentService,
                               EmailNotificationService emailNotificationService,
                               CirculationPolicyService circulationPolicyService,
-                              @org.springframework.beans.factory.annotation.Value("${lulibrisync.reservations.claim-hours:48}") int claimWindowHours) {
+                              @org.springframework.beans.factory.annotation.Value("${lulibrisync.reservations.claim-hours:48}") int claimWindowHours,
+                              @org.springframework.beans.factory.annotation.Value("${lulibrisync.reservations.max-preferred-pickup-days:30}") int maxPreferredPickupDays) {
         this.reservationRepository = reservationRepository;
         this.bookRepository = bookRepository;
         this.issueRecordRepository = issueRecordRepository;
@@ -46,6 +50,7 @@ public class ReservationService {
         this.emailNotificationService = emailNotificationService;
         this.circulationPolicyService = circulationPolicyService;
         this.claimWindowHours = Math.max(1, claimWindowHours);
+        this.maxPreferredPickupDays = Math.max(1, maxPreferredPickupDays);
     }
 
     public List<Reservation> getAllReservations() {
@@ -102,8 +107,17 @@ public class ReservationService {
         return statuses;
     }
 
+    public int getMaxPreferredPickupDays() {
+        return maxPreferredPickupDays;
+    }
+
     @Transactional
     public Reservation placeReservation(Long bookId, String email) {
+        return placeReservation(bookId, email, LocalDate.now());
+    }
+
+    @Transactional
+    public Reservation placeReservation(Long bookId, String email, LocalDate preferredPickupDate) {
         if (bookId == null) {
             throw new IllegalArgumentException("Book is required.");
         }
@@ -116,12 +130,16 @@ public class ReservationService {
         if (issueRecordRepository.existsByBook_IdAndStudent_IdAndStatusIn(bookId, student.getId(), List.of(IssueStatus.ISSUED, IssueStatus.OVERDUE))) {
             throw new IllegalArgumentException("You already have this book on loan.");
         }
-
-        if (getWalkInBorrowableCopyCount(book) > 0) {
-            throw new IllegalArgumentException("This book is currently available. You can borrow it directly from the library.");
-        }
         if (reservationRepository.existsByBook_IdAndStudent_IdAndStatusIn(bookId, student.getId(), ACTIVE_STATUSES)) {
             throw new IllegalArgumentException("You already have an active reservation for this book.");
+        }
+
+        LocalDate requestedPickupDate = preferredPickupDate == null ? LocalDate.now() : preferredPickupDate;
+        if (requestedPickupDate.isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("Preferred pickup date cannot be earlier than today.");
+        }
+        if (requestedPickupDate.isAfter(LocalDate.now().plusDays(maxPreferredPickupDays))) {
+            throw new IllegalArgumentException("Preferred pickup date is too far ahead. Please choose a nearer date.");
         }
 
         Reservation reservation = new Reservation();
@@ -129,11 +147,13 @@ public class ReservationService {
         reservation.setStudent(student);
         reservation.setStatus(ReservationStatus.PENDING);
         reservation.setReservedAt(LocalDateTime.now());
+        reservation.setPreferredPickupDate(requestedPickupDate);
         reservation.setQueuePosition((int) reservationRepository.countByBook_IdAndStatusIn(bookId, ACTIVE_STATUSES) + 1);
 
         Reservation savedReservation = reservationRepository.save(reservation);
+        reindexQueue(bookId);
         promoteReservationsForBook(bookId);
-        return savedReservation;
+        return getReservationById(savedReservation.getId());
     }
 
     @Transactional
@@ -233,7 +253,7 @@ public class ReservationService {
             if (promotableSlots < 1) {
                 break;
             }
-            if (ReservationStatus.PENDING.equals(reservation.getStatus())) {
+            if (ReservationStatus.PENDING.equals(reservation.getStatus()) && isReadyForPickup(reservation)) {
                 reservation.setStatus(ReservationStatus.READY);
                 reservation.setExpiresAt(LocalDateTime.now().plusHours(claimWindowHours));
                 reservationRepository.save(reservation);
@@ -259,6 +279,7 @@ public class ReservationService {
         }
     }
 
+    @Scheduled(fixedDelay = 300000)
     @Transactional
     public void syncReadyReservations() {
         Set<Long> processedBookIds = new LinkedHashSet<>();
@@ -284,6 +305,10 @@ public class ReservationService {
 
     private void reindexQueue(Long bookId) {
         List<Reservation> activeReservations = reservationRepository.findByBook_IdAndStatusInOrderByQueuePositionAscReservedAtAsc(bookId, ACTIVE_STATUSES);
+        activeReservations.sort(Comparator
+                .comparing(this::resolvePriorityDate)
+                .thenComparing(Reservation::getReservedAt)
+                .thenComparing(Reservation::getId));
         int index = 1;
         for (Reservation reservation : activeReservations) {
             reservation.setQueuePosition(index++);
@@ -303,5 +328,17 @@ public class ReservationService {
 
     private int getAvailableCopyCount(Book book) {
         return book == null || book.getAvailableQuantity() == null ? 0 : Math.max(0, book.getAvailableQuantity());
+    }
+
+    private boolean isReadyForPickup(Reservation reservation) {
+        LocalDate preferredPickupDate = reservation.getPreferredPickupDate();
+        return preferredPickupDate == null || !preferredPickupDate.isAfter(LocalDate.now());
+    }
+
+    private LocalDate resolvePriorityDate(Reservation reservation) {
+        if (reservation.getPreferredPickupDate() != null) {
+            return reservation.getPreferredPickupDate();
+        }
+        return reservation.getReservedAt() == null ? LocalDate.now() : reservation.getReservedAt().toLocalDate();
     }
 }

@@ -13,6 +13,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -43,6 +44,9 @@ public class Reservation {
 
     @Column(name = "expires_at")
     private LocalDateTime expiresAt;
+
+    @Column(name = "preferred_pickup_date")
+    private LocalDate preferredPickupDate;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -122,5 +126,13 @@ public class Reservation {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public LocalDate getPreferredPickupDate() {
+        return preferredPickupDate;
+    }
+
+    public void setPreferredPickupDate(LocalDate preferredPickupDate) {
+        this.preferredPickupDate = preferredPickupDate;
     }
 }
