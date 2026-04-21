@@ -48,6 +48,52 @@
         </div>
     </section>
 
+    <section class="modal-section modal-panel-grid">
+        <div class="modal-card">
+            <div class="section-title">Borrower standing</div>
+            <div class="support-item">
+                <strong>${borrowerStanding.statusLabel}</strong>
+                <span>
+                    Active loans: ${borrowerStanding.activeLoansCount}/${borrowerStanding.maxActiveLoans}
+                    | Remaining slots: ${borrowerStanding.remainingLoanSlots}
+                    | Unpaid fines: ${borrowerStanding.outstandingFineAmount}
+                </span>
+            </div>
+            <c:if test="${borrowerStanding.blocked}">
+                <div class="support-list mt-3">
+                    <c:forEach items="${borrowerStanding.blockers}" var="blocker">
+                        <div class="support-item">
+                            <strong>Borrowing blocker</strong>
+                            <span>${blocker}</span>
+                        </div>
+                    </c:forEach>
+                </div>
+            </c:if>
+        </div>
+
+        <div class="modal-card">
+            <div class="section-title">Fine ledger summary</div>
+            <div class="modal-stat-grid">
+                <div class="modal-stat-card">
+                    <span class="modal-stat-label">Outstanding Amount</span>
+                    <strong class="modal-stat-value">${borrowerStanding.outstandingFineAmount}</strong>
+                </div>
+                <div class="modal-stat-card">
+                    <span class="modal-stat-label">Unpaid Fine Records</span>
+                    <strong class="modal-stat-value">${borrowerStanding.unpaidFineCount}</strong>
+                </div>
+                <div class="modal-stat-card">
+                    <span class="modal-stat-label">Overdue Items</span>
+                    <strong class="modal-stat-value">${borrowerStanding.overdueCount}</strong>
+                </div>
+                <div class="modal-stat-card">
+                    <span class="modal-stat-label">Account Access</span>
+                    <strong class="modal-stat-value">${student.user.status}</strong>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <section class="modal-section">
         <div class="section-title">Update Student Account</div>
         <form method="post" action="${pageContext.request.contextPath}/admin/students/${student.studentId}/update" class="row g-3">
@@ -122,7 +168,7 @@
             </p>
             <form method="post" action="${pageContext.request.contextPath}/admin/students/${student.studentId}/delete">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                <button class="btn btn-danger" type="submit" onclick="return confirm('Delete this student account?');">Delete student account</button>
+                <button class="btn btn-danger" type="submit">Delete student account</button>
             </form>
         </div>
     </section>
@@ -155,6 +201,39 @@
                 <c:if test="${empty activeIssues}">
                     <tr>
                         <td colspan="6" class="text-center muted-text">No active borrowed books for this student.</td>
+                    </tr>
+                </c:if>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="modal-section">
+        <div class="section-title">Fine ledger</div>
+        <div class="table-responsive">
+            <table class="table align-middle modal-table">
+                <thead>
+                <tr>
+                    <th>Issue Code</th>
+                    <th>Book</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Calculated</th>
+                </tr>
+                </thead>
+                <tbody>
+                <c:forEach items="${studentFines}" var="fine">
+                    <tr>
+                        <td>${fine.issueRecord.qrIssueCode}</td>
+                        <td>${fine.issueRecord.book.title}</td>
+                        <td>${fine.amount}</td>
+                        <td><span class="tag-chip">${fine.status}</span></td>
+                        <td>${fine.calculatedAt}</td>
+                    </tr>
+                </c:forEach>
+                <c:if test="${empty studentFines}">
+                    <tr>
+                        <td colspan="5" class="text-center muted-text">No fine ledger entries for this borrower yet.</td>
                     </tr>
                 </c:if>
                 </tbody>

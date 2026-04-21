@@ -21,6 +21,8 @@
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/books">Books</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/issues">Issue / Return</a>
             <a class="nav-pill active" href="${pageContext.request.contextPath}/admin/students">Students</a>
+            <a class="nav-pill" href="${pageContext.request.contextPath}/admin/fines">Fines</a>
+            <a class="nav-pill" href="${pageContext.request.contextPath}/admin/reports">Reports</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/references">Categories / Authors</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/profile">Profile</a>
             <form method="post" action="${pageContext.request.contextPath}/logout">
@@ -169,7 +171,7 @@
                 </p>
                 <form method="post" action="${pageContext.request.contextPath}/admin/students/${student.studentId}/delete">
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                    <button class="btn btn-danger" type="submit" onclick="return confirm('Delete this student account?');">Delete student account</button>
+                    <button class="btn btn-danger" type="submit">Delete student account</button>
                 </form>
             </div>
         </div>
@@ -273,5 +275,7 @@
         </div>
     </section>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="${pageContext.request.contextPath}/js/app.js"></script>
 </body>
 </html>

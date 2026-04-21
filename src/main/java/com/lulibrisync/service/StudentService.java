@@ -1,6 +1,7 @@
 package com.lulibrisync.service;
 
 import com.lulibrisync.config.LegacyAwarePasswordEncoder;
+import com.lulibrisync.dto.BorrowerStanding;
 import com.lulibrisync.dto.StudentProfileUpdateRequest;
 import com.lulibrisync.model.IssueStatus;
 import com.lulibrisync.model.Student;
@@ -27,15 +28,18 @@ public class StudentService {
     private final UserRepository userRepository;
     private final IssueRecordRepository issueRecordRepository;
     private final LegacyAwarePasswordEncoder passwordEncoder;
+    private final CirculationPolicyService circulationPolicyService;
 
     public StudentService(StudentRepository studentRepository,
                           UserRepository userRepository,
                           IssueRecordRepository issueRecordRepository,
-                          LegacyAwarePasswordEncoder passwordEncoder) {
+                          LegacyAwarePasswordEncoder passwordEncoder,
+                          CirculationPolicyService circulationPolicyService) {
         this.studentRepository = studentRepository;
         this.userRepository = userRepository;
         this.issueRecordRepository = issueRecordRepository;
         this.passwordEncoder = passwordEncoder;
+        this.circulationPolicyService = circulationPolicyService;
     }
 
     public Student getStudentByEmail(String email) {
@@ -60,6 +64,18 @@ public class StudentService {
             return studentRepository.findAllByOrderByStudentIdAsc();
         }
         return studentRepository.findByStudentIdContainingIgnoreCaseOrderByStudentIdAsc(studentIdKeyword.trim());
+    }
+
+    public BorrowerStanding getBorrowerStanding(Student student) {
+        return circulationPolicyService.evaluateStanding(student);
+    }
+
+    public BorrowerStanding getBorrowerStandingByStudentId(String studentId) {
+        return circulationPolicyService.evaluateStanding(getStudentByStudentId(studentId));
+    }
+
+    public BorrowerStanding getBorrowerStandingByEmail(String email) {
+        return circulationPolicyService.evaluateStanding(getStudentByEmail(email));
     }
 
     public StudentProfileUpdateRequest createProfileUpdateRequest(Student student) {
@@ -119,6 +135,12 @@ public class StudentService {
 
         StudentProfileUpdateRequest normalizedRequest = normalizeProfileUpdateRequest(request);
 
+        if (normalizedRequest.getPhone() != null
+                && studentRepository.existsByPhone(normalizedRequest.getPhone())
+                && !normalizedRequest.getPhone().equals(student.getPhone())) {
+            throw new IllegalArgumentException("This contact number is already used.");
+        }
+
         user.setName(normalizedRequest.getName());
         student.setCourse(normalizedRequest.getCourse());
         student.setYearLevel(normalizedRequest.getYearLevel());
@@ -149,6 +171,10 @@ public class StudentService {
         if (userRepository.existsByEmailIgnoreCaseAndIdNot(normalizedEmail, user.getId())) {
             throw new IllegalArgumentException("Email already exists.");
         }
+        String normalizedPhone = blankToNull(phone);
+        if (normalizedPhone != null && studentRepository.existsByPhone(normalizedPhone) && !normalizedPhone.equals(student.getPhone())) {
+            throw new IllegalArgumentException("This contact number is already used.");
+        }
         if (dateOfBirth != null) {
             validateBirthDate(dateOfBirth);
         }
@@ -159,7 +185,7 @@ public class StudentService {
 
         student.setCourse(defaultText(course, "Not set"));
         student.setYearLevel(defaultText(yearLevel, "Not set"));
-        student.setPhone(blankToNull(phone));
+        student.setPhone(normalizedPhone);
         student.setAddress(blankToNull(address));
         student.setDateOfBirth(dateOfBirth);
 

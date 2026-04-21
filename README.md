@@ -13,14 +13,22 @@ This repository now includes a working project foundation for:
 - Login using Spring Security
 - Student self-registration with generated student ID
 - Admin dashboard with circulation counts and simple analytics
+- Expanded admin dashboard with circulation, fine, borrower block, and audit snapshots
 - Category and author management
-- Book management
-- Book issue and return flow
+- Full book management
+- Book issue and return flow with circulation policy checks
 - Student search by student ID
 - Student dashboard, profile update, and borrowing history
 - Advanced catalog search by title or barcode keyword, category, author, availability, and ISBN
 - Fine calculation for overdue records
+- Fine ledger management with paid and waived states
+- Reservation queue system with ready-to-claim workflow
+- Due-date email reminder queue with SMTP-ready delivery and file outbox fallback
+- Actual PDF upload, e-book access, and inline reader page
 - Digital-ready book fields such as barcode, QR issue code, and e-book path
+- Borrower eligibility rules based on overdue items, unpaid fines, account status, and active loan limits
+- Admin reports center with CSV exports for circulation, overdue, fines, reservations, and audit logs
+- Audit logging for key admin and system-side actions
 
 ## Current Scope
 
@@ -29,16 +37,19 @@ Implemented now:
 - Core admin and student web flow
 - Database-first JPA mapping based on the existing schema
 - Legacy-friendly login that still accepts the plain-text demo passwords from `database/sample-data.sql`
+- Reservation management for students and admins
+- Automatic reminder scheduling for due dates and ready reservations
+- Storage-backed digital library module for PDF resources
+- Admin fine settlement workflow with payment and waiver actions
+- Admin reporting and export module
+- Borrower standing visibility on admin and student pages
+- Database-backed audit trail for operational actions
 
 Planned next:
 
-- Password recovery flow
-- Reservation queue system
-- Email reminders before due date
-- QR code image generation and scanning
-- File upload for e-books
-- PDF reader / digital library screen
-- Deeper analytics charts
+- Optional payment receipts and partial fine payment flow
+- Copy-level inventory records and lost or damaged item handling
+- Dedicated database migrations using Flyway or Liquibase
 
 ## Project Structure
 
@@ -127,3 +138,10 @@ http://localhost:8080
 - New registrations are stored using BCrypt-ready password hashing.
 - Existing sample users can still log in because the app accepts legacy plain-text seed passwords for migration compatibility.
 - A local Maven runtime is included under `tools/apache-maven-3.9.14` for this workspace setup.
+- PDF uploads are stored under `storage/ebooks` by default, or under `LU_LIBRISYNC_STORAGE_ROOT` if that environment variable is set.
+- Email reminders and profile OTP messages are configured to use `lulibrisync@gmail.com` as the default sender identity.
+- For real Gmail delivery, set `LU_LIBRISYNC_SMTP_PASSWORD` to the Gmail App Password for `lulibrisync@gmail.com`. You can optionally override `LU_LIBRISYNC_SMTP_HOST`, `LU_LIBRISYNC_SMTP_PORT`, `LU_LIBRISYNC_SMTP_USERNAME`, `LU_LIBRISYNC_SMTP_FROM`, and `LU_LIBRISYNC_SMTP_SSL` as needed.
+- If SMTP is not configured, reminder content is still generated and written to `storage/email-outbox` for local review.
+- Student profile OTPs are persisted in the database with a 3-minute resend cooldown, so they remain active even after logout/login until they expire or are used.
+- Forgot password now uses persistent OTP records in `password_reset_tokens`, with the same 3-minute resend countdown and database-backed recovery flow.
+- Re-run `database/schema.sql` after pulling the latest changes so the `audit_logs` table, `student_profile_otp_requests` table, and contact-number uniqueness rules are available in MySQL.

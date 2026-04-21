@@ -1,13 +1,16 @@
 package com.lulibrisync.controller;
 
+import com.lulibrisync.dto.StudentProfileOtpDispatchResult;
 import com.lulibrisync.dto.StudentProfileOtpState;
 import com.lulibrisync.dto.StudentProfileUpdateRequest;
 import com.lulibrisync.model.IssueRecord;
 import com.lulibrisync.model.IssueStatus;
 import com.lulibrisync.model.Student;
+import com.lulibrisync.service.FineService;
 import com.lulibrisync.service.IssueService;
+import com.lulibrisync.service.ReservationService;
+import com.lulibrisync.service.StudentProfileOtpService;
 import com.lulibrisync.service.StudentService;
-import jakarta.servlet.http.HttpSession;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -17,24 +20,30 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 @Controller
 public class StudentController {
 
-    private static final String PROFILE_OTP_SESSION_KEY = "studentProfileOtpState";
-    private static final int PROFILE_OTP_EXPIRY_MINUTES = 5;
-
     private final StudentService studentService;
     private final IssueService issueService;
-    private final SecureRandom secureRandom = new SecureRandom();
+    private final ReservationService reservationService;
+    private final StudentProfileOtpService studentProfileOtpService;
+    private final FineService fineService;
 
-    public StudentController(StudentService studentService, IssueService issueService) {
+    public StudentController(StudentService studentService,
+                             IssueService issueService,
+                             ReservationService reservationService,
+                             StudentProfileOtpService studentProfileOtpService,
+                             FineService fineService) {
         this.studentService = studentService;
         this.issueService = issueService;
+        this.reservationService = reservationService;
+        this.studentProfileOtpService = studentProfileOtpService;
+        this.fineService = fineService;
     }
 
     @GetMapping("/student/dashboard")
@@ -54,13 +63,17 @@ public class StudentController {
         model.addAttribute("activeCount", activeCount);
         model.addAttribute("overdueCount", overdueCount);
         model.addAttribute("historyCount", issueRecords.size());
+        model.addAttribute("reservationCount", reservationService.getStudentReservations(authentication.getName()).stream().filter(reservation -> reservation.isActive()).count());
+        model.addAttribute("borrowerStanding", studentService.getBorrowerStanding(student));
+        model.addAttribute("outstandingFineTotal", fineService.getOutstandingFineTotalByStudent(student.getId()));
+        model.addAttribute("studentFines", fineService.getStudentFines(student.getId()));
         return "student/dashboard";
     }
 
     @GetMapping("/student/profile")
-    public String profile(Authentication authentication, Model model, HttpSession session) {
+    public String profile(Authentication authentication, Model model) {
         Student student = studentService.getStudentByEmail(authentication.getName());
-        populateProfilePageModel(model, student, session);
+        populateProfilePageModel(model, student);
         return "student/profile";
     }
 
@@ -72,29 +85,45 @@ public class StudentController {
                                           @RequestParam(required = false) String phone,
                                           @RequestParam(required = false) String address,
                                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateOfBirth,
-                                          RedirectAttributes redirectAttributes,
-                                          HttpSession session) {
+                                          RedirectAttributes redirectAttributes) {
         Student student = studentService.getStudentByEmail(authentication.getName());
         StudentProfileUpdateRequest submittedRequest = new StudentProfileUpdateRequest(name, course, yearLevel, phone, address, dateOfBirth);
 
         try {
-            StudentProfileUpdateRequest normalizedRequest = studentService.normalizeProfileUpdateRequest(submittedRequest);
-            String otpCode = generateOtpCode();
-            StudentProfileOtpState otpState = new StudentProfileOtpState(
-                    normalizedRequest,
-                    otpCode,
-                    LocalDateTime.now().plusMinutes(PROFILE_OTP_EXPIRY_MINUTES),
-                    student.getUser().getEmail()
-            );
-
-            session.setAttribute(PROFILE_OTP_SESSION_KEY, otpState);
-            redirectAttributes.addFlashAttribute("profileForm", normalizedRequest);
-            redirectAttributes.addFlashAttribute("otpMaskedEmail", maskEmail(student.getUser().getEmail()));
-            redirectAttributes.addFlashAttribute("otpPreviewCode", otpCode);
+            StudentProfileOtpDispatchResult dispatchResult = studentProfileOtpService.requestOtp(student, submittedRequest);
+            applyOtpStateFlashAttributes(dispatchResult.getOtpState(), redirectAttributes);
             redirectAttributes.addFlashAttribute("openOtpModal", true);
-            redirectAttributes.addFlashAttribute("info", "Enter the one-time code to confirm your profile update.");
+            if (dispatchResult.isCooldownActive()) {
+                redirectAttributes.addFlashAttribute("info", "A new OTP can only be sent every 3 minutes. Your current OTP is still active.");
+            } else if (dispatchResult.isDelivered()) {
+                redirectAttributes.addFlashAttribute("success", "An OTP has been sent to your registered email.");
+            } else {
+                redirectAttributes.addFlashAttribute("info", "OTP generated. If Gmail SMTP is not fully configured yet, check storage/email-outbox for the fallback copy.");
+            }
         } catch (IllegalArgumentException exception) {
             redirectAttributes.addFlashAttribute("profileForm", submittedRequest);
+            redirectAttributes.addFlashAttribute("openEditModal", true);
+            redirectAttributes.addFlashAttribute("error", exception.getMessage());
+        }
+        return "redirect:/student/profile";
+    }
+
+    @PostMapping("/student/profile/resend-otp")
+    public String resendProfileUpdateOtp(Authentication authentication,
+                                         RedirectAttributes redirectAttributes) {
+        Student student = studentService.getStudentByEmail(authentication.getName());
+        try {
+            StudentProfileOtpDispatchResult dispatchResult = studentProfileOtpService.resendOtp(student);
+            applyOtpStateFlashAttributes(dispatchResult.getOtpState(), redirectAttributes);
+            redirectAttributes.addFlashAttribute("openOtpModal", true);
+            if (dispatchResult.isCooldownActive()) {
+                redirectAttributes.addFlashAttribute("info", "Please wait until the resend countdown finishes before requesting another OTP.");
+            } else if (dispatchResult.isDelivered()) {
+                redirectAttributes.addFlashAttribute("success", "A new OTP has been sent to your registered email.");
+            } else {
+                redirectAttributes.addFlashAttribute("info", "A new OTP was created. If Gmail SMTP is not fully configured yet, check storage/email-outbox.");
+            }
+        } catch (IllegalArgumentException exception) {
             redirectAttributes.addFlashAttribute("openEditModal", true);
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
         }
@@ -104,39 +133,24 @@ public class StudentController {
     @PostMapping("/student/profile/verify-otp")
     public String verifyProfileUpdateOtp(Authentication authentication,
                                          @RequestParam(required = false) String otpCode,
-                                         RedirectAttributes redirectAttributes,
-                                         HttpSession session) {
-        StudentProfileOtpState otpState = getProfileOtpState(session);
-        if (otpState == null) {
-            redirectAttributes.addFlashAttribute("error", "Request a profile update OTP first.");
-            redirectAttributes.addFlashAttribute("openEditModal", true);
-            return "redirect:/student/profile";
-        }
-
-        redirectAttributes.addFlashAttribute("profileForm", otpState.getUpdateRequest());
-        redirectAttributes.addFlashAttribute("otpMaskedEmail", maskEmail(otpState.getDestinationEmail()));
-
-        if (otpState.getExpiresAt() == null || otpState.getExpiresAt().isBefore(LocalDateTime.now())) {
-            session.removeAttribute(PROFILE_OTP_SESSION_KEY);
-            redirectAttributes.addFlashAttribute("openEditModal", true);
-            redirectAttributes.addFlashAttribute("error", "The OTP has expired. Please request a new code.");
-            return "redirect:/student/profile";
-        }
-
-        if (otpCode == null || !otpCode.trim().equals(otpState.getOtpCode())) {
-            redirectAttributes.addFlashAttribute("openOtpModal", true);
-            redirectAttributes.addFlashAttribute("otpPreviewCode", otpState.getOtpCode());
-            redirectAttributes.addFlashAttribute("error", "Invalid OTP. Please try again.");
-            return "redirect:/student/profile";
+                                         RedirectAttributes redirectAttributes) {
+        Student student = studentService.getStudentByEmail(authentication.getName());
+        StudentProfileOtpState latestOtpState = studentProfileOtpService.getLatestOtpState(student);
+        if (latestOtpState != null) {
+            applyOtpStateFlashAttributes(latestOtpState, redirectAttributes);
+            redirectAttributes.addFlashAttribute("profileForm", latestOtpState.getUpdateRequest());
         }
 
         try {
-            studentService.updateProfile(authentication.getName(), otpState.getUpdateRequest());
-            session.removeAttribute(PROFILE_OTP_SESSION_KEY);
+            StudentProfileUpdateRequest verifiedRequest = studentProfileOtpService.verifyOtp(student, otpCode);
+            studentService.updateProfile(authentication.getName(), verifiedRequest);
             redirectAttributes.addFlashAttribute("success", "Profile updated successfully.");
         } catch (IllegalArgumentException exception) {
-            session.removeAttribute(PROFILE_OTP_SESSION_KEY);
-            redirectAttributes.addFlashAttribute("openEditModal", true);
+            boolean hasActiveOtp = latestOtpState != null
+                    && latestOtpState.getExpiresAt() != null
+                    && latestOtpState.getExpiresAt().isAfter(LocalDateTime.now());
+            redirectAttributes.addFlashAttribute("openOtpModal", hasActiveOtp);
+            redirectAttributes.addFlashAttribute("openEditModal", !hasActiveOtp);
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
         }
         return "redirect:/student/profile";
@@ -144,25 +158,43 @@ public class StudentController {
 
     @GetMapping("/student/history")
     public String history(Authentication authentication, Model model) {
-        model.addAttribute("issueRecords", issueService.getStudentIssues(authentication.getName()));
+        Student student = studentService.getStudentByEmail(authentication.getName());
+        List<IssueRecord> issueRecords = issueService.getStudentIssues(authentication.getName());
+        model.addAttribute("student", student);
+        model.addAttribute("issueRecords", issueRecords);
+        model.addAttribute("borrowerStanding", studentService.getBorrowerStanding(student));
+        model.addAttribute("outstandingFineTotal", fineService.getOutstandingFineTotalByStudent(student.getId()));
+        model.addAttribute("activeCount", issueRecords.stream().filter(record -> !record.isReturned()).count());
+        model.addAttribute("overdueCount", issueRecords.stream().filter(record -> IssueStatus.OVERDUE.equals(record.getStatus())).count());
+        model.addAttribute("reservationCount", reservationService.getStudentReservations(authentication.getName()).stream().filter(reservation -> reservation.isActive()).count());
         return "student/history";
     }
 
-    private void populateProfilePageModel(Model model, Student student, HttpSession session) {
-        StudentProfileOtpState otpState = getProfileOtpState(session);
+    private void populateProfilePageModel(Model model, Student student) {
+        StudentProfileOtpState activeOtpState = studentProfileOtpService.getActiveOtpState(student);
+        StudentProfileOtpState latestOtpState = studentProfileOtpService.getLatestOtpState(student);
 
         model.addAttribute("student", student);
         model.addAttribute("studentInitials", buildInitials(student.getUser().getName()));
-        model.addAttribute("hasPendingProfileOtp", otpState != null);
+        model.addAttribute("hasPendingProfileOtp", activeOtpState != null);
+        model.addAttribute("borrowerStanding", studentService.getBorrowerStanding(student));
+        model.addAttribute("studentFines", fineService.getStudentFines(student.getId()));
+        model.addAttribute("outstandingFineTotal", fineService.getOutstandingFineTotalByStudent(student.getId()));
 
         if (!model.containsAttribute("profileForm")) {
-            model.addAttribute("profileForm", otpState != null
-                    ? otpState.getUpdateRequest()
+            model.addAttribute("profileForm", latestOtpState != null
+                    ? latestOtpState.getUpdateRequest()
                     : studentService.createProfileUpdateRequest(student));
         }
 
-        if (!model.containsAttribute("otpMaskedEmail") && otpState != null) {
-            model.addAttribute("otpMaskedEmail", maskEmail(otpState.getDestinationEmail()));
+        if (!model.containsAttribute("otpMaskedEmail") && activeOtpState != null) {
+            model.addAttribute("otpMaskedEmail", maskEmail(activeOtpState.getDestinationEmail()));
+        }
+        if (!model.containsAttribute("otpExpiresAtEpochMs")) {
+            model.addAttribute("otpExpiresAtEpochMs", toEpochMillis(activeOtpState == null ? null : activeOtpState.getExpiresAt()));
+        }
+        if (!model.containsAttribute("otpResendAvailableAtEpochMs")) {
+            model.addAttribute("otpResendAvailableAtEpochMs", toEpochMillis(activeOtpState == null ? null : activeOtpState.getResendAvailableAt()));
         }
         if (!model.containsAttribute("openEditModal")) {
             model.addAttribute("openEditModal", false);
@@ -172,16 +204,15 @@ public class StudentController {
         }
     }
 
-    private StudentProfileOtpState getProfileOtpState(HttpSession session) {
-        Object storedState = session.getAttribute(PROFILE_OTP_SESSION_KEY);
-        if (storedState instanceof StudentProfileOtpState otpState) {
-            return otpState;
+    private void applyOtpStateFlashAttributes(StudentProfileOtpState otpState,
+                                              RedirectAttributes redirectAttributes) {
+        if (otpState == null) {
+            return;
         }
-        return null;
-    }
-
-    private String generateOtpCode() {
-        return String.format("%06d", secureRandom.nextInt(1_000_000));
+        redirectAttributes.addFlashAttribute("profileForm", otpState.getUpdateRequest());
+        redirectAttributes.addFlashAttribute("otpMaskedEmail", maskEmail(otpState.getDestinationEmail()));
+        redirectAttributes.addFlashAttribute("otpExpiresAtEpochMs", toEpochMillis(otpState.getExpiresAt()));
+        redirectAttributes.addFlashAttribute("otpResendAvailableAtEpochMs", toEpochMillis(otpState.getResendAvailableAt()));
     }
 
     private String buildInitials(String fullName) {
@@ -215,5 +246,12 @@ public class StudentController {
         String localPart = email.substring(0, atIndex);
         String domain = email.substring(atIndex);
         return localPart.charAt(0) + "***" + localPart.charAt(localPart.length() - 1) + domain;
+    }
+
+    private Long toEpochMillis(LocalDateTime value) {
+        if (value == null) {
+            return null;
+        }
+        return value.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
     }
 }

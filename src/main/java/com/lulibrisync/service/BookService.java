@@ -140,6 +140,16 @@ public class BookService {
     }
 
     @Transactional
+    public Book updateStoredEbookPath(Long bookId, String ebookPath, boolean digital) {
+        Book book = getBookById(bookId);
+        book.setEbookPath(blankToNull(ebookPath));
+        if (digital || book.getEbookPath() != null) {
+            book.setDigital(true);
+        }
+        return bookRepository.save(book);
+    }
+
+    @Transactional
     public Category updateCategory(Long categoryId, String name, String description) {
         Category category = getCategoryById(categoryId);
         applyCategoryDetails(category, name, description, false);

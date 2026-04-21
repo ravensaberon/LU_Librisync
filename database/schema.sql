@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS students (
     student_id VARCHAR(20) NOT NULL UNIQUE,
     course VARCHAR(120) NOT NULL DEFAULT 'Not set',
     year_level VARCHAR(60) NOT NULL DEFAULT 'Not set',
-    phone VARCHAR(30),
+    phone VARCHAR(30) UNIQUE,
     address VARCHAR(255),
     date_of_birth DATE NULL,
     qr_code_path VARCHAR(255),
@@ -130,6 +130,39 @@ CREATE TABLE IF NOT EXISTS email_notifications (
     status ENUM('PENDING', 'SENT', 'FAILED') NOT NULL DEFAULT 'PENDING',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_email_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    actor_email VARCHAR(120) NULL,
+    actor_name VARCHAR(120) NULL,
+    action VARCHAR(80) NOT NULL,
+    entity_type VARCHAR(80) NOT NULL,
+    entity_id VARCHAR(80) NULL,
+    summary VARCHAR(255) NOT NULL,
+    details VARCHAR(2000) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS student_profile_otp_requests (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    student_id BIGINT NOT NULL,
+    pending_name VARCHAR(100) NOT NULL,
+    pending_course VARCHAR(120),
+    pending_year_level VARCHAR(60),
+    pending_phone VARCHAR(30),
+    pending_address VARCHAR(255),
+    pending_date_of_birth DATE NULL,
+    otp_hash VARCHAR(128) NOT NULL,
+    destination_email VARCHAR(120) NOT NULL,
+    last_sent_at DATETIME NOT NULL,
+    resend_available_at DATETIME NOT NULL,
+    expires_at DATETIME NOT NULL,
+    used BOOLEAN NOT NULL DEFAULT FALSE,
+    verified_at DATETIME NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_profile_otp_student FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
 );
 
 CREATE OR REPLACE VIEW vw_student_reading_history AS

@@ -36,7 +36,7 @@ public class Student {
     @Column(name = "year_level", nullable = false, length = 60)
     private String yearLevel = "Not set";
 
-    @Column(length = 30)
+    @Column(length = 30, unique = true)
     private String phone;
 
     @Column(length = 255)

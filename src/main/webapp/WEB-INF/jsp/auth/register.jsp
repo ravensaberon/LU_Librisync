@@ -160,7 +160,7 @@
                         <label class="form-label" for="email">Email address</label>
                         <input class="form-control form-control-lg" id="email" name="email" type="email" value="${emailValue}" maxlength="120" autocomplete="email" inputmode="email" required>
                         <p class="field-hint">Use a supported provider like `gmail.com`, `outlook.com`, `yahoo.com`, or a school email ending in `.edu` or `.edu.ph`.</p>
-                        <p class="field-error" id="emailError"></p>
+                        <p class="field-error" id="emailError"><c:out value="${emailFieldError}"/></p>
                     </div>
 
                     <div class="register-form-row">
@@ -168,7 +168,7 @@
                             <label class="form-label" for="contactNumber">Contact number</label>
                             <input class="form-control form-control-lg" id="contactNumber" name="contactNumber" type="text" value="${contactNumberValue}" maxlength="20" autocomplete="tel" inputmode="tel" required>
                             <p class="field-hint">Use 10 to 15 digits. A leading `+` is allowed.</p>
-                            <p class="field-error" id="contactNumberError"></p>
+                            <p class="field-error" id="contactNumberError"><c:out value="${contactNumberFieldError}"/></p>
                         </div>
 
                         <div class="mb-3">
@@ -294,8 +294,24 @@
         var password = document.getElementById("password");
         var confirmPassword = document.getElementById("confirmPassword");
         var agree = document.getElementById("agree");
+        var submitButton = form.querySelector("button[type='submit']");
         var initialBarangay = barangay.dataset.selectedBarangay || "";
         var barangayRequestToken = 0;
+        var registerAvailabilityEndpoint = "${pageContext.request.contextPath}/register/availability";
+        var availabilityState = {
+            email: {
+                requestToken: 0,
+                lastCheckedValue: "",
+                available: null,
+                pending: false
+            },
+            contactNumber: {
+                requestToken: 0,
+                lastCheckedValue: "",
+                available: null,
+                pending: false
+            }
+        };
 
         var NAME_ALLOWED_REGEX = /^[A-Za-z](?:[A-Za-z .'-]{0,48}[A-Za-z])?$/;
         var MIN_NAME_LETTERS = 2;
@@ -380,6 +396,16 @@
             }
         }
 
+        function applyInitialServerError(input, errorElement) {
+            var message = (errorElement.textContent || "").trim();
+            if (!message) {
+                return;
+            }
+            input.classList.add("input-invalid");
+            input.classList.remove("input-valid");
+            input.setCustomValidity(message);
+        }
+
         function clearSelectOptions(selectElement) {
             while (selectElement.options.length > 0) {
                 selectElement.remove(0);
@@ -447,6 +473,112 @@
         function getEmailLocalPart(value) {
             var at = value.indexOf("@");
             return at > 0 ? value.substring(0, at) : value;
+        }
+
+        function resetAvailabilityState(fieldKey) {
+            availabilityState[fieldKey].lastCheckedValue = "";
+            availabilityState[fieldKey].available = null;
+            availabilityState[fieldKey].pending = false;
+            availabilityState[fieldKey].requestToken++;
+        }
+
+        function getAvailabilityConfig(fieldKey) {
+            if (fieldKey === "email") {
+                return {
+                    input: email,
+                    errorElement: errors.email,
+                    validator: validateEmailField,
+                    normalizeValue: function () {
+                        return (email.value || "").trim();
+                    },
+                    fieldName: "email"
+                };
+            }
+
+            return {
+                input: contactNumber,
+                errorElement: errors.contactNumber,
+                validator: validateContactField,
+                normalizeValue: function () {
+                    return normalizeContact(contactNumber.value);
+                },
+                fieldName: "contactNumber"
+            };
+        }
+
+        function checkFieldAvailability(fieldKey) {
+            var config = getAvailabilityConfig(fieldKey);
+            var state = availabilityState[fieldKey];
+
+            if (!config.validator()) {
+                state.lastCheckedValue = "";
+                state.available = null;
+                state.pending = false;
+                return Promise.resolve(false);
+            }
+
+            var normalizedValue = config.normalizeValue();
+            if (!normalizedValue) {
+                return Promise.resolve(false);
+            }
+
+            if (state.lastCheckedValue === normalizedValue && state.available !== null) {
+                if (!state.available) {
+                    setFieldState(config.input, config.errorElement, config.errorElement.textContent || "This value is already used.");
+                }
+                return Promise.resolve(state.available);
+            }
+
+            var requestToken = ++state.requestToken;
+            state.pending = true;
+            config.errorElement.textContent = "Checking availability...";
+            config.input.classList.remove("input-valid");
+
+            return fetch(registerAvailabilityEndpoint + "?field=" + encodeURIComponent(config.fieldName) + "&value=" + encodeURIComponent(normalizedValue), {
+                headers: {
+                    "Accept": "application/json"
+                }
+            })
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error("Unable to check availability.");
+                    }
+                    return response.json();
+                })
+                .then(function (result) {
+                    if (requestToken !== state.requestToken) {
+                        return false;
+                    }
+
+                    state.pending = false;
+                    state.lastCheckedValue = normalizedValue;
+                    state.available = !!result.available;
+
+                    if (!result.valid) {
+                        state.available = false;
+                        setFieldState(config.input, config.errorElement, result.message || "Please enter a valid value.");
+                        return false;
+                    }
+
+                    if (!result.available) {
+                        setFieldState(config.input, config.errorElement, result.message || "This value is already used.");
+                        return false;
+                    }
+
+                    setFieldState(config.input, config.errorElement, "");
+                    return true;
+                })
+                .catch(function () {
+                    if (requestToken !== state.requestToken) {
+                        return false;
+                    }
+
+                    state.pending = false;
+                    state.available = null;
+                    state.lastCheckedValue = "";
+                    setFieldState(config.input, config.errorElement, "Unable to check availability right now. Please try again.");
+                    return false;
+                });
         }
 
         function hasRepeatedSequence(text, minLen) {
@@ -876,16 +1008,24 @@
 
         email.addEventListener("input", function () {
             validateEmailField();
+            resetAvailabilityState("email");
             if (password.value) {
                 validatePasswordField();
             }
         });
+        email.addEventListener("blur", function () {
+            checkFieldAvailability("email");
+        });
 
         contactNumber.addEventListener("input", function () {
             validateContactField();
+            resetAvailabilityState("contactNumber");
             if (password.value) {
                 validatePasswordField();
             }
+        });
+        contactNumber.addEventListener("blur", function () {
+            checkFieldAvailability("contactNumber");
         });
 
         birthDate.addEventListener("change", function () {
@@ -918,12 +1058,34 @@
         agree.addEventListener("change", validateAgreement);
 
         form.addEventListener("submit", function (event) {
+            event.preventDefault();
             normalizeFormValues();
             if (!validateAll()) {
-                event.preventDefault();
+                return;
             }
+
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.textContent = "Checking details...";
+            }
+
+            Promise.all([
+                checkFieldAvailability("email"),
+                checkFieldAvailability("contactNumber")
+            ]).then(function (results) {
+                if (results[0] && results[1]) {
+                    form.submit();
+                }
+            }).finally(function () {
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.textContent = "Create student account";
+                }
+            });
         });
 
+        applyInitialServerError(email, errors.email);
+        applyInitialServerError(contactNumber, errors.contactNumber);
         computeAge(false);
         loadBarangaysForSelectedCity(initialBarangay);
     })();

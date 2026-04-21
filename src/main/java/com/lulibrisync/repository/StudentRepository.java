@@ -17,4 +17,6 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
     List<Student> findAllByOrderByStudentIdAsc();
 
     List<Student> findByStudentIdContainingIgnoreCaseOrderByStudentIdAsc(String studentId);
+
+    boolean existsByPhone(String phone);
 }

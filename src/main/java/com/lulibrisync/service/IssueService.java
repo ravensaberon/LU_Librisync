@@ -6,6 +6,7 @@ import com.lulibrisync.model.IssueRecord;
 import com.lulibrisync.model.IssueStatus;
 import com.lulibrisync.model.Student;
 import com.lulibrisync.model.User;
+import com.lulibrisync.model.UserStatus;
 import com.lulibrisync.repository.BookRepository;
 import com.lulibrisync.repository.IssueRecordRepository;
 import com.lulibrisync.repository.StudentRepository;
@@ -28,24 +29,37 @@ import java.util.Map;
 @Service
 public class IssueService {
 
-    private static final BigDecimal DAILY_FINE = new BigDecimal("10.00");
-
     private final IssueRecordRepository issueRecordRepository;
     private final BookRepository bookRepository;
     private final StudentRepository studentRepository;
     private final UserRepository userRepository;
     private final StudentService studentService;
+    private final ReservationService reservationService;
+    private final EmailNotificationService emailNotificationService;
+    private final FineService fineService;
+    private final CirculationPolicyService circulationPolicyService;
+    private final BigDecimal dailyFine;
 
     public IssueService(IssueRecordRepository issueRecordRepository,
                         BookRepository bookRepository,
                         StudentRepository studentRepository,
                         UserRepository userRepository,
-                        StudentService studentService) {
+                        StudentService studentService,
+                        ReservationService reservationService,
+                        EmailNotificationService emailNotificationService,
+                        FineService fineService,
+                        CirculationPolicyService circulationPolicyService,
+                        @org.springframework.beans.factory.annotation.Value("${lulibrisync.circulation.daily-fine:10.00}") BigDecimal dailyFine) {
         this.issueRecordRepository = issueRecordRepository;
         this.bookRepository = bookRepository;
         this.studentRepository = studentRepository;
         this.userRepository = userRepository;
         this.studentService = studentService;
+        this.reservationService = reservationService;
+        this.emailNotificationService = emailNotificationService;
+        this.fineService = fineService;
+        this.circulationPolicyService = circulationPolicyService;
+        this.dailyFine = dailyFine == null ? new BigDecimal("10.00") : dailyFine;
     }
 
     @Transactional
@@ -59,6 +73,12 @@ public class IssueService {
         if (dueDate == null) {
             throw new IllegalArgumentException("Due date is required.");
         }
+        if (dueDate.isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("Due date cannot be earlier than today.");
+        }
+        if (dueDate.isAfter(LocalDate.now().plusDays(circulationPolicyService.getMaxLoanDays()))) {
+            throw new IllegalArgumentException("Due date exceeds the maximum loan period allowed by current circulation policy.");
+        }
 
         Book book = bookRepository.findById(bookId)
                 .orElseThrow(() -> new IllegalArgumentException("Book not found."));
@@ -68,8 +88,13 @@ public class IssueService {
 
         Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> new IllegalArgumentException("Student not found."));
+        if (!UserStatus.ACTIVE.equals(student.getUser().getStatus())) {
+            throw new IllegalArgumentException("This student account is inactive and cannot borrow items.");
+        }
+        circulationPolicyService.validateBorrowingEligibility(student);
         User admin = userRepository.findByEmailIgnoreCase(adminEmail)
                 .orElseThrow(() -> new IllegalArgumentException("Admin user not found."));
+        reservationService.beforeIssueValidation(bookId, studentId);
 
         IssueRecord issueRecord = new IssueRecord();
         issueRecord.setBook(book);
@@ -80,12 +105,15 @@ public class IssueService {
         issueRecord.setStatus(IssueStatus.ISSUED);
         issueRecord.setFineAmount(BigDecimal.ZERO);
         issueRecord.setRemarks(blankToNull(remarks));
-        issueRecord.setQrIssueCode("QR-" + System.currentTimeMillis());
+        issueRecord.setQrIssueCode(buildIssueCode(book, student));
 
         book.setAvailableQuantity(book.getAvailableQuantity() - 1);
         bookRepository.save(book);
-
-        return issueRecordRepository.save(issueRecord);
+        IssueRecord savedIssueRecord = issueRecordRepository.save(issueRecord);
+        reservationService.markReservationClaimed(bookId, studentId);
+        emailNotificationService.queueDueReminder(savedIssueRecord);
+        fineService.syncFineForIssue(savedIssueRecord);
+        return savedIssueRecord;
     }
 
     @Transactional
@@ -107,8 +135,11 @@ public class IssueService {
         int totalQuantity = book.getQuantity() == null ? 1 : book.getQuantity();
         book.setAvailableQuantity(Math.min(totalQuantity, currentAvailable + 1));
         bookRepository.save(book);
-
-        return issueRecordRepository.save(issueRecord);
+        IssueRecord savedIssueRecord = issueRecordRepository.save(issueRecord);
+        emailNotificationService.cancelDueReminder(savedIssueRecord);
+        reservationService.promoteReservationsForBook(book.getId());
+        fineService.syncFineForIssue(savedIssueRecord);
+        return savedIssueRecord;
     }
 
     @Transactional
@@ -131,7 +162,10 @@ public class IssueService {
             }
         }
 
-        issueRecordRepository.saveAll(activeIssues);
+        List<IssueRecord> savedIssues = issueRecordRepository.saveAll(activeIssues);
+        for (IssueRecord savedIssue : savedIssues) {
+            fineService.syncFineForIssue(savedIssue);
+        }
     }
 
     public List<IssueRecord> getActiveIssues() {
@@ -201,18 +235,26 @@ public class IssueService {
             }
         }
 
-        return issueRecordRepository.save(issueRecord);
+        IssueRecord savedIssueRecord = issueRecordRepository.save(issueRecord);
+        if (!savedIssueRecord.isReturned()) {
+            emailNotificationService.queueDueReminder(savedIssueRecord);
+        }
+        fineService.syncFineForIssue(savedIssueRecord);
+        return savedIssueRecord;
     }
 
     @Transactional
     public void deleteIssue(Long issueId) {
         IssueRecord issueRecord = getIssueById(issueId);
+        emailNotificationService.cancelDueReminder(issueRecord);
+        fineService.removeFineForIssue(issueId);
         if (!issueRecord.isReturned()) {
             Book book = issueRecord.getBook();
             int currentAvailable = book.getAvailableQuantity() == null ? 0 : book.getAvailableQuantity();
             int totalQuantity = book.getQuantity() == null ? 1 : book.getQuantity();
             book.setAvailableQuantity(Math.min(totalQuantity, currentAvailable + 1));
             bookRepository.save(book);
+            reservationService.promoteReservationsForBook(book.getId());
         }
         issueRecordRepository.delete(issueRecord);
     }
@@ -269,11 +311,17 @@ public class IssueService {
         if (overdueDays < 1) {
             overdueDays = 1;
         }
-        return DAILY_FINE.multiply(BigDecimal.valueOf(overdueDays));
+        return dailyFine.multiply(BigDecimal.valueOf(overdueDays));
     }
 
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private String buildIssueCode(Book book, Student student) {
+        String studentCode = student.getStudentId() == null ? "STUDENT" : student.getStudentId().replaceAll("[^A-Za-z0-9]", "").toUpperCase(Locale.ENGLISH);
+        String issueDateCode = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss", Locale.ENGLISH));
+        return "LU-ISSUE-" + book.getId() + "-" + studentCode + "-" + issueDateCode;
     }
 
     private int heightPercentage(long value, long maxValue) {

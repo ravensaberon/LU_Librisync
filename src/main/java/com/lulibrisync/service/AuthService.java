@@ -1,6 +1,7 @@
 package com.lulibrisync.service;
 
 import com.lulibrisync.config.LegacyAwarePasswordEncoder;
+import com.lulibrisync.dto.RegistrationAvailabilityResult;
 import com.lulibrisync.model.Role;
 import com.lulibrisync.model.Student;
 import com.lulibrisync.model.User;
@@ -203,6 +204,38 @@ public class AuthService {
         return lagunaBarangaysByCityCache.computeIfAbsent(normalizedCityMunicipality, this::fetchBarangaysForCityMunicipality);
     }
 
+    public RegistrationAvailabilityResult checkRegistrationAvailability(String field, String value) {
+        String normalizedField = field == null ? "" : field.trim().toLowerCase(Locale.ROOT);
+
+        try {
+            return switch (normalizedField) {
+                case "email" -> {
+                    String normalizedValue = normalizeAndValidateEmailFormat(value);
+                    boolean available = !userRepository.existsByEmailIgnoreCase(normalizedValue);
+                    yield new RegistrationAvailabilityResult(
+                            true,
+                            available,
+                            normalizedValue,
+                            available ? "" : "This email is already taken."
+                    );
+                }
+                case "contactnumber", "contact-number", "contact_number", "phone" -> {
+                    String normalizedValue = normalizeAndValidateContactFormat(value);
+                    boolean available = !studentRepository.existsByPhone(normalizedValue);
+                    yield new RegistrationAvailabilityResult(
+                            true,
+                            available,
+                            normalizedValue,
+                            available ? "" : "This contact number is already used."
+                    );
+                }
+                default -> throw new IllegalArgumentException("Unsupported registration field.");
+            };
+        } catch (IllegalArgumentException exception) {
+            return new RegistrationAvailabilityResult(false, false, value == null ? "" : value.trim(), exception.getMessage());
+        }
+    }
+
     private String generateStudentId() {
         long nextSequence = studentRepository.findTopByOrderByIdDesc()
                 .map(Student::getId)
@@ -253,25 +286,11 @@ public class AuthService {
     }
 
     private String normalizeAndValidateEmail(String email) {
-        String rawEmail = required(email, "Email address is required.");
-        String trimmedEmail = rawEmail.trim();
-
-        if (!trimmedEmail.equals(trimmedEmail.toLowerCase(Locale.ROOT))) {
-            throw new IllegalArgumentException("Use lowercase email only.");
+        String normalizedEmail = normalizeAndValidateEmailFormat(email);
+        if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
+            throw new IllegalArgumentException("This email is already taken.");
         }
-        if (!EMAIL_PATTERN.matcher(trimmedEmail).matches() || hasInvalidEmailDots(trimmedEmail)) {
-            throw new IllegalArgumentException("Enter a valid email address.");
-        }
-
-        String domain = getEmailDomain(trimmedEmail);
-        if (!isAllowedEmailDomain(domain)) {
-            throw new IllegalArgumentException("Use a supported provider domain or school email.");
-        }
-        if (userRepository.existsByEmailIgnoreCase(trimmedEmail)) {
-            throw new IllegalArgumentException("Email already exists.");
-        }
-
-        return trimmedEmail;
+        return normalizedEmail;
     }
 
     private String normalizeAndValidateProgram(String program) {
@@ -287,6 +306,33 @@ public class AuthService {
     }
 
     private String normalizeAndValidateContact(String contactNumber) {
+        String normalizedContact = normalizeAndValidateContactFormat(contactNumber);
+        if (studentRepository.existsByPhone(normalizedContact)) {
+            throw new IllegalArgumentException("This contact number is already used.");
+        }
+        return normalizedContact;
+    }
+
+    private String normalizeAndValidateEmailFormat(String email) {
+        String rawEmail = required(email, "Email address is required.");
+        String trimmedEmail = rawEmail.trim();
+
+        if (!trimmedEmail.equals(trimmedEmail.toLowerCase(Locale.ROOT))) {
+            throw new IllegalArgumentException("Use lowercase email only.");
+        }
+        if (!EMAIL_PATTERN.matcher(trimmedEmail).matches() || hasInvalidEmailDots(trimmedEmail)) {
+            throw new IllegalArgumentException("Enter a valid email address.");
+        }
+
+        String domain = getEmailDomain(trimmedEmail);
+        if (!isAllowedEmailDomain(domain)) {
+            throw new IllegalArgumentException("Use a supported provider domain or school email.");
+        }
+
+        return trimmedEmail;
+    }
+
+    private String normalizeAndValidateContactFormat(String contactNumber) {
         String normalizedContact = normalizeContact(required(contactNumber, "Contact number is required."));
         if (!CONTACT_PATTERN.matcher(normalizedContact).matches()) {
             throw new IllegalArgumentException("Use 10 to 15 digits for the contact number.");

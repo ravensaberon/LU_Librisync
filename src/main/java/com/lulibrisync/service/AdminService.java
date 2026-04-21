@@ -10,13 +10,18 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AdminService {
 
+    private static final java.util.regex.Pattern PASSWORD_PATTERN = java.util.regex.Pattern.compile("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z\\d\\s]).{12,100}$");
+
     private final UserRepository userRepository;
     private final LegacyAwarePasswordEncoder passwordEncoder;
+    private final AuditLogService auditLogService;
 
     public AdminService(UserRepository userRepository,
-                        LegacyAwarePasswordEncoder passwordEncoder) {
+                        LegacyAwarePasswordEncoder passwordEncoder,
+                        AuditLogService auditLogService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.auditLogService = auditLogService;
     }
 
     public User getAdminByEmail(String email) {
@@ -34,7 +39,16 @@ public class AdminService {
     public User updateProfile(String email, String name) {
         User admin = getAdminByEmail(email);
         admin.setName(required(name, "Display name is required."));
-        return userRepository.save(admin);
+        User savedAdmin = userRepository.save(admin);
+        auditLogService.log(
+                email,
+                "ADMIN_PROFILE_UPDATED",
+                "ADMIN_ACCOUNT",
+                savedAdmin.getId().toString(),
+                "Admin profile updated",
+                "Display name changed to " + savedAdmin.getName()
+        );
+        return savedAdmin;
     }
 
     @Transactional
@@ -50,8 +64,11 @@ public class AdminService {
         if (!passwordEncoder.matches(normalizedCurrentPassword, admin.getPasswordHash())) {
             throw new IllegalArgumentException("Current password is incorrect.");
         }
-        if (normalizedNewPassword.length() < 8) {
-            throw new IllegalArgumentException("New password must be at least 8 characters.");
+        if (normalizedNewPassword.length() < 12) {
+            throw new IllegalArgumentException("New password must be at least 12 characters.");
+        }
+        if (!PASSWORD_PATTERN.matcher(normalizedNewPassword).matches()) {
+            throw new IllegalArgumentException("New password must include uppercase, lowercase, number, and special character.");
         }
         if (!normalizedNewPassword.equals(normalizedConfirmPassword)) {
             throw new IllegalArgumentException("New password and confirmation do not match.");
@@ -62,6 +79,14 @@ public class AdminService {
 
         admin.setPasswordHash(passwordEncoder.encode(normalizedNewPassword));
         userRepository.save(admin);
+        auditLogService.log(
+                email,
+                "ADMIN_PASSWORD_CHANGED",
+                "ADMIN_ACCOUNT",
+                admin.getId().toString(),
+                "Admin password changed",
+                "Password changed successfully for admin account."
+        );
     }
 
     private String required(String value, String message) {

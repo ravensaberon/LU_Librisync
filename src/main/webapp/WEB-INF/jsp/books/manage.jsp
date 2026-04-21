@@ -21,7 +21,10 @@
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/dashboard">Dashboard</a>
             <a class="nav-pill active" href="${pageContext.request.contextPath}/admin/books">Books</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/issues">Issue / Return</a>
+            <a class="nav-pill" href="${pageContext.request.contextPath}/admin/reservations">Reservations</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/students">Students</a>
+            <a class="nav-pill" href="${pageContext.request.contextPath}/admin/fines">Fines</a>
+            <a class="nav-pill" href="${pageContext.request.contextPath}/admin/reports">Reports</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/references">Categories / Authors</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/profile">Profile</a>
             <form method="post" action="${pageContext.request.contextPath}/logout">
@@ -43,100 +46,48 @@
         <c:set var="bookFormAction" value="${pageContext.request.contextPath}/admin/books/${editBook.id}/update"/>
     </c:if>
 
-    <section class="panel-card mb-4">
-        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+    <section class="hero-card mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
             <div>
-                <div class="section-title mb-2">
-                    <c:choose>
-                        <c:when test="${not empty editBook}">Edit book record</c:when>
-                        <c:otherwise>Add book to the library</c:otherwise>
-                    </c:choose>
-                </div>
-                <p class="helper-copy">
-                    Create new catalog entries, update bibliographic details, adjust inventory totals, and maintain digital resource information.
+                <span class="tag-chip">Catalog Workspace</span>
+                <h1 class="fw-bold mt-3 mb-2">Manage your library collection</h1>
+                <p class="muted-text mb-0">
+                    Add new titles through a popup form, keep bibliographic details organized, and update inventory records without leaving the current page.
                 </p>
             </div>
-            <c:if test="${not empty editBook}">
-                <a class="action-link" href="${pageContext.request.contextPath}/admin/books">Cancel editing</a>
-            </c:if>
-        </div>
-
-        <form method="post" action="${bookFormAction}" class="row g-3">
-            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-
-            <div class="col-md-6">
-                <label class="form-label" for="title">Title</label>
-                <input class="form-control" id="title" name="title" value="${editBook.title}" required>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label" for="isbn">ISBN</label>
-                <input class="form-control" id="isbn" name="isbn" value="${editBook.isbn}" required>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label" for="barcode">Barcode</label>
-                <input class="form-control" id="barcode" name="barcode" value="${editBook.barcode}">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label" for="categoryId">Category</label>
-                <select class="form-select" id="categoryId" name="categoryId">
-                    <option value="">Select category</option>
-                    <c:forEach items="${categories}" var="category">
-                        <option value="${category.id}" <c:if test="${not empty editBook and not empty editBook.category and editBook.category.id == category.id}">selected</c:if>>
-                            ${category.name}
-                        </option>
-                    </c:forEach>
-                </select>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label" for="authorId">Author</label>
-                <select class="form-select" id="authorId" name="authorId">
-                    <option value="">Select author</option>
-                    <c:forEach items="${authors}" var="author">
-                        <option value="${author.id}" <c:if test="${not empty editBook and not empty editBook.author and editBook.author.id == author.id}">selected</c:if>>
-                            ${author.name}
-                        </option>
-                    </c:forEach>
-                </select>
-            </div>
-            <div class="col-md-2">
-                <label class="form-label" for="publicationYear">Year</label>
-                <input class="form-control" id="publicationYear" name="publicationYear" type="number" value="${editBook.publicationYear}">
-            </div>
-            <div class="col-md-2">
-                <label class="form-label" for="quantity">Quantity</label>
-                <input class="form-control" id="quantity" name="quantity" type="number" min="1" value="${not empty editBook ? editBook.quantity : 1}">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label" for="shelfLocation">Shelf location</label>
-                <input class="form-control" id="shelfLocation" name="shelfLocation" value="${editBook.shelfLocation}">
-            </div>
-            <div class="col-md-5">
-                <label class="form-label" for="ebookPath">E-book path</label>
-                <input class="form-control" id="ebookPath" name="ebookPath" value="${editBook.ebookPath}" placeholder="Optional PDF or file path">
-            </div>
-            <div class="col-md-3 d-flex align-items-end">
-                <div class="form-check">
-                    <input class="form-check-input" id="digital" name="digital" type="checkbox" value="true" <c:if test="${not empty editBook and editBook.digital}">checked</c:if>>
-                    <label class="form-check-label" for="digital">Digital copy available</label>
-                </div>
-            </div>
-            <div class="col-12">
-                <label class="form-label" for="description">Description</label>
-                <textarea class="form-control" id="description" name="description" rows="3">${editBook.description}</textarea>
-            </div>
-            <div class="col-12 d-flex flex-wrap gap-2">
-                <button class="btn btn-brand" type="submit">
-                    <i class="bi bi-journal-plus me-2"></i>
-                    <c:choose>
-                        <c:when test="${not empty editBook}">Update book</c:when>
-                        <c:otherwise>Save book</c:otherwise>
-                    </c:choose>
+            <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-light" type="button" data-bs-toggle="modal" data-bs-target="#bookFormModal">
+                    <i class="bi bi-journal-plus me-2"></i>Add book to the library
                 </button>
                 <c:if test="${not empty editBook}">
-                    <a class="btn btn-warm" href="${pageContext.request.contextPath}/admin/books">Back to add mode</a>
+                    <a class="action-link" href="${pageContext.request.contextPath}/admin/books">Exit edit mode</a>
                 </c:if>
             </div>
-        </form>
+        </div>
+        <c:if test="${not empty editBook}">
+            <div class="mt-3">
+                <span class="tag-chip">Editing now: ${editBook.title}</span>
+            </div>
+        </c:if>
+    </section>
+
+    <section class="stat-grid mb-4">
+        <div class="metric-card">
+            <div class="metric-value">${bookCount}</div>
+            <div class="metric-label">Catalog titles</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">${totalCopyCount}</div>
+            <div class="metric-label">Total copies</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">${availableBookCount}</div>
+            <div class="metric-label">Available copies</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">${digitalBookCount}</div>
+            <div class="metric-label">Digital-ready titles</div>
+        </div>
     </section>
 
     <section class="panel-card">
@@ -215,5 +166,122 @@
         </div>
     </section>
 </div>
+<div class="modal fade" id="bookFormModal" tabindex="-1" aria-labelledby="bookFormModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header modal-header-brand">
+                <div>
+                    <div class="modal-kicker">Book Management</div>
+                    <h2 class="modal-title h4 mb-1" id="bookFormModalLabel">
+                        <c:choose>
+                            <c:when test="${not empty editBook}">Edit book record</c:when>
+                            <c:otherwise>Add book to the library</c:otherwise>
+                        </c:choose>
+                    </h2>
+                    <p class="modal-subtitle mb-0">Create new catalog entries, update bibliographic details, adjust inventory totals, and maintain digital resource information.</p>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" action="${bookFormAction}" class="row g-3" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="title">Title</label>
+                            <input class="form-control" id="title" name="title" value="${editBook.title}" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label" for="isbn">ISBN</label>
+                            <input class="form-control" id="isbn" name="isbn" value="${editBook.isbn}" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label" for="barcode">Barcode</label>
+                            <input class="form-control" id="barcode" name="barcode" value="${editBook.barcode}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="categoryId">Category</label>
+                            <select class="form-select" id="categoryId" name="categoryId">
+                                <option value="">Select category</option>
+                                <c:forEach items="${categories}" var="category">
+                                    <option value="${category.id}" <c:if test="${not empty editBook and not empty editBook.category and editBook.category.id == category.id}">selected</c:if>>
+                                        ${category.name}
+                                    </option>
+                                </c:forEach>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="authorId">Author</label>
+                            <select class="form-select" id="authorId" name="authorId">
+                                <option value="">Select author</option>
+                                <c:forEach items="${authors}" var="author">
+                                    <option value="${author.id}" <c:if test="${not empty editBook and not empty editBook.author and editBook.author.id == author.id}">selected</c:if>>
+                                        ${author.name}
+                                    </option>
+                                </c:forEach>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label" for="publicationYear">Year</label>
+                            <input class="form-control" id="publicationYear" name="publicationYear" type="number" value="${editBook.publicationYear}">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label" for="quantity">Quantity</label>
+                            <input class="form-control" id="quantity" name="quantity" type="number" min="1" value="${not empty editBook ? editBook.quantity : 1}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="shelfLocation">Shelf location</label>
+                            <input class="form-control" id="shelfLocation" name="shelfLocation" value="${editBook.shelfLocation}">
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label" for="ebookPath">E-book path</label>
+                            <input class="form-control" id="ebookPath" name="ebookPath" value="${editBook.ebookPath}" placeholder="Optional PDF or file path">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="ebookFile">Upload PDF</label>
+                            <input class="form-control" id="ebookFile" name="ebookFile" type="file" accept="application/pdf,.pdf">
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <div class="form-check">
+                                <input class="form-check-input" id="digital" name="digital" type="checkbox" value="true" <c:if test="${not empty editBook and editBook.digital}">checked</c:if>>
+                                <label class="form-check-label" for="digital">Digital copy available</label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="description">Description</label>
+                            <textarea class="form-control" id="description" name="description" rows="3">${editBook.description}</textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <c:if test="${not empty editBook}">
+                        <a class="btn btn-warm me-auto" href="${pageContext.request.contextPath}/admin/books">Back to add mode</a>
+                    </c:if>
+                    <button class="btn btn-warm" type="button" data-bs-dismiss="modal">Close</button>
+                    <button class="btn btn-brand" type="submit">
+                        <i class="bi bi-journal-plus me-2"></i>
+                        <c:choose>
+                            <c:when test="${not empty editBook}">Update book</c:when>
+                            <c:otherwise>Save book</c:otherwise>
+                        </c:choose>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="${pageContext.request.contextPath}/js/app.js"></script>
+<script>
+    (function () {
+        var shouldOpenBookModal = ${not empty editBook or openBookModal ? 'true' : 'false'};
+        var bookFormModal = document.getElementById("bookFormModal");
+
+        if (shouldOpenBookModal && bookFormModal) {
+            bootstrap.Modal.getOrCreateInstance(bookFormModal).show();
+        }
+    })();
+</script>
 </body>
 </html>

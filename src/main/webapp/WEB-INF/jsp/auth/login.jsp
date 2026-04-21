@@ -60,6 +60,11 @@
                 <button class="btn btn-brand w-100 mb-3" type="submit">Login</button>
             </form>
 
+            <c:if test="${not empty param.resetSuccess}">
+                <div class="alert alert-success">Password reset complete. You can now sign in with your new password.</div>
+            </c:if>
+
+            <p class="mb-2"><a href="${pageContext.request.contextPath}/forgot-password">Forgot password?</a></p>
             <p class="mb-0">No student account yet? <a href="${pageContext.request.contextPath}/register">Register here</a>.</p>
         </section>
     </div>

@@ -21,7 +21,10 @@
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/dashboard">Dashboard</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/books">Books</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/issues">Issue / Return</a>
+            <a class="nav-pill" href="${pageContext.request.contextPath}/admin/reservations">Reservations</a>
             <a class="nav-pill active" href="${pageContext.request.contextPath}/admin/students">Students</a>
+            <a class="nav-pill" href="${pageContext.request.contextPath}/admin/fines">Fines</a>
+            <a class="nav-pill" href="${pageContext.request.contextPath}/admin/reports">Reports</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/references">Categories / Authors</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/profile">Profile</a>
             <form method="post" action="${pageContext.request.contextPath}/logout">
@@ -88,6 +91,8 @@
                     <th>Email</th>
                     <th>Program</th>
                     <th>Year level</th>
+                    <th>Standing</th>
+                    <th>Outstanding</th>
                     <th>Phone</th>
                     <th>Status</th>
                     <th>Action</th>
@@ -95,12 +100,24 @@
                 </thead>
                 <tbody>
                 <c:forEach items="${students}" var="student">
+                    <c:set var="standing" value="${borrowerStandingByStudentId[student.studentId]}"/>
                     <tr>
                         <td>${student.studentId}</td>
                         <td>${student.user.name}</td>
                         <td>${student.user.email}</td>
                         <td>${student.course}</td>
                         <td>${student.yearLevel}</td>
+                        <td>
+                            <c:choose>
+                                <c:when test="${standing.eligibleToBorrow}">
+                                    <span class="tag-chip">Borrowing cleared</span>
+                                </c:when>
+                                <c:otherwise>
+                                    <span class="tag-chip warn">Blocked</span>
+                                </c:otherwise>
+                            </c:choose>
+                        </td>
+                        <td>${standing.outstandingFineAmount}</td>
                         <td>${student.phone}</td>
                         <td><span class="tag-chip">${student.user.status}</span></td>
                         <td class="table-actions">
@@ -116,7 +133,7 @@
                 </c:forEach>
                 <c:if test="${empty students}">
                     <tr>
-                        <td colspan="8" class="text-center muted-text">No student matched the entered ID.</td>
+                        <td colspan="10" class="text-center muted-text">No student matched the entered ID.</td>
                     </tr>
                 </c:if>
                 </tbody>
@@ -280,5 +297,7 @@
         }
     })();
 </script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="${pageContext.request.contextPath}/js/app.js"></script>
 </body>
 </html>

@@ -6,21 +6,21 @@ import java.time.LocalDateTime;
 public class StudentProfileOtpState implements Serializable {
 
     private StudentProfileUpdateRequest updateRequest;
-    private String otpCode;
     private LocalDateTime expiresAt;
     private String destinationEmail;
+    private LocalDateTime resendAvailableAt;
 
     public StudentProfileOtpState() {
     }
 
     public StudentProfileOtpState(StudentProfileUpdateRequest updateRequest,
-                                  String otpCode,
                                   LocalDateTime expiresAt,
-                                  String destinationEmail) {
+                                  String destinationEmail,
+                                  LocalDateTime resendAvailableAt) {
         this.updateRequest = updateRequest;
-        this.otpCode = otpCode;
         this.expiresAt = expiresAt;
         this.destinationEmail = destinationEmail;
+        this.resendAvailableAt = resendAvailableAt;
     }
 
     public StudentProfileUpdateRequest getUpdateRequest() {
@@ -29,14 +29,6 @@ public class StudentProfileOtpState implements Serializable {
 
     public void setUpdateRequest(StudentProfileUpdateRequest updateRequest) {
         this.updateRequest = updateRequest;
-    }
-
-    public String getOtpCode() {
-        return otpCode;
-    }
-
-    public void setOtpCode(String otpCode) {
-        this.otpCode = otpCode;
     }
 
     public LocalDateTime getExpiresAt() {
@@ -53,5 +45,13 @@ public class StudentProfileOtpState implements Serializable {
 
     public void setDestinationEmail(String destinationEmail) {
         this.destinationEmail = destinationEmail;
+    }
+
+    public LocalDateTime getResendAvailableAt() {
+        return resendAvailableAt;
+    }
+
+    public void setResendAvailableAt(LocalDateTime resendAvailableAt) {
+        this.resendAvailableAt = resendAvailableAt;
     }
 }

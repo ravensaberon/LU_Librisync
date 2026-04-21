@@ -19,6 +19,7 @@
         <div class="nav-links">
             <a class="nav-pill active" href="${pageContext.request.contextPath}/student/dashboard">Dashboard</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/student/catalog">Catalog</a>
+            <a class="nav-pill" href="${pageContext.request.contextPath}/student/reservations">Reservations</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/student/profile">Profile</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/student/history">Borrowing history</a>
             <form method="post" action="${pageContext.request.contextPath}/logout">
@@ -52,6 +53,57 @@
         <div class="metric-card">
             <div class="metric-value">${historyCount}</div>
             <div class="metric-label">Total issue history</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">${reservationCount}</div>
+            <div class="metric-label">Active reservations</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">${outstandingFineTotal}</div>
+            <div class="metric-label">Outstanding fines</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">${borrowerStanding.remainingLoanSlots}</div>
+            <div class="metric-label">Remaining loan slots</div>
+        </div>
+    </section>
+
+    <section class="panel-grid panel-grid-equal mb-4">
+        <div class="panel-card">
+            <div class="section-title">Borrowing standing</div>
+            <div class="support-item">
+                <strong>${borrowerStanding.statusLabel}</strong>
+                <span>
+                    Active loans: ${borrowerStanding.activeLoansCount}/${borrowerStanding.maxActiveLoans}
+                    | Overdue items: ${borrowerStanding.overdueCount}
+                    | Outstanding fines: ${borrowerStanding.outstandingFineAmount}
+                </span>
+            </div>
+            <c:if test="${borrowerStanding.blocked}">
+                <div class="support-list mt-3">
+                    <c:forEach items="${borrowerStanding.blockers}" var="blocker">
+                        <div class="support-item">
+                            <strong>Action needed</strong>
+                            <span>${blocker}</span>
+                        </div>
+                    </c:forEach>
+                </div>
+            </c:if>
+        </div>
+
+        <div class="panel-card">
+            <div class="section-title">Recent fine activity</div>
+            <ul class="list-clean">
+                <c:forEach items="${studentFines}" var="fine" end="4">
+                    <li class="d-flex justify-content-between align-items-center">
+                        <span>${fine.issueRecord.book.title}</span>
+                        <span class="tag-chip">${fine.amount} | ${fine.status}</span>
+                    </li>
+                </c:forEach>
+                <c:if test="${empty studentFines}">
+                    <li class="muted-text">No fines are currently recorded for your account.</li>
+                </c:if>
+            </ul>
         </div>
     </section>
 
@@ -88,5 +140,7 @@
         </div>
     </section>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="${pageContext.request.contextPath}/js/app.js"></script>
 </body>
 </html>

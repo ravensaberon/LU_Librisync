@@ -1,5 +1,7 @@
 package com.lulibrisync.controller;
 
+import com.lulibrisync.dto.BorrowerStanding;
+import com.lulibrisync.model.Fine;
 import com.lulibrisync.model.IssueRecord;
 import com.lulibrisync.model.IssueStatus;
 import com.lulibrisync.model.Role;
@@ -9,9 +11,12 @@ import com.lulibrisync.model.UserStatus;
 import com.lulibrisync.repository.BookRepository;
 import com.lulibrisync.repository.IssueRecordRepository;
 import com.lulibrisync.repository.UserRepository;
+import com.lulibrisync.service.AuditLogService;
 import com.lulibrisync.service.AdminService;
 import com.lulibrisync.service.AuthService;
+import com.lulibrisync.service.FineService;
 import com.lulibrisync.service.IssueService;
+import com.lulibrisync.service.ReservationService;
 import com.lulibrisync.service.StudentService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.Authentication;
@@ -38,6 +43,9 @@ public class AdminController {
     private final StudentService studentService;
     private final AdminService adminService;
     private final AuthService authService;
+    private final ReservationService reservationService;
+    private final FineService fineService;
+    private final AuditLogService auditLogService;
 
     public AdminController(BookRepository bookRepository,
                            UserRepository userRepository,
@@ -45,7 +53,10 @@ public class AdminController {
                            IssueService issueService,
                            StudentService studentService,
                            AdminService adminService,
-                           AuthService authService) {
+                           AuthService authService,
+                           ReservationService reservationService,
+                           FineService fineService,
+                           AuditLogService auditLogService) {
         this.bookRepository = bookRepository;
         this.userRepository = userRepository;
         this.issueRecordRepository = issueRecordRepository;
@@ -53,6 +64,9 @@ public class AdminController {
         this.studentService = studentService;
         this.adminService = adminService;
         this.authService = authService;
+        this.reservationService = reservationService;
+        this.fineService = fineService;
+        this.auditLogService = auditLogService;
     }
 
     @GetMapping("/dashboard")
@@ -60,6 +74,10 @@ public class AdminController {
         issueService.refreshOverdueStatuses();
         long issuedCount = issueRecordRepository.countByStatus(IssueStatus.ISSUED);
         long overdueCount = issueRecordRepository.countByStatus(IssueStatus.OVERDUE);
+        long blockedBorrowerCount = studentService.searchStudents(null).stream()
+                .map(studentService::getBorrowerStanding)
+                .filter(BorrowerStanding::isBlocked)
+                .count();
 
         model.addAttribute("bookCount", bookRepository.count());
         model.addAttribute("availableCount", bookRepository.countByAvailableQuantityGreaterThan(0));
@@ -70,6 +88,13 @@ public class AdminController {
         model.addAttribute("recentIssues", issueService.getRecentIssues());
         model.addAttribute("mostBorrowedBooks", issueService.getMostBorrowedBooks());
         model.addAttribute("weeklyChart", issueService.getWeeklyCirculationChart());
+        model.addAttribute("pendingReservationCount", reservationService.countPendingReservations());
+        model.addAttribute("readyReservationCount", reservationService.countReadyReservations());
+        model.addAttribute("outstandingFineCount", fineService.countOutstandingFines());
+        model.addAttribute("outstandingFineTotal", fineService.getOutstandingFineTotal());
+        model.addAttribute("blockedBorrowerCount", blockedBorrowerCount);
+        model.addAttribute("recentAuditLogs", auditLogService.getRecentLogs().stream().limit(8).toList());
+        model.addAttribute("recentOutstandingFines", fineService.getRecentOutstandingFines());
         return "admin/dashboard";
     }
 
@@ -77,10 +102,18 @@ public class AdminController {
     public String students(@RequestParam(required = false) String studentId,
                            @RequestParam(required = false) String modalStudentId,
                            Model model) {
-        model.addAttribute("students", studentService.searchStudents(studentId));
+        List<Student> students = studentService.searchStudents(studentId);
+        model.addAttribute("students", students);
         model.addAttribute("studentIdFilter", studentId);
         model.addAttribute("userStatuses", studentService.getAvailableStatuses());
         model.addAttribute("modalStudentId", modalStudentId);
+        model.addAttribute("borrowerStandingByStudentId", students.stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        Student::getStudentId,
+                        studentService::getBorrowerStanding,
+                        (left, right) -> left,
+                        java.util.LinkedHashMap::new
+                )));
         return "admin/students";
     }
 
@@ -94,9 +127,18 @@ public class AdminController {
                                 @RequestParam(required = false) String address,
                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateOfBirth,
                                 @RequestParam(defaultValue = "ACTIVE") UserStatus status,
+                                Authentication authentication,
                                 RedirectAttributes redirectAttributes) {
         try {
-            authService.createStudentByAdmin(name, email, password, course, yearLevel, phone, address, dateOfBirth, status);
+            Student student = authService.createStudentByAdmin(name, email, password, course, yearLevel, phone, address, dateOfBirth, status);
+            auditLogService.log(
+                    authentication.getName(),
+                    "STUDENT_CREATED",
+                    "STUDENT",
+                    student.getStudentId(),
+                    "Student account created",
+                    "Student: " + student.getUser().getName() + " | Email: " + student.getUser().getEmail()
+            );
             redirectAttributes.addFlashAttribute("success", "Student account created successfully.");
         } catch (IllegalArgumentException exception) {
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
@@ -129,6 +171,8 @@ public class AdminController {
                 .map(IssueRecord::getFineAmount)
                 .filter(fine -> fine != null)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BorrowerStanding borrowerStanding = studentService.getBorrowerStanding(student);
+        List<Fine> studentFines = fineService.getStudentFines(student.getId());
 
         model.addAttribute("student", student);
         model.addAttribute("issueRecords", issueRecords);
@@ -138,6 +182,8 @@ public class AdminController {
         model.addAttribute("overdueItems", overdueItems);
         model.addAttribute("totalFineAmount", totalFineAmount);
         model.addAttribute("userStatuses", studentService.getAvailableStatuses());
+        model.addAttribute("borrowerStanding", borrowerStanding);
+        model.addAttribute("studentFines", studentFines);
     }
 
     @PostMapping("/students/{studentId}/update")
@@ -150,9 +196,18 @@ public class AdminController {
                                 @RequestParam(required = false) String address,
                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateOfBirth,
                                 @RequestParam(defaultValue = "ACTIVE") UserStatus status,
+                                Authentication authentication,
                                 RedirectAttributes redirectAttributes) {
         try {
-            studentService.updateStudentByAdmin(studentId, name, email, course, yearLevel, phone, address, dateOfBirth, status);
+            Student student = studentService.updateStudentByAdmin(studentId, name, email, course, yearLevel, phone, address, dateOfBirth, status);
+            auditLogService.log(
+                    authentication.getName(),
+                    "STUDENT_UPDATED",
+                    "STUDENT",
+                    studentId,
+                    "Student account updated",
+                    "Status: " + student.getUser().getStatus() + " | Program: " + student.getCourse()
+            );
             redirectAttributes.addFlashAttribute("success", "Student details updated successfully.");
         } catch (IllegalArgumentException exception) {
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
@@ -164,9 +219,18 @@ public class AdminController {
     public String resetStudentPassword(@PathVariable String studentId,
                                        @RequestParam String newPassword,
                                        @RequestParam String confirmPassword,
+                                       Authentication authentication,
                                        RedirectAttributes redirectAttributes) {
         try {
             studentService.resetStudentPassword(studentId, newPassword, confirmPassword);
+            auditLogService.log(
+                    authentication.getName(),
+                    "STUDENT_PASSWORD_RESET",
+                    "STUDENT",
+                    studentId,
+                    "Student password reset",
+                    "Temporary password reset was completed by admin."
+            );
             redirectAttributes.addFlashAttribute("success", "Student password reset successfully.");
         } catch (IllegalArgumentException exception) {
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
@@ -176,9 +240,18 @@ public class AdminController {
 
     @PostMapping("/students/{studentId}/delete")
     public String deleteStudent(@PathVariable String studentId,
+                                Authentication authentication,
                                 RedirectAttributes redirectAttributes) {
         try {
             studentService.deleteStudent(studentId);
+            auditLogService.log(
+                    authentication.getName(),
+                    "STUDENT_DELETED",
+                    "STUDENT",
+                    studentId,
+                    "Student account deleted",
+                    "Student account " + studentId + " was removed by admin."
+            );
             redirectAttributes.addFlashAttribute("success", "Student account deleted successfully.");
             return "redirect:/admin/students";
         } catch (IllegalArgumentException exception) {

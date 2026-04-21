@@ -7,6 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Admin Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="${pageContext.request.contextPath}/css/app.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 </head>
@@ -21,7 +22,10 @@
             <a class="nav-pill active" href="${pageContext.request.contextPath}/admin/dashboard">Dashboard</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/books">Books</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/issues">Issue / Return</a>
+            <a class="nav-pill" href="${pageContext.request.contextPath}/admin/reservations">Reservations</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/students">Students</a>
+            <a class="nav-pill" href="${pageContext.request.contextPath}/admin/fines">Fines</a>
+            <a class="nav-pill" href="${pageContext.request.contextPath}/admin/reports">Reports</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/references">Categories / Authors</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/profile">Profile</a>
             <form method="post" action="${pageContext.request.contextPath}/logout">
@@ -61,6 +65,26 @@
             <div class="metric-value">${overdueRate}%</div>
             <div class="metric-label">Overdue rate</div>
         </div>
+        <div class="metric-card">
+            <div class="metric-value">${pendingReservationCount}</div>
+            <div class="metric-label">Pending reservations</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">${readyReservationCount}</div>
+            <div class="metric-label">Ready for claim</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">${outstandingFineCount}</div>
+            <div class="metric-label">Outstanding fines</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">${outstandingFineTotal}</div>
+            <div class="metric-label">Unpaid balance</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">${blockedBorrowerCount}</div>
+            <div class="metric-label">Blocked borrowers</div>
+        </div>
     </section>
 
     <section class="panel-card mb-4">
@@ -85,6 +109,21 @@
                 <h3>Borrower Accounts</h3>
                 <p>Create student accounts, update profiles, reset passwords, deactivate access, and review borrower history.</p>
                 <a class="action-link" href="${pageContext.request.contextPath}/admin/students">Manage students</a>
+            </div>
+            <div class="module-card">
+                <h3>Reservation Queue</h3>
+                <p>Track pending holds, release ready reservations, and keep queue order fair when books become available again.</p>
+                <a class="action-link" href="${pageContext.request.contextPath}/admin/reservations">Manage reservations</a>
+            </div>
+            <div class="module-card">
+                <h3>Fine Ledger</h3>
+                <p>Review unpaid balances, settle penalties, waive approved charges, and keep financial actions inside the audit trail.</p>
+                <a class="action-link" href="${pageContext.request.contextPath}/admin/fines">Manage fines</a>
+            </div>
+            <div class="module-card">
+                <h3>Reports and Exports</h3>
+                <p>Generate circulation, overdue, reservation, fine, and audit CSV reports for review or formal submission.</p>
+                <a class="action-link" href="${pageContext.request.contextPath}/admin/reports">Open reports</a>
             </div>
             <div class="module-card">
                 <h3>Reference Data</h3>
@@ -205,6 +244,58 @@
                 </div>
             </div>
         </div>
+
+        <div class="panel-card">
+            <div class="section-title">Recent outstanding fines</div>
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                    <tr>
+                        <th>Student</th>
+                        <th>Book</th>
+                        <th>Amount</th>
+                        <th>Recorded</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <c:forEach items="${recentOutstandingFines}" var="fine">
+                        <tr>
+                            <td>${fine.student.studentId} - ${fine.student.user.name}</td>
+                            <td>${fine.issueRecord.book.title}</td>
+                            <td>${fine.amount}</td>
+                            <td>${fine.calculatedAt}</td>
+                        </tr>
+                    </c:forEach>
+                    <c:if test="${empty recentOutstandingFines}">
+                        <tr>
+                            <td colspan="4" class="text-center muted-text">No outstanding fines are recorded right now.</td>
+                        </tr>
+                    </c:if>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="panel-card">
+            <div class="section-title">Recent audit trail</div>
+            <div class="audit-timeline">
+                <c:forEach items="${recentAuditLogs}" var="log">
+                    <div class="audit-item">
+                        <div class="audit-item-badge"><i class="bi bi-shield-check"></i></div>
+                        <div>
+                            <div class="audit-item-heading">${log.summary}</div>
+                            <div class="audit-item-meta">${log.action} | ${empty log.actorName ? 'System' : log.actorName} | ${log.createdAt}</div>
+                            <c:if test="${not empty log.details}">
+                                <div class="audit-item-copy">${log.details}</div>
+                            </c:if>
+                        </div>
+                    </div>
+                </c:forEach>
+                <c:if test="${empty recentAuditLogs}">
+                    <div class="muted-text">Audit trail data will appear after admin and system actions are recorded.</div>
+                </c:if>
+            </div>
+        </div>
     </section>
 </div>
 <script>
@@ -313,5 +404,7 @@
         });
     })();
 </script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="${pageContext.request.contextPath}/js/app.js"></script>
 </body>
 </html>

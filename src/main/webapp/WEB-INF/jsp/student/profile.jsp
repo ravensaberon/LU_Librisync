@@ -21,6 +21,7 @@
         <div class="nav-links">
             <a class="nav-pill" href="${pageContext.request.contextPath}/student/dashboard">Dashboard</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/student/catalog">Catalog</a>
+            <a class="nav-pill" href="${pageContext.request.contextPath}/student/reservations">Reservations</a>
             <a class="nav-pill active" href="${pageContext.request.contextPath}/student/profile">Profile</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/student/history">Borrowing history</a>
             <form method="post" action="${pageContext.request.contextPath}/logout">
@@ -131,10 +132,64 @@
                     <i class="bi bi-hourglass-split"></i>
                     <div>
                         <strong>Pending verification</strong>
-                        <p class="mb-0">You still have a profile update waiting for OTP confirmation.</p>
+                        <p class="mb-1">You still have a profile update waiting for OTP confirmation.</p>
+                        <div class="small muted-text">
+                            OTP expires in <strong id="profileOtpExpiryCountdown">calculating...</strong>
+                            <span class="mx-1">|</span>
+                            New OTP in <strong id="profileOtpResendCountdown">calculating...</strong>
+                        </div>
                     </div>
                 </div>
             </c:if>
+        </article>
+    </section>
+
+    <section class="panel-grid panel-grid-equal mb-4">
+        <article class="panel-card">
+            <div class="section-title">Borrowing standing</div>
+            <div class="support-item">
+                <strong>${borrowerStanding.statusLabel}</strong>
+                <span>
+                    Active loans: ${borrowerStanding.activeLoansCount}/${borrowerStanding.maxActiveLoans}
+                    | Remaining slots: ${borrowerStanding.remainingLoanSlots}
+                    | Outstanding fines: ${borrowerStanding.outstandingFineAmount}
+                </span>
+            </div>
+            <c:if test="${borrowerStanding.blocked}">
+                <div class="support-list mt-3">
+                    <c:forEach items="${borrowerStanding.blockers}" var="blocker">
+                        <div class="support-item">
+                            <strong>Account hold</strong>
+                            <span>${blocker}</span>
+                        </div>
+                    </c:forEach>
+                </div>
+            </c:if>
+        </article>
+
+        <article class="panel-card">
+            <div class="section-title">Fine ledger summary</div>
+            <div class="info-grid">
+                <div class="info-tile">
+                    <span class="info-tile-label">Outstanding amount</span>
+                    <span class="info-tile-value">${outstandingFineTotal}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-tile-label">Unpaid fine records</span>
+                    <span class="info-tile-value">${borrowerStanding.unpaidFineCount}</span>
+                </div>
+            </div>
+            <ul class="list-clean mt-3">
+                <c:forEach items="${studentFines}" var="fine" end="4">
+                    <li class="d-flex justify-content-between align-items-center">
+                        <span>${fine.issueRecord.book.title}</span>
+                        <span class="tag-chip">${fine.amount} | ${fine.status}</span>
+                    </li>
+                </c:forEach>
+                <c:if test="${empty studentFines}">
+                    <li class="muted-text">No fine ledger entries have been recorded for this account yet.</li>
+                </c:if>
+            </ul>
         </article>
     </section>
 
@@ -296,24 +351,29 @@
                         <div class="otp-panel-icon"><i class="bi bi-envelope-paper"></i></div>
                         <div>
                             <strong>Verification destination</strong>
-                            <p class="mb-0">Use the code assigned to <span class="otp-destination">${empty otpMaskedEmail ? 'your registered email' : otpMaskedEmail}</span>.</p>
+                            <p class="mb-1">Use the code assigned to <span class="otp-destination">${empty otpMaskedEmail ? 'your registered email' : otpMaskedEmail}</span>.</p>
+                            <div class="small muted-text">
+                                Expires in <strong id="modalOtpExpiryCountdown">calculating...</strong>
+                                <span class="mx-1">|</span>
+                                Resend in <strong id="modalOtpResendCountdown">calculating...</strong>
+                            </div>
                         </div>
                     </div>
-
-                    <c:if test="${not empty otpPreviewCode}">
-                        <div class="otp-preview-card">
-                            <span class="otp-preview-label">Development preview OTP</span>
-                            <strong class="otp-preview-code">${otpPreviewCode}</strong>
-                            <p class="mb-0">Email delivery is not configured yet, so the code is shown here for local testing.</p>
-                        </div>
-                    </c:if>
 
                     <div class="mt-3">
                         <label class="form-label" for="otpCode">One-time passcode</label>
                         <input class="form-control form-control-lg otp-input" id="otpCode" name="otpCode" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" placeholder="Enter 6-digit OTP" required>
                     </div>
+                    <div class="otp-preview-card">
+                        <span class="otp-preview-label">Email delivery note</span>
+                        <p class="mb-0">The system sends OTPs to your registered email. If Gmail SMTP is still being configured locally, a fallback copy is written to <strong>storage/email-outbox</strong>.</p>
+                    </div>
                 </div>
                 <div class="modal-footer">
+                    <button class="btn btn-warm me-auto" type="submit" form="resendProfileOtpForm" id="resendOtpButton">
+                        <i class="bi bi-arrow-repeat"></i>
+                        Resend OTP
+                    </button>
                     <button class="btn btn-warm" type="button" data-bs-dismiss="modal">Close</button>
                     <button class="btn btn-brand" type="submit">
                         <i class="bi bi-check2-circle"></i>
@@ -324,24 +384,73 @@
         </div>
     </div>
 </div>
+<form id="resendProfileOtpForm" method="post" action="${pageContext.request.contextPath}/student/profile/resend-otp" class="d-none">
+    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+</form>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="${pageContext.request.contextPath}/js/app.js"></script>
 <script>
     (function () {
         var shouldOpenEditModal = ${openEditModal ? 'true' : 'false'};
         var shouldOpenOtpModal = ${openOtpModal ? 'true' : 'false'};
+        var otpExpiresAtEpochMs = ${empty otpExpiresAtEpochMs ? 'null' : otpExpiresAtEpochMs};
+        var otpResendAvailableAtEpochMs = ${empty otpResendAvailableAtEpochMs ? 'null' : otpResendAvailableAtEpochMs};
 
         var editProfileModal = document.getElementById("editProfileModal");
         var verifyProfileOtpModal = document.getElementById("verifyProfileOtpModal");
+        var resendOtpButton = document.getElementById("resendOtpButton");
+
+        function formatCountdown(targetEpochMs) {
+            if (!targetEpochMs) {
+                return "not active";
+            }
+
+            var remainingMs = targetEpochMs - Date.now();
+            if (remainingMs <= 0) {
+                return "00:00";
+            }
+
+            var totalSeconds = Math.floor(remainingMs / 1000);
+            var minutes = Math.floor(totalSeconds / 60);
+            var seconds = totalSeconds % 60;
+            return String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0");
+        }
+
+        function updateOtpCountdowns() {
+            var expiryTargets = document.querySelectorAll("#profileOtpExpiryCountdown, #modalOtpExpiryCountdown");
+            var resendTargets = document.querySelectorAll("#profileOtpResendCountdown, #modalOtpResendCountdown");
+
+            expiryTargets.forEach(function (element) {
+                if (element) {
+                    element.textContent = formatCountdown(otpExpiresAtEpochMs);
+                }
+            });
+
+            var resendCountdown = formatCountdown(otpResendAvailableAtEpochMs);
+            resendTargets.forEach(function (element) {
+                if (element) {
+                    element.textContent = resendCountdown;
+                }
+            });
+
+            if (resendOtpButton) {
+                var resendBlocked = otpResendAvailableAtEpochMs && otpResendAvailableAtEpochMs > Date.now();
+                resendOtpButton.disabled = resendBlocked;
+            }
+        }
 
         if (shouldOpenOtpModal && verifyProfileOtpModal) {
             bootstrap.Modal.getOrCreateInstance(verifyProfileOtpModal).show();
-            return;
         }
 
         if (shouldOpenEditModal && editProfileModal) {
             bootstrap.Modal.getOrCreateInstance(editProfileModal).show();
         }
+
+        updateOtpCountdowns();
+        window.setInterval(updateOtpCountdowns, 1000);
     })();
 </script>
 </body>

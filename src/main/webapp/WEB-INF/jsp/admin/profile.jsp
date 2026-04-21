@@ -20,7 +20,10 @@
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/dashboard">Dashboard</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/books">Books</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/issues">Issue / Return</a>
+            <a class="nav-pill" href="${pageContext.request.contextPath}/admin/reservations">Reservations</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/students">Students</a>
+            <a class="nav-pill" href="${pageContext.request.contextPath}/admin/fines">Fines</a>
+            <a class="nav-pill" href="${pageContext.request.contextPath}/admin/reports">Reports</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/references">Categories / Authors</a>
             <a class="nav-pill active" href="${pageContext.request.contextPath}/admin/profile">Profile</a>
             <form method="post" action="${pageContext.request.contextPath}/logout">
@@ -116,5 +119,7 @@
         </div>
     </section>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="${pageContext.request.contextPath}/js/app.js"></script>
 </body>
 </html>

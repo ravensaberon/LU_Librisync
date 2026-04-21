@@ -19,6 +19,7 @@
         <div class="nav-links">
             <a class="nav-pill" href="${pageContext.request.contextPath}/student/dashboard">Dashboard</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/student/catalog">Catalog</a>
+            <a class="nav-pill" href="${pageContext.request.contextPath}/student/reservations">Reservations</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/student/profile">Profile</a>
             <a class="nav-pill active" href="${pageContext.request.contextPath}/student/history">Borrowing history</a>
             <form method="post" action="${pageContext.request.contextPath}/logout">
@@ -29,6 +30,29 @@
     </div>
 
     <section class="panel-card">
+        <div class="section-title">Reading history overview</div>
+        <div class="info-grid mb-4">
+            <div class="info-tile">
+                <span class="info-tile-label">Borrowed items</span>
+                <span class="info-tile-value">${activeCount}</span>
+            </div>
+            <div class="info-tile">
+                <span class="info-tile-label">Overdue items</span>
+                <span class="info-tile-value">${overdueCount}</span>
+            </div>
+            <div class="info-tile">
+                <span class="info-tile-label">Active reservations</span>
+                <span class="info-tile-value">${reservationCount}</span>
+            </div>
+            <div class="info-tile">
+                <span class="info-tile-label">Outstanding fines</span>
+                <span class="info-tile-value">${outstandingFineTotal}</span>
+            </div>
+        </div>
+        <div class="support-item mb-4">
+            <strong>${borrowerStanding.statusLabel}</strong>
+            <span>Active loans: ${borrowerStanding.activeLoansCount}/${borrowerStanding.maxActiveLoans} | Remaining slots: ${borrowerStanding.remainingLoanSlots}</span>
+        </div>
         <div class="section-title">All issue records</div>
         <div class="table-responsive">
             <table class="table align-middle">
@@ -63,5 +87,7 @@
         </div>
     </section>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="${pageContext.request.contextPath}/js/app.js"></script>
 </body>
 </html>
