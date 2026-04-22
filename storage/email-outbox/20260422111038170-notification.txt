@@ -1,0 +1,18 @@
+To: maria.santos@student.edu
+Subject: Due Reminder | Issue #1 | Clean Code
+Content-Type: text/plain
+
+Hello Maria Santos,
+
+This is a reminder from LU Librisync that your borrowed book is due soon.
+
+Book title: Clean Code
+Student ID: 241-0001
+Due date: April 15, 2026 1:21 AM
+Issue code: QR-ISSUE-0001
+
+Please return the book on or before the due date to avoid additional fines.
+
+
+Send error:
+SMTP authentication is enabled but no SMTP password is configured.

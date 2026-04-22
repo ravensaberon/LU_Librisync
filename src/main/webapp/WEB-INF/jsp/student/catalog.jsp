@@ -40,7 +40,7 @@
     <section class="panel-card mb-4">
         <form method="get" action="${pageContext.request.contextPath}/student/catalog" class="row g-3" id="catalogSearchForm">
             <div class="col-md-3">
-                <label class="form-label" for="keyword">Title or barcode</label>
+                <label class="form-label" for="keyword">Title or code</label>
                 <input class="form-control" id="keyword" name="keyword" value="${keyword}">
             </div>
             <div class="col-md-3">
@@ -76,7 +76,7 @@
                     <i class="bi bi-search me-2"></i>Search catalog
                 </button>
                 <button class="btn btn-warm scanner-trigger" type="button" data-bs-toggle="modal" data-bs-target="#catalogScannerModal">
-                    <i class="bi bi-upc-scan"></i>Scan barcode or ISBN
+                    <i class="bi bi-upc-scan"></i>Scan barcode
                 </button>
             </div>
         </form>
@@ -261,7 +261,7 @@
                     <div>
                         <span class="modal-kicker">Barcode Scan</span>
                         <h2 class="h4 mb-1 mt-2">Search the catalog with your camera</h2>
-                        <p class="modal-subtitle mb-0">Point your device at a library barcode, ISBN label, or QR code and the search form will update automatically.</p>
+                        <p class="modal-subtitle mb-0">Point your device at a book barcode and the search form will update automatically.</p>
                     </div>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -272,7 +272,7 @@
                         <div class="scanner-target"></div>
                     </div>
                     <div class="scanner-status" id="catalogScannerStatus">
-                        Camera scanner is preparing. Hold the code steady inside the highlighted frame.
+                        Camera scanner is preparing. Hold the barcode steady inside the highlighted frame.
                     </div>
                 </div>
             </div>
@@ -281,38 +281,27 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://unpkg.com/@zxing/browser@0.1.5"></script>
+<script src="${pageContext.request.contextPath}/js/qr-tools.js"></script>
 <script src="${pageContext.request.contextPath}/js/app.js"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function () {
         const modalElement = document.getElementById("catalogScannerModal");
-        const videoElement = document.getElementById("catalogScannerVideo");
-        const statusElement = document.getElementById("catalogScannerStatus");
         const keywordInput = document.getElementById("keyword");
         const isbnInput = document.getElementById("isbn");
         const searchForm = document.getElementById("catalogSearchForm");
-
-        let detector = null;
-        let activeStream = null;
-        let animationFrameId = null;
-
-        function setStatus(message, isWarning) {
-            statusElement.textContent = message;
-            statusElement.classList.toggle("warn", Boolean(isWarning));
-        }
-
-        function stopScanner() {
-            if (animationFrameId) {
-                cancelAnimationFrame(animationFrameId);
-                animationFrameId = null;
+        const scanner = window.LuLibrisyncQr.createScanner({
+            videoElement: document.getElementById("catalogScannerVideo"),
+            statusElement: document.getElementById("catalogScannerStatus"),
+            formats: ["code_128", "ean_13", "ean_8", "upc_a", "upc_e", "code_39", "codabar", "itf"],
+            liveMessage: "Scanner is live. Align the barcode inside the frame and hold still for a moment.",
+            unsupportedMessage: "This browser cannot decode live barcodes. You can still type the ISBN or barcode manually.",
+            permissionMessage: "Camera access was blocked or is unavailable on this device. Please allow camera access, then try again.",
+            onDetected: applyDetectedCode,
+            onScanError: function () {
+                scanner.setStatus("Camera access is active, but the current barcode could not be decoded yet.", true);
             }
-            if (activeStream) {
-                activeStream.getTracks().forEach(function (track) {
-                    track.stop();
-                });
-                activeStream = null;
-            }
-            videoElement.srcObject = null;
-        }
+        });
 
         function applyDetectedCode(rawValue) {
             const detectedCode = (rawValue || "").trim();
@@ -325,7 +314,7 @@
                 isbnInput.value = detectedCode;
             }
 
-            setStatus("Code detected: " + detectedCode + ". Applying it to the search form now.", false);
+            scanner.setStatus("Code detected: " + detectedCode + ". Applying it to the search form now.", false);
             const modal = bootstrap.Modal.getInstance(modalElement);
             if (modal) {
                 modal.hide();
@@ -335,54 +324,12 @@
             }, 220);
         }
 
-        async function scanLoop() {
-            if (!detector || !videoElement.srcObject || videoElement.readyState < 2) {
-                animationFrameId = window.requestAnimationFrame(scanLoop);
-                return;
-            }
-
-            try {
-                const detectedCodes = await detector.detect(videoElement);
-                if (detectedCodes.length > 0) {
-                    applyDetectedCode(detectedCodes[0].rawValue);
-                    return;
-                }
-            } catch (error) {
-                setStatus("Camera scanning is available, but the browser could not decode the current frame yet.", true);
-            }
-
-            animationFrameId = window.requestAnimationFrame(scanLoop);
-        }
-
-        async function startScanner() {
-            if (!("BarcodeDetector" in window)) {
-                setStatus("This browser does not support live barcode scanning. You can still type the ISBN or barcode manually.", true);
-                return;
-            }
-
-            try {
-                detector = new BarcodeDetector({
-                    formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_39", "code_128", "qr_code"]
-                });
-                activeStream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: { ideal: "environment" }
-                    },
-                    audio: false
-                });
-                videoElement.srcObject = activeStream;
-                await videoElement.play();
-                setStatus("Scanner is live. Align the code inside the frame and hold still for a moment.", false);
-                animationFrameId = window.requestAnimationFrame(scanLoop);
-            } catch (error) {
-                setStatus("Camera access was blocked or is unavailable on this device. Please allow camera access, then try again.", true);
-            }
-        }
-
-        modalElement.addEventListener("shown.bs.modal", startScanner);
+        modalElement.addEventListener("shown.bs.modal", function () {
+            scanner.start();
+        });
         modalElement.addEventListener("hidden.bs.modal", function () {
-            stopScanner();
-            setStatus("Camera scanner is preparing. Hold the code steady inside the highlighted frame.", false);
+            scanner.stop();
+            scanner.setStatus("Camera scanner is preparing. Hold the barcode steady inside the highlighted frame.", false);
         });
     });
 </script>

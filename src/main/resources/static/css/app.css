@@ -2523,6 +2523,13 @@ textarea.form-control {
     bottom: 22px;
 }
 
+.scanner-target.scanner-target-qr {
+    width: min(72vw, 280px);
+    height: min(72vw, 280px);
+    max-width: 72%;
+    border-radius: 32px;
+}
+
 .scanner-status {
     margin-top: 16px;
     padding: 14px 16px;
@@ -2537,6 +2544,25 @@ textarea.form-control {
     background: #fff7f6;
     border-color: #f0d6d3;
     color: #9d2f2a;
+}
+
+.scanner-upload {
+    margin-top: 14px;
+    padding: 16px 18px;
+    border-radius: 18px;
+    border: 1px dashed rgba(15, 127, 52, 0.22);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(232, 248, 237, 0.72));
+}
+
+.scanner-upload-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+}
+
+.scanner-upload .form-note {
+    align-self: auto;
 }
 
 .qr-card {

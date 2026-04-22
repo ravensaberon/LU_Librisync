@@ -6,14 +6,22 @@ param(
 )
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$mavenCmd = Join-Path $projectRoot "tools\apache-maven-3.9.14\bin\mvn.cmd"
+$mavenCandidates = @(
+    (Join-Path $projectRoot "tools\apache-maven-3.9.14\bin\mvn.cmd"),
+    "C:\Users\labar\Downloads\apache-maven-3.9.9\bin\mvn.cmd"
+)
+$systemMaven = Get-Command mvn.cmd -ErrorAction SilentlyContinue
+if ($systemMaven) {
+    $mavenCandidates += $systemMaven.Source
+}
+$mavenCmd = $mavenCandidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
 $mysqlCli = "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe"
 $mavenRepo = Join-Path $projectRoot ".m2\repository"
 $fallbackJavaHome = Join-Path $env:USERPROFILE ".jdks\temurin-17"
 $localEnvFile = Join-Path $PSScriptRoot "local-dev-env.env"
 
-if (-not (Test-Path $mavenCmd)) {
-    throw "Local Maven was not found at $mavenCmd"
+if (-not $mavenCmd) {
+    throw "Maven was not found in the project tools folder, Downloads fallback, or system PATH."
 }
 
 New-Item -ItemType Directory -Force -Path $mavenRepo | Out-Null

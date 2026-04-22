@@ -97,6 +97,16 @@ public class Book {
         return availableQuantity != null && availableQuantity > 0;
     }
 
+    @Transient
+    public String getScanCode() {
+        return barcode == null || barcode.isBlank() ? isbn : barcode.trim();
+    }
+
+    @Transient
+    public String getScanCodeLabel() {
+        return barcode == null || barcode.isBlank() ? "ISBN" : "Barcode";
+    }
+
     public Long getId() {
         return id;
     }

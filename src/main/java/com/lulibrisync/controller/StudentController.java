@@ -87,6 +87,9 @@ public class StudentController {
 
     @GetMapping("/student/profile")
     public String profile(Authentication authentication, Model model) {
+        if (isAdmin(authentication)) {
+            return "redirect:/admin/profile";
+        }
         Student student = studentService.getStudentByEmail(authentication.getName());
         populateProfilePageModel(model, student);
         return "student/profile";
@@ -378,5 +381,11 @@ public class StudentController {
             return null;
         }
         return value.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+    }
+
+    private boolean isAdmin(Authentication authentication) {
+        return authentication != null
+                && authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
     }
 }

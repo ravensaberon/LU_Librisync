@@ -1,0 +1,8 @@
+To: john.cruz@student.edu
+Subject: Reservation ready: Clean Code
+Content-Type: text/plain
+
+Hello John Cruz, your reservation for "Clean Code" is now ready to claim until 2026-04-19.
+
+Send error:
+SMTP authentication is enabled but no SMTP password is configured.

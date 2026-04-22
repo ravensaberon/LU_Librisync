@@ -79,9 +79,9 @@
                 </select>
                 <div class="d-flex flex-wrap gap-2 mt-2">
                     <button class="btn btn-warm scanner-trigger" type="button" data-bs-toggle="modal" data-bs-target="#issueBookScannerModal">
-                        <i class="bi bi-upc-scan"></i>Scan book barcode
+                        <i class="bi bi-upc-scan"></i>Scan book QR
                     </button>
-                    <span class="form-note">Use the camera to match a book barcode or ISBN directly to this circulation form.</span>
+                    <span class="form-note">Use the camera to scan the LU Librisync QR label on the book and match it directly to this circulation form.</span>
                 </div>
             </div>
             <div class="col-md-4">
@@ -263,7 +263,7 @@
                     <div>
                         <span class="modal-kicker">Circulation Scan</span>
                         <h2 class="h4 mb-1 mt-2">Match a book copy instantly</h2>
-                        <p class="modal-subtitle mb-0">Scan the barcode or ISBN on the physical item and the issue form will select the matching catalog record automatically.</p>
+                        <p class="modal-subtitle mb-0">Scan the LU Librisync QR label with your camera or upload a saved QR image from the phone gallery.</p>
                     </div>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -271,10 +271,19 @@
                     <div class="scanner-shell">
                         <video id="issueScannerVideo" autoplay muted playsinline></video>
                         <div class="scanner-overlay"></div>
-                        <div class="scanner-target"></div>
+                        <div class="scanner-target scanner-target-qr"></div>
                     </div>
                     <div class="scanner-status" id="issueScannerStatus">
-                        Camera scanner is preparing. Hold the book code inside the highlighted frame.
+                        Camera scanner is preparing. Hold the book QR code inside the highlighted frame.
+                    </div>
+                    <div class="scanner-upload">
+                        <div class="scanner-upload-actions">
+                            <label class="btn btn-warm mb-0" for="issueScannerUpload">
+                                <i class="bi bi-image me-2"></i>Upload QR from gallery
+                            </label>
+                            <input class="d-none" id="issueScannerUpload" type="file" accept="image/*">
+                            <span class="form-note">Choose a downloaded QR image instead of pointing the code at the camera.</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -311,6 +320,9 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="d-flex flex-wrap gap-2 mt-3">
+                            <button class="btn btn-brand" id="downloadIssueQrButton" type="button" disabled>Download PNG</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -318,38 +330,34 @@
     </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="${pageContext.request.contextPath}/vendor/qrious.min.js"></script>
+<script src="${pageContext.request.contextPath}/vendor/jsQR.js"></script>
+<script src="${pageContext.request.contextPath}/js/qr-tools.js"></script>
 <script src="${pageContext.request.contextPath}/js/app.js"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function () {
         const scannerModalElement = document.getElementById("issueBookScannerModal");
-        const scannerVideoElement = document.getElementById("issueScannerVideo");
-        const scannerStatusElement = document.getElementById("issueScannerStatus");
         const bookSelectElement = document.getElementById("bookId");
-
-        let detector = null;
-        let activeStream = null;
-        let animationFrameId = null;
-
-        function setScannerStatus(message, isWarning) {
-            scannerStatusElement.textContent = message;
-            scannerStatusElement.classList.toggle("warn", Boolean(isWarning));
-        }
-
-        function stopIssueScanner() {
-            if (animationFrameId) {
-                cancelAnimationFrame(animationFrameId);
-                animationFrameId = null;
+        const uploadInput = document.getElementById("issueScannerUpload");
+        const scanner = window.LuLibrisyncQr.createScanner({
+            videoElement: document.getElementById("issueScannerVideo"),
+            statusElement: document.getElementById("issueScannerStatus"),
+            formats: ["qr_code"],
+            liveMessage: "Scanner is live. Aim the camera at the book QR code and hold it inside the frame.",
+            qrFallbackMessage: "QR-only scanning is active on this browser. Aim the camera at a LU Librisync QR book label.",
+            unsupportedMessage: "This browser cannot decode live QR codes. You can still choose the book manually.",
+            permissionMessage: "Camera access was blocked or unavailable. Please allow camera use, then try again.",
+            fileSuccessMessage: "QR image decoded successfully. Matching the book now.",
+            onDetected: selectBookFromCode,
+            onScanError: function () {
+                window.LuLibrisyncQr.setStatus(
+                    document.getElementById("issueScannerStatus"),
+                    "Camera access is active, but the current frame could not be decoded yet.",
+                    true
+                );
             }
-            if (activeStream) {
-                activeStream.getTracks().forEach(function (track) {
-                    track.stop();
-                });
-                activeStream = null;
-            }
-            scannerVideoElement.srcObject = null;
-        }
+        });
 
         function selectBookFromCode(rawValue) {
             const detectedCode = (rawValue || "").trim().toLowerCase();
@@ -363,66 +371,35 @@
             });
 
             if (!matchingOption) {
-                setScannerStatus("Scanned code " + rawValue + " was not found in the currently available book list.", true);
+                scanner.setStatus("Scanned code " + rawValue + " was not found in the currently available book list.", true);
                 return;
             }
 
             bookSelectElement.value = matchingOption.value;
-            setScannerStatus("Matched and selected: " + matchingOption.textContent, false);
+            scanner.setStatus("Matched and selected: " + matchingOption.textContent, false);
             const scannerModal = bootstrap.Modal.getInstance(scannerModalElement);
             if (scannerModal) {
                 scannerModal.hide();
             }
         }
 
-        async function scanIssueFrame() {
-            if (!detector || !scannerVideoElement.srcObject || scannerVideoElement.readyState < 2) {
-                animationFrameId = window.requestAnimationFrame(scanIssueFrame);
-                return;
-            }
-
-            try {
-                const detectedCodes = await detector.detect(scannerVideoElement);
-                if (detectedCodes.length > 0) {
-                    selectBookFromCode(detectedCodes[0].rawValue);
-                    return;
-                }
-            } catch (error) {
-                setScannerStatus("Camera scanning is available, but the current frame could not be decoded yet.", true);
-            }
-
-            animationFrameId = window.requestAnimationFrame(scanIssueFrame);
-        }
-
-        async function startIssueScanner() {
-            if (!("BarcodeDetector" in window)) {
-                setScannerStatus("This browser does not support live barcode scanning. You can still choose the book manually.", true);
-                return;
-            }
-
-            try {
-                detector = new BarcodeDetector({
-                    formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_39", "code_128", "qr_code"]
-                });
-                activeStream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: { ideal: "environment" }
-                    },
-                    audio: false
-                });
-                scannerVideoElement.srcObject = activeStream;
-                await scannerVideoElement.play();
-                setScannerStatus("Scanner is live. Aim the camera at the barcode or ISBN and hold it inside the frame.", false);
-                animationFrameId = window.requestAnimationFrame(scanIssueFrame);
-            } catch (error) {
-                setScannerStatus("Camera access was blocked or unavailable. Please allow camera use, then try again.", true);
-            }
-        }
-
-        scannerModalElement.addEventListener("shown.bs.modal", startIssueScanner);
+        scannerModalElement.addEventListener("shown.bs.modal", function () {
+            scanner.start();
+        });
         scannerModalElement.addEventListener("hidden.bs.modal", function () {
-            stopIssueScanner();
-            setScannerStatus("Camera scanner is preparing. Hold the book code inside the highlighted frame.", false);
+            scanner.stop();
+            scanner.setStatus("Camera scanner is preparing. Hold the book QR code inside the highlighted frame.", false);
+            uploadInput.value = "";
+        });
+
+        uploadInput.addEventListener("change", function (event) {
+            const selectedFile = event.target.files && event.target.files[0];
+            if (!selectedFile) {
+                return;
+            }
+
+            scanner.decodeFile(selectedFile);
+            uploadInput.value = "";
         });
 
         const qrModalElement = document.getElementById("issueQrModal");
@@ -430,6 +407,8 @@
         const qrValueElement = document.getElementById("issueQrValue");
         const qrBookTitleElement = document.getElementById("issueQrBookTitle");
         const qrStudentNameElement = document.getElementById("issueQrStudentName");
+        const downloadIssueQrButton = document.getElementById("downloadIssueQrButton");
+        let currentIssueQrCanvas = null;
 
         qrModalElement.addEventListener("show.bs.modal", function (event) {
             const trigger = event.relatedTarget;
@@ -440,28 +419,21 @@
             qrValueElement.textContent = issueCode;
             qrBookTitleElement.textContent = bookTitle;
             qrStudentNameElement.textContent = studentName;
-            qrCanvasElement.innerHTML = "";
+            currentIssueQrCanvas = window.LuLibrisyncQr.renderQr(qrCanvasElement, issueCode, {
+                size: 220,
+                emptyText: "No QR code available.",
+                errorText: "Unable to render this QR code."
+            });
+            downloadIssueQrButton.disabled = !currentIssueQrCanvas;
+            downloadIssueQrButton.dataset.filename = window.LuLibrisyncQr.normalizeFilename(issueCode, "issue-code") + ".png";
+        });
 
-            if (!issueCode) {
-                qrCanvasElement.textContent = "No QR code available.";
+        downloadIssueQrButton.addEventListener("click", function () {
+            if (!currentIssueQrCanvas) {
                 return;
             }
 
-            const canvasElement = document.createElement("canvas");
-            QRCode.toCanvas(canvasElement, issueCode, {
-                width: 220,
-                margin: 2,
-                color: {
-                    dark: "#0f7f34",
-                    light: "#ffffff"
-                }
-            }, function (error) {
-                if (error) {
-                    qrCanvasElement.textContent = "Unable to render this QR code.";
-                    return;
-                }
-                qrCanvasElement.appendChild(canvasElement);
-            });
+            window.LuLibrisyncQr.downloadCanvas(currentIssueQrCanvas, downloadIssueQrButton.dataset.filename);
         });
     });
 </script>

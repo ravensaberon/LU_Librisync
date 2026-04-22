@@ -144,6 +144,9 @@
                             </c:choose>
                         </td>
                         <td class="table-actions">
+                            <button class="icon-action" type="button" title="View book QR code" data-bs-toggle="modal" data-bs-target="#bookQrModal" data-book-title="${book.title}" data-book-isbn="${book.isbn}" data-book-code="${book.scanCode}" data-book-code-label="${book.scanCodeLabel}">
+                                <i class="bi bi-qr-code"></i>
+                            </button>
                             <a class="icon-action" href="${pageContext.request.contextPath}/admin/books?editId=${book.id}" title="Edit book">
                                 <i class="bi bi-pencil-square"></i>
                             </a>
@@ -165,6 +168,49 @@
             </table>
         </div>
     </section>
+
+    <div class="modal fade" id="bookQrModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header modal-header-brand">
+                    <div>
+                        <span class="modal-kicker">Book QR Label</span>
+                        <h2 class="h4 mb-1 mt-2">Scan-ready catalog code</h2>
+                        <p class="modal-subtitle mb-0">Each title now has a QR label that resolves to its saved barcode or ISBN for fast lookup and desk-side scanning.</p>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="qr-card">
+                        <div class="qr-code-shell mb-3" id="bookQrCanvas"></div>
+                        <div class="qr-code-meta">
+                            <div>
+                                <span class="info-tile-label">Encoded value</span>
+                                <span class="qr-code-value" id="bookQrValue">No code selected yet.</span>
+                            </div>
+                            <div class="info-grid">
+                                <div class="info-tile">
+                                    <span class="info-tile-label">Title</span>
+                                    <span class="info-tile-value" id="bookQrTitle">Not selected</span>
+                                </div>
+                                <div class="info-tile">
+                                    <span class="info-tile-label">ISBN</span>
+                                    <span class="info-tile-value" id="bookQrIsbn">Not selected</span>
+                                </div>
+                                <div class="info-tile">
+                                    <span class="info-tile-label">Code type</span>
+                                    <span class="info-tile-value" id="bookQrType">Not selected</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 mt-3">
+                            <button class="btn btn-brand" id="downloadBookQrButton" type="button" disabled>Download PNG</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 <div class="modal fade" id="bookFormModal" tabindex="-1" aria-labelledby="bookFormModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
@@ -272,15 +318,53 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="${pageContext.request.contextPath}/vendor/qrious.min.js"></script>
+<script src="${pageContext.request.contextPath}/js/qr-tools.js"></script>
 <script src="${pageContext.request.contextPath}/js/app.js"></script>
 <script>
     (function () {
         var shouldOpenBookModal = ${not empty editBook or openBookModal ? 'true' : 'false'};
         var bookFormModal = document.getElementById("bookFormModal");
+        var qrModalElement = document.getElementById("bookQrModal");
+        var qrCanvasElement = document.getElementById("bookQrCanvas");
+        var qrValueElement = document.getElementById("bookQrValue");
+        var qrTitleElement = document.getElementById("bookQrTitle");
+        var qrIsbnElement = document.getElementById("bookQrIsbn");
+        var qrTypeElement = document.getElementById("bookQrType");
+        var downloadButton = document.getElementById("downloadBookQrButton");
+        var currentQrCanvas = null;
 
         if (shouldOpenBookModal && bookFormModal) {
             bootstrap.Modal.getOrCreateInstance(bookFormModal).show();
         }
+
+        qrModalElement.addEventListener("show.bs.modal", function (event) {
+            var trigger = event.relatedTarget;
+            var bookCode = trigger.getAttribute("data-book-code") || "";
+            var bookTitle = trigger.getAttribute("data-book-title") || "Not selected";
+            var bookIsbn = trigger.getAttribute("data-book-isbn") || "Not selected";
+            var bookCodeLabel = trigger.getAttribute("data-book-code-label") || "Book code";
+
+            qrValueElement.textContent = bookCode;
+            qrTitleElement.textContent = bookTitle;
+            qrIsbnElement.textContent = bookIsbn;
+            qrTypeElement.textContent = bookCodeLabel;
+            currentQrCanvas = window.LuLibrisyncQr.renderQr(qrCanvasElement, bookCode, {
+                size: 240,
+                emptyText: "No QR code available for this book.",
+                errorText: "Unable to render this QR code."
+            });
+            downloadButton.disabled = !currentQrCanvas;
+            downloadButton.dataset.filename = window.LuLibrisyncQr.normalizeFilename(bookTitle, "book") + "-qr.png";
+        });
+
+        downloadButton.addEventListener("click", function () {
+            if (!currentQrCanvas) {
+                return;
+            }
+
+            window.LuLibrisyncQr.downloadCanvas(currentQrCanvas, downloadButton.dataset.filename);
+        });
     })();
 </script>
 </body>

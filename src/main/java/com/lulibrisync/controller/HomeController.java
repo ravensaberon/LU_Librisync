@@ -22,4 +22,11 @@ public class HomeController {
                 .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
         return isAdmin ? "redirect:/admin/dashboard" : "redirect:/student/dashboard";
     }
+
+    @GetMapping("/profile")
+    public String profile(Authentication authentication) {
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
+        return isAdmin ? "redirect:/admin/profile" : "redirect:/student/profile";
+    }
 }
