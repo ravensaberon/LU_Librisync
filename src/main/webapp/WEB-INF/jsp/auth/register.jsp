@@ -7,32 +7,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>LU Librisync Registration</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="${pageContext.request.contextPath}/css/app.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="${pageContext.request.contextPath}/css/app.css?v=20260430-auth-back-link">
     <style>
-        .register-card {
-            max-width: 1160px;
-        }
-
-        .register-card .auth-card {
-            grid-template-columns: 0.92fr 1.08fr;
-        }
-
-        .register-story {
-            position: relative;
-            overflow: hidden;
-        }
-
-        .register-story::after {
-            content: "";
-            position: absolute;
-            right: -80px;
-            bottom: -80px;
-            width: 220px;
-            height: 220px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.10);
-        }
-
         .register-note {
             margin-top: 24px;
             padding: 20px;
@@ -89,7 +66,6 @@
         }
 
         @media (max-width: 900px) {
-            .register-card .auth-card,
             .register-form-row {
                 grid-template-columns: 1fr;
             }
@@ -97,18 +73,21 @@
     </style>
 </head>
 <body>
-<div class="auth-shell">
-    <div class="register-card w-100">
-        <div class="auth-card hero-card">
-            <section class="auth-story register-story">
-                <span class="tag-chip warn">Student Registration</span>
-                <h1 class="mt-3 mb-3 fw-bold">Create your LU Librisync account</h1>
-                <p class="fs-5 mb-0">Complete the form below to create your account.</p>
-            </section>
+<div class="auth-shell auth-shell-library auth-shell-register">
+            <section class="auth-form-wrap auth-form-panel auth-form-panel-register register-form-wrap">
+                <div class="auth-utility-bar">
+                    <a class="auth-back-link" href="${pageContext.request.contextPath}/">
+                        <i class="bi bi-arrow-left"></i>
+                        <span>Back to landing page</span>
+                    </a>
+                </div>
 
-            <section class="auth-form-wrap register-form-wrap">
-                <h2 class="fw-bold mb-2">Create account</h2>
-                <p class="muted-text mb-4">Complete all required fields below. Your student ID will be assigned by the system after registration.</p>
+                <div class="auth-panel-heading">
+                    <h2 class="auth-panel-title">Create your <span class="auth-panel-title-accent">account</span></h2>
+                    <p class="auth-panel-copy">Laguna University library registration for college students. Complete the details below to continue.</p>
+                </div>
+
+                <div class="auth-role-label">College Student</div>
 
                 <c:if test="${not empty error}">
                     <div class="alert alert-danger">${error}</div>
@@ -277,13 +256,14 @@
                         <p class="field-error mb-0" id="agreeError"></p>
                     </div>
 
-                    <button class="btn btn-brand w-100 mb-3" type="submit">Create student account</button>
+                    <button class="btn btn-brand auth-primary-btn w-100 mb-3" type="submit">Create account</button>
                 </form>
 
-                <p class="mb-0">Already have an account? <a href="${pageContext.request.contextPath}/login">Sign in here</a>.</p>
+                <div class="auth-support-row">
+                    <span class="text-muted">Already have an account?</span>
+                    <a class="auth-support-link" href="${pageContext.request.contextPath}/login">Sign in here</a>
+                </div>
             </section>
-        </div>
-    </div>
 </div>
 
 <script>

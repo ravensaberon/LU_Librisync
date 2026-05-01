@@ -188,24 +188,6 @@
             background: var(--accent-050);
         }
 
-        .slider-dots {
-            margin-top: 26px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: rgba(15, 127, 52, 0.18);
-        }
-
-        .dot.active {
-            background: var(--accent-900);
-        }
-
         .placeholder-note {
             margin-top: 18px;
             padding: 10px 12px;
@@ -269,7 +251,7 @@
             transform: translateX(18px);
             transition: opacity 0.38s ease, transform 0.38s ease;
             display: grid;
-            grid-template-columns: auto 1fr auto;
+            grid-template-columns: auto 1fr;
             align-items: center;
             gap: 16px;
             pointer-events: none;
@@ -405,10 +387,6 @@
                     <span class="nav-logo">LU</span>
                     <span>Librisync</span>
                 </a>
-                <div class="nav-right">
-                    <a class="btn-outline" href="<%= contextPath %>/login">Login</a>
-                    <a class="btn" href="<%= contextPath %>/register">Create Account</a>
-                </div>
             </header>
 
             <div class="hero-image" aria-hidden="true"></div>
@@ -422,15 +400,6 @@
                     <a class="btn-outline" href="<%= contextPath %>/register">Create Account</a>
                 </div>
 
-                <div class="slider-dots" aria-hidden="true">
-                    <span class="dot active"></span>
-                    <span class="dot"></span>
-                    <span class="dot"></span>
-                </div>
-
-                <div class="placeholder-note">
-                    Centralized access for circulation, catalog management, reservations, and student library services.
-                </div>
             </div>
         </section>
 
@@ -446,7 +415,6 @@
                         <strong>Book Discovery</strong>
                         <span>Browse titles, check availability, and find your next read quickly.</span>
                     </div>
-                    <a class="feature-link" href="<%= contextPath %>/login">Open Login</a>
                 </article>
 
                 <article class="feature-slide">
@@ -455,7 +423,6 @@
                         <strong>Borrow & Track</strong>
                         <span>View borrowed books and keep your account activity organized.</span>
                     </div>
-                    <a class="feature-link" href="<%= contextPath %>/login">Go to Portal</a>
                 </article>
 
                 <article class="feature-slide">
@@ -464,7 +431,6 @@
                         <strong>Reservations</strong>
                         <span>Queue for unavailable titles and monitor request status updates.</span>
                     </div>
-                    <a class="feature-link" href="<%= contextPath %>/login">Check Access</a>
                 </article>
 
                 <article class="feature-slide">
@@ -473,7 +439,6 @@
                         <strong>Profile & Account</strong>
                         <span>Manage your account details and recover access anytime.</span>
                     </div>
-                    <a class="feature-link" id="support" href="<%= contextPath %>/login">Manage Account</a>
                 </article>
             </div>
 
