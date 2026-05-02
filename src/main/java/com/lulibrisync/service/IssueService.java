@@ -123,6 +123,13 @@ public class IssueService {
         IssueRecord savedIssueRecord = issueRecordRepository.save(issueRecord);
         reservationService.markReservationClaimed(bookId, studentId);
         emailNotificationService.queueDueReminder(savedIssueRecord);
+        adminNotificationService.notifyUser(
+                student.getUser().getEmail(),
+                AdminNotificationType.BORROW_STATUS,
+                "Book issued",
+                "Your loan for " + book.getTitle() + " is now active until " + savedIssueRecord.getDueDateDisplay() + ".",
+                "/student/history"
+        );
         fineService.syncFineForIssue(savedIssueRecord);
         return savedIssueRecord;
     }
@@ -150,6 +157,13 @@ public class IssueService {
         IssueRecord savedIssueRecord = issueRecordRepository.save(issueRecord);
         emailNotificationService.cancelDueReminder(savedIssueRecord);
         reservationService.promoteReservationsForBook(book.getId());
+        adminNotificationService.notifyUser(
+                issueRecord.getStudent().getUser().getEmail(),
+                AdminNotificationType.RETURN_STATUS,
+                "Return confirmed",
+                "Your return for " + issueRecord.getBook().getTitle() + " was confirmed by the circulation desk.",
+                "/student/history?tab=returned"
+        );
         fineService.syncFineForIssue(savedIssueRecord);
         return savedIssueRecord;
     }
@@ -306,6 +320,13 @@ public class IssueService {
 
         issueRecord.setReturnRequestedAt(LocalDateTime.now());
         IssueRecord savedIssueRecord = issueRecordRepository.save(issueRecord);
+        adminNotificationService.notifyUser(
+                student.getUser().getEmail(),
+                AdminNotificationType.RETURN_STATUS,
+                "Return request sent",
+                "Your desk return request for " + issueRecord.getBook().getTitle() + " has been submitted.",
+                "/student/history?tab=requests"
+        );
         adminNotificationService.notifyAdmins(
                 AdminNotificationType.RETURN_REQUEST,
                 "New return request",
@@ -330,7 +351,15 @@ public class IssueService {
         }
 
         issueRecord.setReturnRequestedAt(null);
-        return issueRecordRepository.save(issueRecord);
+        IssueRecord savedIssueRecord = issueRecordRepository.save(issueRecord);
+        adminNotificationService.notifyUser(
+                student.getUser().getEmail(),
+                AdminNotificationType.RETURN_STATUS,
+                "Return request cancelled",
+                "Your return request for " + issueRecord.getBook().getTitle() + " was cancelled.",
+                "/student/history?tab=current"
+        );
+        return savedIssueRecord;
     }
 
     @Transactional

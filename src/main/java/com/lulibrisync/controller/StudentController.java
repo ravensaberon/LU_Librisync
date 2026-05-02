@@ -8,6 +8,7 @@ import com.lulibrisync.dto.StudentProfileUpdateRequest;
 import com.lulibrisync.model.IssueRecord;
 import com.lulibrisync.model.IssueStatus;
 import com.lulibrisync.model.Student;
+import com.lulibrisync.service.AdminNotificationService;
 import com.lulibrisync.service.AuthService;
 import com.lulibrisync.service.FineService;
 import com.lulibrisync.service.IssueService;
@@ -54,6 +55,7 @@ public class StudentController {
     private final StudentService studentService;
     private final IssueService issueService;
     private final ReservationService reservationService;
+    private final AdminNotificationService adminNotificationService;
     private final StudentProfileOtpService studentProfileOtpService;
     private final PasswordResetService passwordResetService;
     private final FineService fineService;
@@ -63,6 +65,7 @@ public class StudentController {
     public StudentController(StudentService studentService,
                              IssueService issueService,
                              ReservationService reservationService,
+                             AdminNotificationService adminNotificationService,
                              StudentProfileOtpService studentProfileOtpService,
                              PasswordResetService passwordResetService,
                              FineService fineService,
@@ -71,6 +74,7 @@ public class StudentController {
         this.studentService = studentService;
         this.issueService = issueService;
         this.reservationService = reservationService;
+        this.adminNotificationService = adminNotificationService;
         this.studentProfileOtpService = studentProfileOtpService;
         this.passwordResetService = passwordResetService;
         this.fineService = fineService;
@@ -101,6 +105,49 @@ public class StudentController {
         model.addAttribute("studentFines", fineService.getStudentFines(student.getId()));
         model.addAttribute("popularBooks", issueService.getMostBorrowedBooks());
         return "student/dashboard";
+    }
+
+    @PostMapping("/student/notifications/read-all")
+    @ResponseBody
+    public Map<String, Object> markAllStudentNotificationsRead(Authentication authentication) {
+        adminNotificationService.markAllAsRead(authentication.getName());
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("success", true);
+        response.put("unreadCount", 0);
+        return response;
+    }
+
+    @GetMapping("/student/notifications/panel")
+    @ResponseBody
+    public Map<String, Object> studentNotificationPanel(Authentication authentication) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("unreadCount", adminNotificationService.countUnreadNotifications(authentication.getName()));
+        response.put("items", adminNotificationService.getRecentNotifications(authentication.getName(), 5).stream()
+                .map(this::serializeNotification)
+                .toList());
+        return response;
+    }
+
+    @GetMapping("/student/notifications/history")
+    @ResponseBody
+    public Map<String, Object> studentNotificationHistory(Authentication authentication,
+                                                          @RequestParam(defaultValue = "1") Integer page) {
+        var notificationPage = adminNotificationService.getNotificationPage(authentication.getName(), page, 8);
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("items", notificationPage.getItems().stream()
+                .map(this::serializeNotification)
+                .toList());
+        response.put("page", notificationPage.getPage());
+        response.put("totalPages", notificationPage.getTotalPages());
+        response.put("hasPrevious", notificationPage.isHasPrevious());
+        response.put("hasNext", notificationPage.isHasNext());
+        response.put("previousPage", notificationPage.getPreviousPage());
+        response.put("nextPage", notificationPage.getNextPage());
+        response.put("startPage", notificationPage.getStartPage());
+        response.put("endPage", notificationPage.getEndPage());
+        response.put("totalItems", notificationPage.getTotalItems());
+        response.put("unreadCount", adminNotificationService.countUnreadNotifications(authentication.getName()));
+        return response;
     }
 
     @GetMapping("/student/profile")
@@ -549,6 +596,18 @@ public class StudentController {
 
     private boolean isPasswordOtpVerified(HttpSession session) {
         return getVerifiedPasswordTokenId(session) != null;
+    }
+
+    private Map<String, Object> serializeNotification(com.lulibrisync.model.AdminNotification notification) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("id", notification.getId());
+        item.put("title", notification.getTitle());
+        item.put("message", notification.getMessage());
+        item.put("createdAtDisplay", notification.getCreatedAtDisplay());
+        item.put("read", notification.isRead());
+        item.put("linkUrl", notification.getLinkUrl());
+        item.put("notificationTypeLabel", notification.getNotificationTypeLabel());
+        return item;
     }
 
     private Long getVerifiedPasswordTokenId(HttpSession session) {

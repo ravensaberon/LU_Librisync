@@ -206,6 +206,13 @@ public class ReservationService {
 
         Reservation savedReservation = reservationRepository.save(reservation);
         emailNotificationService.queueReservationReadyNotification(savedReservation);
+        adminNotificationService.notifyUserIfAbsent(
+                student.getUser().getEmail(),
+                AdminNotificationType.BORROW_STATUS,
+                "Borrow request approved",
+                "Your borrow request for " + book.getTitle() + " is ready at the circulation desk.",
+                "/student/reservations?tab=borrow"
+        );
         adminNotificationService.notifyAdmins(
                 AdminNotificationType.BORROW_REQUEST,
                 "New borrow request",
@@ -257,6 +264,13 @@ public class ReservationService {
         reservation.setQueuePosition((int) reservationRepository.countByBook_IdAndStatusInAndRequestType(bookId, ACTIVE_STATUSES, ReservationRequestType.RESERVATION) + 1);
 
         Reservation savedReservation = reservationRepository.save(reservation);
+        adminNotificationService.notifyUser(
+                student.getUser().getEmail(),
+                AdminNotificationType.RESERVATION_STATUS,
+                "Reservation placed",
+                "Your reservation for " + book.getTitle() + " was placed for " + savedReservation.getPreferredPickupDateDisplay() + ".",
+                "/student/reservations?tab=queue"
+        );
         adminNotificationService.notifyAdmins(
                 AdminNotificationType.RESERVATION_REQUEST,
                 "New reservation request",
@@ -275,12 +289,27 @@ public class ReservationService {
         if (!reservation.getStudent().getId().equals(student.getId())) {
             throw new IllegalArgumentException("You can only cancel your own reservation.");
         }
+        adminNotificationService.notifyUser(
+                student.getUser().getEmail(),
+                AdminNotificationType.RESERVATION_STATUS,
+                reservation.isBorrowRequest() ? "Borrow request cancelled" : "Reservation cancelled",
+                "Your " + (reservation.isBorrowRequest() ? "borrow request" : "reservation") + " for " + reservation.getBook().getTitle() + " was cancelled.",
+                "/student/reservations"
+        );
         cancelReservation(reservation);
     }
 
     @Transactional
     public void cancelReservationByAdmin(Long reservationId) {
-        cancelReservation(getReservationById(reservationId));
+        Reservation reservation = getReservationById(reservationId);
+        adminNotificationService.notifyUser(
+                reservation.getStudent().getUser().getEmail(),
+                AdminNotificationType.RESERVATION_STATUS,
+                reservation.isBorrowRequest() ? "Borrow request cancelled by staff" : "Reservation cancelled by staff",
+                "Library staff cancelled your " + (reservation.isBorrowRequest() ? "borrow request" : "reservation") + " for " + reservation.getBook().getTitle() + ".",
+                "/student/reservations"
+        );
+        cancelReservation(reservation);
     }
 
     @Transactional
@@ -329,6 +358,13 @@ public class ReservationService {
                 reservation.setStatus(ReservationStatus.CLAIMED);
                 reservation.setExpiresAt(null);
                 reservationRepository.save(reservation);
+                adminNotificationService.notifyUser(
+                        reservation.getStudent().getUser().getEmail(),
+                        AdminNotificationType.BORROW_STATUS,
+                        "Pickup confirmed",
+                        "Your " + (reservation.isBorrowRequest() ? "borrow request" : "reservation pickup") + " for " + reservation.getBook().getTitle() + " was confirmed by staff.",
+                        "/student/history"
+                );
                 reindexQueue(bookId);
                 return;
             }
@@ -373,6 +409,15 @@ public class ReservationService {
                 reservation.setExpiresAt(LocalDateTime.now().plusHours(claimWindowHours));
                 reservationRepository.save(reservation);
                 emailNotificationService.queueReservationReadyNotification(reservation);
+                adminNotificationService.notifyUserIfAbsent(
+                        reservation.getStudent().getUser().getEmail(),
+                        AdminNotificationType.RESERVATION_STATUS,
+                        reservation.isBorrowRequest() ? "Borrow request ready" : "Reservation ready for pickup",
+                        reservation.isBorrowRequest()
+                                ? "Your borrow request for " + reservation.getBook().getTitle() + " is ready at the circulation desk."
+                                : "Your reservation for " + reservation.getBook().getTitle() + " is now ready for pickup.",
+                        "/student/reservations?tab=" + (reservation.isBorrowRequest() ? "borrow" : "queue")
+                );
                 promotableSlots--;
             }
         }
@@ -389,6 +434,13 @@ public class ReservationService {
             reservation.setStatus(ReservationStatus.CANCELLED);
             reservation.setExpiresAt(null);
             reservationRepository.save(reservation);
+            adminNotificationService.notifyUser(
+                    reservation.getStudent().getUser().getEmail(),
+                    AdminNotificationType.RESERVATION_STATUS,
+                    reservation.isBorrowRequest() ? "Borrow request expired" : "Reservation expired",
+                    "Your " + (reservation.isBorrowRequest() ? "borrow request" : "reservation hold") + " for " + reservation.getBook().getTitle() + " expired before pickup.",
+                    "/student/reservations"
+            );
             reindexQueue(reservation.getBook().getId());
             promoteReservationsForBook(reservation.getBook().getId());
         }

@@ -24,6 +24,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -32,6 +33,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -103,17 +105,55 @@ public class AdminController {
         model.addAttribute("blockedBorrowerCount", blockedBorrowerCount);
         model.addAttribute("recentAuditLogs", auditLogService.getRecentLogs().stream().limit(8).toList());
         model.addAttribute("recentOutstandingFines", fineService.getRecentOutstandingFines());
-        model.addAttribute("recentAdminNotifications", adminNotificationService.getRecentNotifications(authentication.getName()));
-        model.addAttribute("unreadAdminNotificationCount", adminNotificationService.countUnreadNotifications(authentication.getName()));
         return "admin/dashboard";
     }
 
     @PostMapping("/notifications/read-all")
-    public String markAllNotificationsRead(Authentication authentication,
-                                           RedirectAttributes redirectAttributes) {
+    @ResponseBody
+    public Map<String, Object> markAllNotificationsRead(Authentication authentication) {
         adminNotificationService.markAllAsRead(authentication.getName());
-        redirectAttributes.addFlashAttribute("success", "Notifications marked as read.");
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("success", true);
+        response.put("unreadCount", 0);
+        return response;
+    }
+
+    @GetMapping("/notifications")
+    public String notifications() {
         return "redirect:/admin/dashboard";
+    }
+
+    @GetMapping("/notifications/panel")
+    @ResponseBody
+    public Map<String, Object> notificationPanel(Authentication authentication) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("unreadCount", adminNotificationService.countUnreadNotifications(authentication.getName()));
+        response.put("items", adminNotificationService.getRecentNotifications(authentication.getName(), 5).stream()
+                .map(this::serializeAdminNotification)
+                .toList());
+        return response;
+    }
+
+    @GetMapping("/notifications/history")
+    @ResponseBody
+    public Map<String, Object> notificationHistory(Authentication authentication,
+                                                   @RequestParam(defaultValue = "1") Integer page) {
+        var notificationPage = adminNotificationService.getNotificationPage(authentication.getName(), page, 8);
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("items", notificationPage.getItems().stream()
+                .map(this::serializeAdminNotification)
+                .toList());
+        response.put("page", notificationPage.getPage());
+        response.put("totalPages", notificationPage.getTotalPages());
+        response.put("hasPrevious", notificationPage.isHasPrevious());
+        response.put("hasNext", notificationPage.isHasNext());
+        response.put("previousPage", notificationPage.getPreviousPage());
+        response.put("nextPage", notificationPage.getNextPage());
+        response.put("startPage", notificationPage.getStartPage());
+        response.put("endPage", notificationPage.getEndPage());
+        response.put("totalItems", notificationPage.getTotalItems());
+        response.put("unreadCount", adminNotificationService.countUnreadNotifications(authentication.getName()));
+        return response;
     }
 
     @GetMapping("/students")
@@ -227,6 +267,18 @@ public class AdminController {
         model.addAttribute("borrowerStanding", borrowerStanding);
         model.addAttribute("studentFines", studentFines);
         populateAddressModelAttributes("studentAddress", student.getAddress(), model);
+    }
+
+    private Map<String, Object> serializeAdminNotification(com.lulibrisync.model.AdminNotification notification) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("id", notification.getId());
+        item.put("title", notification.getTitle());
+        item.put("message", notification.getMessage());
+        item.put("createdAtDisplay", notification.getCreatedAtDisplay());
+        item.put("read", notification.isRead());
+        item.put("linkUrl", notification.getLinkUrl());
+        item.put("notificationTypeLabel", notification.getNotificationTypeLabel());
+        return item;
     }
 
     @PostMapping("/students/{studentId}/update")

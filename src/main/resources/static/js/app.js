@@ -283,12 +283,17 @@ window.LuLibrisyncAddress = (function () {
     body.insertBefore(navBackdrop, topbar.nextSibling);
 
     var notificationButton = topbar.querySelector("[data-shell-toggle='notifications']");
+    var notificationBadge = topbar.querySelector("[data-shell-notification-badge]");
     var accountButton = topbar.querySelector("[data-shell-toggle='account']");
     var toggleButton = topbar.querySelector("[data-shell-toggle='sidebar']");
-    var notificationPanel = buildNotificationPanel(pageShell.querySelectorAll(".alert"));
+    var notificationUi = buildUserNotificationUi(shellMeta, notificationBadge);
+    var notificationPanel = notificationUi.panel;
     var accountPanel = buildAccountPanel(shellMeta, profileLink, logoutForm);
 
     body.appendChild(notificationPanel);
+    if (notificationUi.modal) {
+        body.appendChild(notificationUi.modal);
+    }
     body.appendChild(accountPanel);
 
     function closePanels() {
@@ -382,6 +387,9 @@ window.LuLibrisyncAddress = (function () {
     }
 
     syncSidebarState();
+    if (typeof notificationUi.refresh === "function") {
+        notificationUi.refresh();
+    }
 
     function buildShellMeta(brand, currentProfileLink, currentNavLinks, currentLogoutForm) {
         var kicker = brand ? getTextContent(brand.querySelector(".tag-chip")) : "";
@@ -407,6 +415,9 @@ window.LuLibrisyncAddress = (function () {
             passwordResendOtpHref: baseHref + "/password/resend-otp",
             passwordVerifyOtpHref: baseHref + "/password/verify-otp",
             passwordUpdateHref: baseHref + "/password/update",
+            notificationPanelHref: baseHref + "/notifications/panel",
+            notificationHistoryHref: baseHref + "/notifications/history",
+            notificationReadAllHref: baseHref + "/notifications/read-all",
             csrfParamName: csrfInput ? csrfInput.getAttribute("name") : "",
             csrfToken: csrfInput ? csrfInput.value : ""
         };
@@ -473,10 +484,15 @@ window.LuLibrisyncAddress = (function () {
         notificationWrap.appendChild(notification);
 
         var alertCount = pageShell.querySelectorAll(".alert").length;
-        if (alertCount > 0) {
+        if (!meta.isStudent || alertCount > 0) {
             var badge = document.createElement("span");
             badge.className = "shell-alert-badge";
-            badge.textContent = alertCount > 9 ? "9+" : String(alertCount);
+            badge.setAttribute("data-shell-notification-badge", "true");
+            if (!meta.isStudent) {
+                badge.hidden = true;
+            } else {
+                badge.textContent = alertCount > 9 ? "9+" : String(alertCount);
+            }
             notificationWrap.appendChild(badge);
         }
 
@@ -555,6 +571,281 @@ window.LuLibrisyncAddress = (function () {
         return panel;
     }
 
+    function buildUserNotificationUi(meta, badgeNode) {
+        var panel = document.createElement("div");
+        panel.className = "shell-panel shell-panel-wide";
+        panel.hidden = true;
+        panel.appendChild(createPanelHeader("Notifications", meta.isStudent ? "Recent account and borrowing updates" : "Recent student request activity"));
+
+        var list = document.createElement("div");
+        list.className = "shell-notification-list";
+        panel.appendChild(list);
+
+        var footer = document.createElement("div");
+        footer.className = "shell-panel-footer";
+
+        var markReadButton = document.createElement("button");
+        markReadButton.type = "button";
+        markReadButton.className = "shell-panel-inline-action";
+        markReadButton.textContent = "Mark all read";
+
+        var seeAllButton = document.createElement("button");
+        seeAllButton.type = "button";
+        seeAllButton.className = "shell-panel-inline-action shell-panel-inline-action-primary";
+        seeAllButton.textContent = "See all notifications";
+
+        footer.appendChild(markReadButton);
+        footer.appendChild(seeAllButton);
+        panel.appendChild(footer);
+
+        var modal = createNotificationHistoryModal();
+        var modalList = modal.querySelector("[data-notification-history-list]");
+        var modalPagination = modal.querySelector("[data-notification-history-pagination]");
+        var modalUnreadCount = modal.querySelector("[data-notification-history-unread]");
+        var modalSummary = modal.querySelector("[data-notification-history-summary]");
+        var modalMarkReadButton = modal.querySelector("[data-notification-history-read-all]");
+        var modalCloseButtons = modal.querySelectorAll("[data-notification-history-close]");
+        var currentHistoryPage = 1;
+
+        function setBadge(unreadCount) {
+            if (!badgeNode) {
+                return;
+            }
+            if (!unreadCount || unreadCount < 1) {
+                badgeNode.hidden = true;
+                badgeNode.textContent = "";
+                return;
+            }
+            badgeNode.hidden = false;
+            badgeNode.textContent = unreadCount > 9 ? "9+" : String(unreadCount);
+        }
+
+        function createLoadingState(targetList, message) {
+            targetList.innerHTML = "";
+            var item = document.createElement("div");
+            item.className = "shell-notification-item shell-panel-item-muted";
+            item.textContent = message;
+            targetList.appendChild(item);
+        }
+
+        function createAdminNotificationItem(notification, compact) {
+            var item = document.createElement("a");
+            item.className = compact ? "shell-notification-item" : "shell-notification-item shell-notification-item-full";
+            item.href = assetBaseUrl.replace(/\/$/, "") + (notification.linkUrl || (meta.isStudent ? "/student/dashboard" : "/admin/dashboard"));
+
+            item.appendChild(createPanelIcon("bell"));
+
+            var copy = document.createElement("span");
+            copy.className = "shell-panel-item-copy";
+
+            var title = document.createElement("strong");
+            title.textContent = notification.title || "Notification";
+
+            var subtitle = document.createElement("span");
+            subtitle.textContent = notification.message || "";
+
+            var metaLine = document.createElement("span");
+            metaLine.className = "shell-panel-item-meta";
+            metaLine.textContent = (notification.notificationTypeLabel || "Update") + " | " + (notification.createdAtDisplay || "");
+
+            copy.appendChild(title);
+            copy.appendChild(subtitle);
+            copy.appendChild(metaLine);
+            item.appendChild(copy);
+
+            if (!notification.read) {
+                var state = document.createElement("span");
+                state.className = "tag-chip";
+                state.textContent = "New";
+                item.appendChild(state);
+            }
+
+            return item;
+        }
+
+        function renderPanel(data) {
+            list.innerHTML = "";
+            var items = data && Array.isArray(data.items) ? data.items : [];
+            var unreadCount = data && typeof data.unreadCount === "number" ? data.unreadCount : 0;
+
+            setBadge(unreadCount);
+            markReadButton.hidden = unreadCount < 1;
+
+            if (!items.length) {
+                createLoadingState(list, "You're all caught up. No new notifications right now.");
+                return;
+            }
+
+            items.forEach(function (notification) {
+                list.appendChild(createAdminNotificationItem(notification, true));
+            });
+        }
+
+        function renderHistory(data) {
+            modalList.innerHTML = "";
+            modalPagination.innerHTML = "";
+
+            var items = data && Array.isArray(data.items) ? data.items : [];
+            var unreadCount = data && typeof data.unreadCount === "number" ? data.unreadCount : 0;
+            var totalItems = data && typeof data.totalItems === "number" ? data.totalItems : 0;
+            var totalPages = data && typeof data.totalPages === "number" ? data.totalPages : 1;
+            var page = data && typeof data.page === "number" ? data.page : 1;
+
+            modalUnreadCount.textContent = "Unread: " + unreadCount;
+            modalSummary.textContent = totalItems + " notification" + (totalItems === 1 ? "" : "s");
+            modalMarkReadButton.hidden = unreadCount < 1;
+
+            if (!items.length) {
+                createLoadingState(modalList, "No notification history yet.");
+            } else {
+                items.forEach(function (notification) {
+                    modalList.appendChild(createAdminNotificationItem(notification, false));
+                });
+            }
+
+            if (totalPages > 1) {
+                if (data.hasPrevious) {
+                    modalPagination.appendChild(createPaginationButton("Previous", data.previousPage));
+                }
+
+                for (var current = data.startPage; current <= data.endPage; current += 1) {
+                    modalPagination.appendChild(createPaginationButton(String(current), current, current === page));
+                }
+
+                if (data.hasNext) {
+                    modalPagination.appendChild(createPaginationButton("Next", data.nextPage));
+                }
+            }
+        }
+
+        function createPaginationButton(label, page, active) {
+            var button = document.createElement("button");
+            button.type = "button";
+            button.className = active ? "shell-pagination-button is-active" : "shell-pagination-button";
+            button.textContent = label;
+            button.addEventListener("click", function () {
+                loadHistory(page);
+            });
+            return button;
+        }
+
+        function loadPanel() {
+            createLoadingState(list, "Loading notifications...");
+            return fetch(meta.notificationPanelHref, {
+                headers: {
+                    "Accept": "application/json"
+                }
+            })
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error("Unable to load notification panel.");
+                    }
+                    return response.json();
+                })
+                .then(function (data) {
+                    renderPanel(data);
+                })
+                .catch(function () {
+                    createLoadingState(list, "Unable to load notifications right now.");
+                });
+        }
+
+        function loadHistory(page) {
+            currentHistoryPage = page || 1;
+            createLoadingState(modalList, "Loading notification history...");
+            modalPagination.innerHTML = "";
+
+            return fetch(meta.notificationHistoryHref + "?page=" + encodeURIComponent(currentHistoryPage), {
+                headers: {
+                    "Accept": "application/json"
+                }
+            })
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error("Unable to load notification history.");
+                    }
+                    return response.json();
+                })
+                .then(function (data) {
+                    renderHistory(data);
+                })
+                .catch(function () {
+                    createLoadingState(modalList, "Unable to load notification history right now.");
+                });
+        }
+
+        function markAllRead() {
+            var csrfPayload = "";
+            if (meta.csrfParamName && meta.csrfToken) {
+                csrfPayload = encodeURIComponent(meta.csrfParamName) + "=" + encodeURIComponent(meta.csrfToken);
+            }
+
+            return fetch(meta.notificationReadAllHref, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                    "Accept": "application/json"
+                },
+                body: csrfPayload
+            }).then(function (response) {
+                if (!response.ok) {
+                    throw new Error("Unable to mark notifications as read.");
+                }
+                return Promise.all([loadPanel(), loadHistory(currentHistoryPage)]);
+            });
+        }
+
+        function openModal() {
+            modal.hidden = false;
+            document.body.classList.add("shell-modal-open");
+            loadHistory(currentHistoryPage);
+        }
+
+        function closeModal() {
+            modal.hidden = true;
+            document.body.classList.remove("shell-modal-open");
+        }
+
+        markReadButton.addEventListener("click", function () {
+            markAllRead();
+        });
+
+        modalMarkReadButton.addEventListener("click", function () {
+            markAllRead();
+        });
+
+        seeAllButton.addEventListener("click", function () {
+            panel.hidden = true;
+            var shellToggleButton = document.querySelector("[data-shell-toggle='notifications']");
+            if (shellToggleButton) {
+                shellToggleButton.setAttribute("aria-expanded", "false");
+            }
+            openModal();
+        });
+
+        Array.prototype.forEach.call(modalCloseButtons, function (button) {
+            button.addEventListener("click", closeModal);
+        });
+
+        modal.addEventListener("click", function (event) {
+            if (event.target === modal) {
+                closeModal();
+            }
+        });
+
+        document.addEventListener("keydown", function (event) {
+            if (event.key === "Escape" && !modal.hidden) {
+                closeModal();
+            }
+        });
+
+        return {
+            panel: panel,
+            modal: modal,
+            refresh: loadPanel
+        };
+    }
+
     function createPanelHeader(title, subtitle) {
         var header = document.createElement("div");
         header.className = "shell-panel-header";
@@ -575,6 +866,79 @@ window.LuLibrisyncAddress = (function () {
         header.appendChild(heading);
         header.appendChild(note);
         return header;
+    }
+
+    function createNotificationHistoryModal() {
+        var modal = document.createElement("div");
+        modal.className = "shell-modal";
+        modal.hidden = true;
+
+        var card = document.createElement("div");
+        card.className = "shell-modal-card";
+
+        var header = document.createElement("div");
+        header.className = "shell-modal-header";
+
+        var copy = document.createElement("div");
+        copy.className = "shell-modal-copy";
+
+        var title = document.createElement("div");
+        title.className = "shell-modal-title";
+        title.textContent = "Notification history";
+
+        var subtitle = document.createElement("div");
+        subtitle.className = "shell-modal-subtitle";
+        subtitle.textContent = "Recent account, borrowing, reservation, and return updates.";
+
+        copy.appendChild(title);
+        copy.appendChild(subtitle);
+
+        var actions = document.createElement("div");
+        actions.className = "shell-modal-actions";
+
+        var unread = document.createElement("span");
+        unread.className = "tag-chip";
+        unread.setAttribute("data-notification-history-unread", "true");
+        unread.textContent = "Unread: 0";
+
+        var markRead = document.createElement("button");
+        markRead.type = "button";
+        markRead.className = "shell-panel-inline-action";
+        markRead.setAttribute("data-notification-history-read-all", "true");
+        markRead.textContent = "Mark all read";
+
+        var close = document.createElement("button");
+        close.type = "button";
+        close.className = "shell-modal-close";
+        close.setAttribute("aria-label", "Close notifications");
+        close.setAttribute("data-notification-history-close", "true");
+        close.innerHTML = "&times;";
+
+        actions.appendChild(unread);
+        actions.appendChild(markRead);
+        actions.appendChild(close);
+        header.appendChild(copy);
+        header.appendChild(actions);
+
+        var summary = document.createElement("div");
+        summary.className = "shell-modal-summary";
+        summary.setAttribute("data-notification-history-summary", "true");
+        summary.textContent = "0 notifications";
+
+        var list = document.createElement("div");
+        list.className = "shell-notification-list shell-notification-history-list";
+        list.setAttribute("data-notification-history-list", "true");
+
+        var pagination = document.createElement("div");
+        pagination.className = "shell-pagination";
+        pagination.setAttribute("data-notification-history-pagination", "true");
+
+        card.appendChild(header);
+        card.appendChild(summary);
+        card.appendChild(list);
+        card.appendChild(pagination);
+        modal.appendChild(card);
+        return modal;
     }
 
     function createNotificationItem(alertNode) {

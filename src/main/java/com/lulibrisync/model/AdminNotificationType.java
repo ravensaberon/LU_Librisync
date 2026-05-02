@@ -3,5 +3,8 @@ package com.lulibrisync.model;
 public enum AdminNotificationType {
     BORROW_REQUEST,
     RESERVATION_REQUEST,
-    RETURN_REQUEST
+    RETURN_REQUEST,
+    BORROW_STATUS,
+    RESERVATION_STATUS,
+    RETURN_STATUS
 }

@@ -255,6 +255,10 @@ body {
     backdrop-filter: blur(18px);
 }
 
+.shell-panel-wide {
+    width: min(100vw - 28px, 420px);
+}
+
 .shell-panel[hidden] {
     display: none !important;
 }
@@ -356,6 +360,12 @@ body {
     line-height: 1.35;
 }
 
+.shell-panel-item-meta {
+    color: #5e7164 !important;
+    font-size: 0.76rem !important;
+    font-weight: 700;
+}
+
 .shell-panel-form {
     margin: 0;
 }
@@ -364,6 +374,140 @@ body {
     border: none;
     text-align: left;
     cursor: pointer;
+}
+
+.shell-panel-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 6px 4px;
+}
+
+.shell-panel-inline-action {
+    min-height: 38px;
+    padding: 8px 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(15, 127, 52, 0.14);
+    background: rgba(15, 127, 52, 0.06);
+    color: var(--primary-900);
+    font-weight: 800;
+}
+
+.shell-panel-inline-action:hover {
+    background: rgba(15, 127, 52, 0.10);
+}
+
+.shell-panel-inline-action-primary {
+    background: linear-gradient(135deg, var(--primary-900), var(--primary-700));
+    border-color: transparent;
+    color: #fff;
+}
+
+.shell-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1300;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: rgba(12, 22, 15, 0.36);
+    backdrop-filter: blur(6px);
+}
+
+.shell-modal[hidden] {
+    display: none !important;
+}
+
+body.shell-modal-open {
+    overflow: hidden;
+}
+
+.shell-modal-card {
+    width: min(100%, 860px);
+    max-height: min(86vh, 920px);
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    gap: 16px;
+    padding: 24px;
+    border-radius: 28px;
+    border: 1px solid rgba(15, 127, 52, 0.12);
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: var(--shadow);
+}
+
+.shell-modal-header,
+.shell-modal-actions {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.shell-modal-copy {
+    min-width: 0;
+}
+
+.shell-modal-title {
+    font-size: 1.18rem;
+    font-weight: 800;
+    color: var(--ink);
+    font-family: "Poppins", "Manrope", sans-serif;
+}
+
+.shell-modal-subtitle,
+.shell-modal-summary {
+    color: var(--muted);
+    line-height: 1.5;
+}
+
+.shell-modal-summary {
+    font-size: 0.92rem;
+}
+
+.shell-modal-close {
+    width: 42px;
+    height: 42px;
+    border: 1px solid rgba(15, 127, 52, 0.14);
+    border-radius: 14px;
+    background: rgba(15, 127, 52, 0.06);
+    color: var(--primary-900);
+    font-size: 1.4rem;
+    line-height: 1;
+}
+
+.shell-notification-history-list {
+    overflow: auto;
+    padding-right: 4px;
+}
+
+.shell-notification-item-full {
+    align-items: flex-start;
+}
+
+.shell-pagination {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.shell-pagination-button {
+    min-width: 42px;
+    min-height: 42px;
+    padding: 8px 14px;
+    border: 1px solid rgba(15, 127, 52, 0.14);
+    border-radius: 14px;
+    background: #fff;
+    color: var(--primary-900);
+    font-weight: 800;
+}
+
+.shell-pagination-button.is-active {
+    background: linear-gradient(135deg, var(--primary-900), var(--primary-700));
+    border-color: transparent;
+    color: #fff;
 }
 
 .app-nav {
@@ -3358,6 +3502,26 @@ textarea.form-control {
         top: 70px;
         right: 14px;
         width: min(100vw - 28px, 320px);
+    }
+
+    .shell-panel-wide {
+        width: min(100vw - 28px, 420px);
+    }
+
+    .shell-modal {
+        padding: 14px;
+    }
+
+    .shell-modal-card {
+        max-height: calc(100vh - 28px);
+        padding: 18px;
+        border-radius: 22px;
+    }
+
+    .shell-modal-header,
+    .shell-modal-actions {
+        flex-direction: column;
+        align-items: stretch;
     }
 
     .app-nav {

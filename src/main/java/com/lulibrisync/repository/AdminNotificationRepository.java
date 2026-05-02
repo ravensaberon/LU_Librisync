@@ -12,9 +12,16 @@ public interface AdminNotificationRepository extends JpaRepository<AdminNotifica
 
     List<AdminNotification> findTop10ByAdminUser_EmailIgnoreCaseAndReadFalseOrderByCreatedAtDesc(String email);
 
+    List<AdminNotification> findByAdminUser_EmailIgnoreCaseOrderByCreatedAtDesc(String email);
+
     List<AdminNotification> findByAdminUser_EmailIgnoreCaseAndReadFalseOrderByCreatedAtDesc(String email);
 
     long countByAdminUser_EmailIgnoreCaseAndReadFalse(String email);
 
     Optional<AdminNotification> findByIdAndAdminUser_EmailIgnoreCase(Long id, String email);
+
+    Optional<AdminNotification> findTopByAdminUser_EmailIgnoreCaseAndNotificationTypeAndTitleAndMessageOrderByCreatedAtDesc(String email,
+                                                                                                                             com.lulibrisync.model.AdminNotificationType notificationType,
+                                                                                                                             String title,
+                                                                                                                             String message);
 }

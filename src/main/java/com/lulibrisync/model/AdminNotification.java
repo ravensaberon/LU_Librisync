@@ -136,6 +136,9 @@ public class AdminNotification {
             case BORROW_REQUEST -> "Borrow request";
             case RESERVATION_REQUEST -> "Reservation request";
             case RETURN_REQUEST -> "Return request";
+            case BORROW_STATUS -> "Borrow status";
+            case RESERVATION_STATUS -> "Reservation status";
+            case RETURN_STATUS -> "Return status";
         };
     }
 }
