@@ -224,8 +224,15 @@ public class StudentService {
                                String currentPassword,
                                String newPassword,
                                String confirmPassword) {
-        User user = userRepository.findByEmailIgnoreCase(required(email, "User not found."))
-                .orElseThrow(() -> new IllegalArgumentException("User not found."));
+        String encodedPasswordHash = preparePasswordChange(email, currentPassword, newPassword, confirmPassword);
+        applyEncodedPasswordChange(email, encodedPasswordHash);
+    }
+
+    public String preparePasswordChange(String email,
+                                        String currentPassword,
+                                        String newPassword,
+                                        String confirmPassword) {
+        User user = findUserByEmail(email);
 
         String normalizedCurrentPassword = required(currentPassword, "Current password is required.");
         String normalizedNewPassword = required(newPassword, "New password is required.");
@@ -247,7 +254,14 @@ public class StudentService {
             throw new IllegalArgumentException("Choose a different password from the current one.");
         }
 
-        user.setPasswordHash(passwordEncoder.encode(normalizedNewPassword));
+        return passwordEncoder.encode(normalizedNewPassword);
+    }
+
+    @Transactional
+    public void applyEncodedPasswordChange(String email, String encodedPasswordHash) {
+        User user = findUserByEmail(email);
+        String normalizedHash = required(encodedPasswordHash, "Password update payload is missing.");
+        user.setPasswordHash(normalizedHash);
         userRepository.save(user);
     }
 
@@ -271,6 +285,11 @@ public class StudentService {
             throw new IllegalArgumentException(message);
         }
         return value.trim();
+    }
+
+    private User findUserByEmail(String email) {
+        return userRepository.findByEmailIgnoreCase(required(email, "User not found."))
+                .orElseThrow(() -> new IllegalArgumentException("User not found."));
     }
 
     private String normalizeEmail(String value) {

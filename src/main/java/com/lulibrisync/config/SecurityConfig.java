@@ -22,7 +22,7 @@ public class SecurityConfig {
         http
                 .authorizeHttpRequests(authorize -> authorize
                         .dispatcherTypeMatchers(DispatcherType.FORWARD, DispatcherType.ERROR).permitAll()
-                        .requestMatchers("/", "/login", "/register", "/register/barangays", "/register/availability", "/forgot-password", "/forgot-password/**", "/error", "/css/**", "/assets/**").permitAll()
+                        .requestMatchers("/", "/login", "/register/**", "/forgot-password", "/forgot-password/**", "/error", "/css/**", "/assets/**").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .requestMatchers("/student/**").hasAnyRole("STUDENT", "ADMIN")
                         .anyRequest().authenticated()
