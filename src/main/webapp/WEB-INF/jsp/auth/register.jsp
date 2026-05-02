@@ -8,7 +8,7 @@
     <title>LU Librisync Registration</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="${pageContext.request.contextPath}/css/app.css?v=20260430-auth-back-link">
+    <link rel="stylesheet" href="${pageContext.request.contextPath}/css/app.css?v=20260501-register-otp">
     <style>
         .register-note {
             margin-top: 24px;
@@ -89,6 +89,12 @@
 
                 <div class="auth-role-label">College Student</div>
 
+                <c:if test="${not empty success}">
+                    <div class="alert alert-success">${success}</div>
+                </c:if>
+                <c:if test="${not empty info}">
+                    <div class="alert alert-info">${info}</div>
+                </c:if>
                 <c:if test="${not empty error}">
                     <div class="alert alert-danger">${error}</div>
                 </c:if>
@@ -248,7 +254,7 @@
 
                     <div class="register-check mb-4">
                         <div class="form-check">
-                            <input class="form-check-input" id="agree" name="agree" type="checkbox" value="yes" <c:if test="${agreeChecked}">checked</c:if>>
+                            <input class="form-check-input" id="agree" name="agreeChecked" type="checkbox" value="true" <c:if test="${agreeChecked}">checked</c:if>>
                             <label class="form-check-label" for="agree">
                                 I confirm that the information above is correct and may be used for my student library account.
                             </label>
@@ -256,8 +262,51 @@
                         <p class="field-error mb-0" id="agreeError"></p>
                     </div>
 
-                    <button class="btn btn-brand auth-primary-btn w-100 mb-3" type="submit">Create account</button>
+                    <button class="btn btn-brand auth-primary-btn w-100 mb-3" type="submit">Send OTP</button>
                 </form>
+
+                <c:if test="${hasPendingRegistrationOtp or openRegistrationOtpPanel}">
+                    <div class="panel-card mb-4">
+                        <div class="section-title mb-2">Complete student registration</div>
+                        <c:if test="${hasPendingRegistrationOtp}">
+                            <div class="otp-panel mb-3">
+                                <div class="otp-panel-icon"><i class="bi bi-envelope-paper"></i></div>
+                                <div>
+                                    <strong>${empty registrationOtpMaskedEmail ? 'Registered email' : registrationOtpMaskedEmail}</strong>
+                                    <div class="small muted-text">
+                                        OTP expires in <strong id="registrationOtpExpiryCountdown">calculating...</strong>
+                                        <span class="mx-1">|</span>
+                                        New OTP in <strong id="registrationOtpResendCountdown">calculating...</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </c:if>
+
+                        <form method="post" action="${pageContext.request.contextPath}/register/verify-otp" class="mb-3">
+                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                            <input type="hidden" name="email" value="${emailValue}">
+
+                            <div class="mb-3">
+                                <label class="form-label" for="registrationOtpCode">6-digit OTP</label>
+                                <input class="form-control form-control-lg otp-input"
+                                       id="registrationOtpCode"
+                                       name="otpCode"
+                                       maxlength="6"
+                                       inputmode="numeric"
+                                       pattern="[0-9]{6}"
+                                       placeholder="Enter OTP"
+                                       required>
+                            </div>
+                            <button class="btn btn-brand w-100" type="submit">Verify OTP and create account</button>
+                        </form>
+
+                        <form method="post" action="${pageContext.request.contextPath}/register/resend-otp">
+                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                            <input type="hidden" name="email" value="${emailValue}">
+                            <button class="btn btn-warm w-100" type="submit" id="resendRegistrationOtpButton">Resend OTP</button>
+                        </form>
+                    </div>
+                </c:if>
 
                 <div class="auth-support-row">
                     <span class="text-muted">Already have an account?</span>
@@ -1099,7 +1148,7 @@
             }).finally(function () {
                 if (submitButton) {
                     submitButton.disabled = false;
-                    submitButton.textContent = "Create student account";
+                    submitButton.textContent = "Send OTP";
                 }
             });
         });
@@ -1108,6 +1157,47 @@
         applyInitialServerError(contactNumber, errors.contactNumber);
         computeAge(false);
         loadBarangaysForSelectedCity(initialBarangay);
+    })();
+</script>
+<script>
+    (function () {
+        var otpExpiresAtEpochMs = ${empty registrationOtpExpiresAtEpochMs ? 'null' : registrationOtpExpiresAtEpochMs};
+        var otpResendAvailableAtEpochMs = ${empty registrationOtpResendAvailableAtEpochMs ? 'null' : registrationOtpResendAvailableAtEpochMs};
+        var resendButton = document.getElementById("resendRegistrationOtpButton");
+
+        function formatCountdown(targetEpochMs) {
+            if (!targetEpochMs) {
+                return "not active";
+            }
+
+            var remainingMs = targetEpochMs - Date.now();
+            if (remainingMs <= 0) {
+                return "00:00";
+            }
+
+            var totalSeconds = Math.floor(remainingMs / 1000);
+            var minutes = Math.floor(totalSeconds / 60);
+            var seconds = totalSeconds % 60;
+            return String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0");
+        }
+
+        function updateCountdowns() {
+            var expiryLabel = document.getElementById("registrationOtpExpiryCountdown");
+            var resendLabel = document.getElementById("registrationOtpResendCountdown");
+
+            if (expiryLabel) {
+                expiryLabel.textContent = formatCountdown(otpExpiresAtEpochMs);
+            }
+            if (resendLabel) {
+                resendLabel.textContent = formatCountdown(otpResendAvailableAtEpochMs);
+            }
+            if (resendButton) {
+                resendButton.disabled = otpResendAvailableAtEpochMs && otpResendAvailableAtEpochMs > Date.now();
+            }
+        }
+
+        updateCountdowns();
+        window.setInterval(updateCountdowns, 1000);
     })();
 </script>
 </body>

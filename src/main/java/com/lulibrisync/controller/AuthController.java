@@ -3,19 +3,26 @@ package com.lulibrisync.controller;
 import com.lulibrisync.dto.PasswordResetOtpDispatchResult;
 import com.lulibrisync.dto.PasswordResetOtpState;
 import com.lulibrisync.dto.RegistrationAvailabilityResult;
+import com.lulibrisync.dto.StudentRegistrationForm;
+import com.lulibrisync.dto.StudentRegistrationOtpDispatchResult;
+import com.lulibrisync.dto.StudentRegistrationOtpState;
 import com.lulibrisync.service.AuthService;
 import com.lulibrisync.service.PasswordResetService;
+import com.lulibrisync.service.StudentRegistrationOtpService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -25,11 +32,14 @@ public class AuthController {
 
     private final AuthService authService;
     private final PasswordResetService passwordResetService;
+    private final StudentRegistrationOtpService studentRegistrationOtpService;
 
     public AuthController(AuthService authService,
-                          PasswordResetService passwordResetService) {
+                          PasswordResetService passwordResetService,
+                          StudentRegistrationOtpService studentRegistrationOtpService) {
         this.authService = authService;
         this.passwordResetService = passwordResetService;
+        this.studentRegistrationOtpService = studentRegistrationOtpService;
     }
 
     @GetMapping("/login")
@@ -41,12 +51,27 @@ public class AuthController {
     }
 
     @GetMapping("/register")
-    public String registerPage(Authentication authentication, Model model) {
+    public String registerPage(@RequestParam(required = false) String email,
+                               Authentication authentication,
+                               Model model) {
         if (authentication != null && authentication.isAuthenticated() && !(authentication instanceof AnonymousAuthenticationToken)) {
             return "redirect:/dashboard";
         }
-        populateRegisterOptions(model);
+        populateRegisterPageModel(model, email);
         return "auth/register";
+    }
+
+    @GetMapping("/register/otp")
+    public String registerOtpPage(@RequestParam(required = false) String email,
+                                  Authentication authentication,
+                                  Model model) {
+        if (authentication != null && authentication.isAuthenticated() && !(authentication instanceof AnonymousAuthenticationToken)) {
+            return "redirect:/dashboard";
+        }
+        if (!populateRegisterOtpPageModel(model, email)) {
+            return "redirect:/register";
+        }
+        return "auth/register-otp";
     }
 
     @GetMapping("/forgot-password")
@@ -84,65 +109,69 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public String register(@RequestParam(required = false) String firstName,
-                           @RequestParam(required = false) String middleName,
-                           @RequestParam(required = false) String lastName,
-                           @RequestParam(required = false) String program,
-                           @RequestParam(required = false) String yearLevel,
-                           @RequestParam(required = false) String email,
-                           @RequestParam(required = false) String contactNumber,
-                           @RequestParam(required = false) String birthDate,
-                           @RequestParam(required = false) String province,
-                           @RequestParam(required = false) String cityMunicipality,
-                           @RequestParam(required = false) String barangay,
-                           @RequestParam(required = false) String street,
-                           @RequestParam(required = false) String zipcode,
-                           @RequestParam(required = false) String password,
-                           @RequestParam(required = false) String confirmPassword,
-                           @RequestParam(required = false) String agree,
-                           Model model) {
+    public String register(@ModelAttribute StudentRegistrationForm registrationForm,
+                           Authentication authentication,
+                           Model model,
+                           RedirectAttributes redirectAttributes) {
+        if (authentication != null && authentication.isAuthenticated() && !(authentication instanceof AnonymousAuthenticationToken)) {
+            return "redirect:/dashboard";
+        }
         try {
-            authService.registerStudent(
-                    firstName,
-                    middleName,
-                    lastName,
-                    program,
-                    yearLevel,
-                    email,
-                    contactNumber,
-                    birthDate,
-                    province,
-                    cityMunicipality,
-                    barangay,
-                    street,
-                    zipcode,
-                    password,
-                    confirmPassword,
-                    agree != null
-            );
-            return "redirect:/login?registered";
+            StudentRegistrationOtpDispatchResult dispatchResult = studentRegistrationOtpService.requestOtp(registrationForm);
+            applyRegistrationOtpStateFlashAttributes(dispatchResult.getOtpState(), redirectAttributes);
+            if (dispatchResult.isCooldownActive()) {
+                redirectAttributes.addFlashAttribute("info", "A registration OTP is already active.");
+            } else if (dispatchResult.isDelivered()) {
+                redirectAttributes.addFlashAttribute("success", "A registration OTP has been sent to your email.");
+            } else {
+                redirectAttributes.addFlashAttribute("error", "Unable to send OTP email right now.");
+            }
+            return registrationOtpRedirect(dispatchResult.getOtpState().getEmail());
         } catch (IllegalArgumentException exception) {
-            populateRegisterModel(
-                    model,
-                    firstName,
-                    middleName,
-                    lastName,
-                    program,
-                    yearLevel,
-                    email,
-                    contactNumber,
-                    birthDate,
-                    province,
-                    cityMunicipality,
-                    barangay,
-                    street,
-                    zipcode,
-                    agree != null
-            );
+            populateRegisterModel(model, registrationForm);
             if (!applyRegisterFieldError(model, exception.getMessage())) {
                 model.addAttribute("error", exception.getMessage());
             }
             return "auth/register";
+        }
+    }
+
+    @PostMapping("/register/resend-otp")
+    public String resendRegistrationOtp(@RequestParam(required = false) String email,
+                                        RedirectAttributes redirectAttributes) {
+        try {
+            StudentRegistrationOtpDispatchResult dispatchResult = studentRegistrationOtpService.resendOtp(email);
+            applyRegistrationOtpStateFlashAttributes(dispatchResult.getOtpState(), redirectAttributes);
+            if (dispatchResult.isCooldownActive()) {
+                redirectAttributes.addFlashAttribute("info", "Please wait before requesting another OTP.");
+            } else if (dispatchResult.isDelivered()) {
+                redirectAttributes.addFlashAttribute("success", "A fresh registration OTP has been sent to your email.");
+            } else {
+                redirectAttributes.addFlashAttribute("error", "Unable to send OTP email right now.");
+            }
+            return registrationOtpRedirect(dispatchResult.getOtpState().getEmail());
+        } catch (IllegalArgumentException exception) {
+            redirectAttributes.addFlashAttribute("emailValue", email);
+            redirectAttributes.addFlashAttribute("error", exception.getMessage());
+            return registrationOtpRedirect(email);
+        }
+    }
+
+    @PostMapping("/register/verify-otp")
+    public String verifyRegistrationOtp(@RequestParam(required = false) String email,
+                                        @RequestParam(required = false) String otpCode,
+                                        RedirectAttributes redirectAttributes) {
+        try {
+            studentRegistrationOtpService.verifyOtp(email, otpCode);
+            return "redirect:/login?registered";
+        } catch (IllegalArgumentException exception) {
+            redirectAttributes.addFlashAttribute("emailValue", email);
+            redirectAttributes.addFlashAttribute("error", exception.getMessage());
+            StudentRegistrationOtpState otpState = studentRegistrationOtpService.getActiveOtpState(email);
+            if (otpState != null) {
+                applyRegistrationOtpStateFlashAttributes(otpState, redirectAttributes);
+            }
+            return registrationOtpRedirect(email);
         }
     }
 
@@ -214,6 +243,30 @@ public class AuthController {
         }
     }
 
+    private void populateRegisterModel(Model model, StudentRegistrationForm registrationForm) {
+        if (registrationForm == null) {
+            populateRegisterOptions(model);
+            return;
+        }
+        populateRegisterModel(
+                model,
+                registrationForm.getFirstName(),
+                registrationForm.getMiddleName(),
+                registrationForm.getLastName(),
+                registrationForm.getProgram(),
+                registrationForm.getYearLevel(),
+                registrationForm.getEmail(),
+                registrationForm.getContactNumber(),
+                registrationForm.getBirthDate(),
+                registrationForm.getProvince(),
+                registrationForm.getCityMunicipality(),
+                registrationForm.getBarangay(),
+                registrationForm.getStreet(),
+                registrationForm.getZipcode(),
+                registrationForm.isAgreeChecked()
+        );
+    }
+
     private void populateRegisterModel(Model model,
                                        String firstName,
                                        String middleName,
@@ -246,6 +299,59 @@ public class AuthController {
         model.addAttribute("agreeChecked", agreeChecked);
     }
 
+    private void populateRegisterPageModel(Model model, String email) {
+        populateRegisterOptions(model);
+        String effectiveEmail = resolveEmailForRegister(model, email);
+        if (!model.containsAttribute("emailValue")) {
+            model.addAttribute("emailValue", effectiveEmail);
+        }
+
+        if (effectiveEmail == null || effectiveEmail.isBlank()) {
+            return;
+        }
+
+        StudentRegistrationOtpState latestState = studentRegistrationOtpService.getLatestOtpState(effectiveEmail);
+        if (latestState != null && !model.containsAttribute("firstNameValue")) {
+            populateRegisterModel(model, latestState.getRegistrationForm());
+        }
+    }
+
+    private boolean populateRegisterOtpPageModel(Model model, String email) {
+        String effectiveEmail = resolveEmailForRegister(model, email);
+        if (!model.containsAttribute("emailValue")) {
+            model.addAttribute("emailValue", effectiveEmail);
+        }
+
+        if (effectiveEmail == null || effectiveEmail.isBlank()) {
+            return false;
+        }
+
+        StudentRegistrationOtpState latestState = studentRegistrationOtpService.getLatestOtpState(effectiveEmail);
+        if (latestState == null) {
+            return false;
+        }
+
+        StudentRegistrationOtpState activeState = studentRegistrationOtpService.getActiveOtpState(effectiveEmail);
+        StudentRegistrationOtpState displayState = activeState != null ? activeState : latestState;
+
+        if (!model.containsAttribute("registrationOtpMaskedEmail")) {
+            model.addAttribute("registrationOtpMaskedEmail", displayState.getMaskedEmail());
+        }
+        if (!model.containsAttribute("hasPendingRegistrationOtp")) {
+            model.addAttribute("hasPendingRegistrationOtp", activeState != null);
+        }
+        if (!model.containsAttribute("registrationOtpExpired")) {
+            model.addAttribute("registrationOtpExpired", activeState == null);
+        }
+        if (!model.containsAttribute("registrationOtpExpiresAtEpochMs")) {
+            model.addAttribute("registrationOtpExpiresAtEpochMs", toEpochMillis(displayState.getExpiresAt()));
+        }
+        if (!model.containsAttribute("registrationOtpResendAvailableAtEpochMs")) {
+            model.addAttribute("registrationOtpResendAvailableAtEpochMs", toEpochMillis(displayState.getResendAvailableAt()));
+        }
+        return true;
+    }
+
     private void populateRegisterOptions(Model model) {
         model.addAttribute("registrationCityZipCodes", authService.getLagunaCityZipCodes());
         if (!model.containsAttribute("provinceValue")) {
@@ -266,6 +372,27 @@ public class AuthController {
             return true;
         }
         return false;
+    }
+
+    private String resolveEmailForRegister(Model model, String email) {
+        if (model.containsAttribute("emailValue")) {
+            Object existingValue = model.getAttribute("emailValue");
+            return existingValue == null ? null : existingValue.toString();
+        }
+        return email;
+    }
+
+    private void applyRegistrationOtpStateFlashAttributes(StudentRegistrationOtpState otpState,
+                                                          RedirectAttributes redirectAttributes) {
+        if (otpState == null) {
+            return;
+        }
+        redirectAttributes.addFlashAttribute("emailValue", otpState.getEmail());
+        redirectAttributes.addFlashAttribute("registrationOtpMaskedEmail", otpState.getMaskedEmail());
+        redirectAttributes.addFlashAttribute("hasPendingRegistrationOtp", true);
+        redirectAttributes.addFlashAttribute("registrationOtpExpired", false);
+        redirectAttributes.addFlashAttribute("registrationOtpExpiresAtEpochMs", toEpochMillis(otpState.getExpiresAt()));
+        redirectAttributes.addFlashAttribute("registrationOtpResendAvailableAtEpochMs", toEpochMillis(otpState.getResendAvailableAt()));
     }
 
     private void populateForgotPasswordModel(Model model, String email) {
@@ -335,5 +462,13 @@ public class AuthController {
             return null;
         }
         return value.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+    }
+
+    private String urlEncode(String value) {
+        return value == null ? "" : URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    private String registrationOtpRedirect(String email) {
+        return "redirect:/register/otp?email=" + urlEncode(email);
     }
 }

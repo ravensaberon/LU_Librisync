@@ -1,5 +1,7 @@
 package com.lulibrisync.controller;
 
+import com.lulibrisync.dto.StudentPasswordOtpDispatchResult;
+import com.lulibrisync.dto.StudentPasswordOtpState;
 import com.lulibrisync.dto.StudentProfileOtpDispatchResult;
 import com.lulibrisync.dto.StudentProfileOtpState;
 import com.lulibrisync.dto.StudentProfileUpdateRequest;
@@ -12,6 +14,7 @@ import com.lulibrisync.service.IssueService;
 import com.lulibrisync.service.ReservationService;
 import com.lulibrisync.service.StudentProfileImageService;
 import com.lulibrisync.service.StudentProfileOtpService;
+import com.lulibrisync.service.StudentPasswordChangeOtpService;
 import com.lulibrisync.service.StudentService;
 import org.springframework.core.io.Resource;
 import org.springframework.http.CacheControl;
@@ -40,6 +43,7 @@ public class StudentController {
     private final IssueService issueService;
     private final ReservationService reservationService;
     private final StudentProfileOtpService studentProfileOtpService;
+    private final StudentPasswordChangeOtpService studentPasswordChangeOtpService;
     private final FineService fineService;
     private final StudentProfileImageService studentProfileImageService;
     private final AuthService authService;
@@ -48,6 +52,7 @@ public class StudentController {
                              IssueService issueService,
                              ReservationService reservationService,
                              StudentProfileOtpService studentProfileOtpService,
+                             StudentPasswordChangeOtpService studentPasswordChangeOtpService,
                              FineService fineService,
                              StudentProfileImageService studentProfileImageService,
                              AuthService authService) {
@@ -55,6 +60,7 @@ public class StudentController {
         this.issueService = issueService;
         this.reservationService = reservationService;
         this.studentProfileOtpService = studentProfileOtpService;
+        this.studentPasswordChangeOtpService = studentPasswordChangeOtpService;
         this.fineService = fineService;
         this.studentProfileImageService = studentProfileImageService;
         this.authService = authService;
@@ -215,16 +221,75 @@ public class StudentController {
         return "redirect:/student/profile";
     }
 
-    @PostMapping("/student/profile/password")
-    public String changePassword(Authentication authentication,
-                                 @RequestParam String currentPassword,
-                                 @RequestParam String newPassword,
-                                 @RequestParam String confirmPassword,
-                                 RedirectAttributes redirectAttributes) {
+    @PostMapping("/student/profile/password/request-otp")
+    public String requestPasswordChangeOtp(Authentication authentication,
+                                           @RequestParam String currentPassword,
+                                           @RequestParam String newPassword,
+                                           @RequestParam String confirmPassword,
+                                           RedirectAttributes redirectAttributes) {
+        Student student = studentService.getStudentByEmail(authentication.getName());
         try {
-            studentService.changePassword(authentication.getName(), currentPassword, newPassword, confirmPassword);
+            StudentPasswordOtpDispatchResult dispatchResult = studentPasswordChangeOtpService.requestOtp(
+                    student,
+                    currentPassword,
+                    newPassword,
+                    confirmPassword
+            );
+            applyPasswordOtpStateFlashAttributes(dispatchResult.getOtpState(), redirectAttributes);
+            redirectAttributes.addFlashAttribute("openPasswordOtpPanel", true);
+            if (dispatchResult.isCooldownActive()) {
+                redirectAttributes.addFlashAttribute("info", "A password change OTP is already active.");
+            } else if (dispatchResult.isDelivered()) {
+                redirectAttributes.addFlashAttribute("success", "A password change OTP has been sent to your registered email.");
+            } else {
+                redirectAttributes.addFlashAttribute("error", "Unable to send OTP email right now.");
+            }
+        } catch (IllegalArgumentException exception) {
+            redirectAttributes.addFlashAttribute("error", exception.getMessage());
+        }
+        return "redirect:/student/profile#password-security";
+    }
+
+    @PostMapping("/student/profile/password/resend-otp")
+    public String resendPasswordChangeOtp(Authentication authentication,
+                                          RedirectAttributes redirectAttributes) {
+        Student student = studentService.getStudentByEmail(authentication.getName());
+        try {
+            StudentPasswordOtpDispatchResult dispatchResult = studentPasswordChangeOtpService.resendOtp(student);
+            applyPasswordOtpStateFlashAttributes(dispatchResult.getOtpState(), redirectAttributes);
+            redirectAttributes.addFlashAttribute("openPasswordOtpPanel", true);
+            if (dispatchResult.isCooldownActive()) {
+                redirectAttributes.addFlashAttribute("info", "Please wait before requesting another OTP.");
+            } else if (dispatchResult.isDelivered()) {
+                redirectAttributes.addFlashAttribute("success", "A fresh password change OTP has been sent to your registered email.");
+            } else {
+                redirectAttributes.addFlashAttribute("error", "Unable to send OTP email right now.");
+            }
+        } catch (IllegalArgumentException exception) {
+            redirectAttributes.addFlashAttribute("openPasswordOtpPanel", true);
+            redirectAttributes.addFlashAttribute("error", exception.getMessage());
+        }
+        return "redirect:/student/profile#password-security";
+    }
+
+    @PostMapping("/student/profile/password/verify-otp")
+    public String verifyPasswordChangeOtp(Authentication authentication,
+                                          @RequestParam(required = false) String otpCode,
+                                          RedirectAttributes redirectAttributes) {
+        Student student = studentService.getStudentByEmail(authentication.getName());
+        StudentPasswordOtpState latestOtpState = studentPasswordChangeOtpService.getLatestOtpState(student);
+        if (latestOtpState != null) {
+            applyPasswordOtpStateFlashAttributes(latestOtpState, redirectAttributes);
+        }
+
+        try {
+            studentPasswordChangeOtpService.verifyOtp(student, otpCode);
             redirectAttributes.addFlashAttribute("success", "Password changed successfully.");
         } catch (IllegalArgumentException exception) {
+            boolean hasActiveOtp = latestOtpState != null
+                    && latestOtpState.getExpiresAt() != null
+                    && latestOtpState.getExpiresAt().isAfter(LocalDateTime.now());
+            redirectAttributes.addFlashAttribute("openPasswordOtpPanel", hasActiveOtp);
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
         }
         return "redirect:/student/profile#password-security";
@@ -247,12 +312,14 @@ public class StudentController {
     private void populateProfilePageModel(Model model, Student student) {
         StudentProfileOtpState activeOtpState = studentProfileOtpService.getActiveOtpState(student);
         StudentProfileOtpState latestOtpState = studentProfileOtpService.getLatestOtpState(student);
+        StudentPasswordOtpState activePasswordOtpState = studentPasswordChangeOtpService.getActiveOtpState(student);
 
         model.addAttribute("student", student);
         model.addAttribute("studentInitials", buildInitials(student.getUser().getName()));
         model.addAttribute("hasProfileImage", studentProfileImageService.hasProfileImage(student));
         model.addAttribute("profileImageVersion", studentProfileImageService.getProfileImageVersion(student));
         model.addAttribute("hasPendingProfileOtp", activeOtpState != null);
+        model.addAttribute("hasPendingPasswordOtp", activePasswordOtpState != null);
         model.addAttribute("borrowerStanding", studentService.getBorrowerStanding(student));
         model.addAttribute("studentFines", fineService.getStudentFines(student.getId()));
         model.addAttribute("outstandingFineTotal", fineService.getOutstandingFineTotalByStudent(student.getId()));
@@ -281,6 +348,18 @@ public class StudentController {
         if (!model.containsAttribute("openOtpModal")) {
             model.addAttribute("openOtpModal", false);
         }
+        if (!model.containsAttribute("passwordOtpMaskedEmail") && activePasswordOtpState != null) {
+            model.addAttribute("passwordOtpMaskedEmail", activePasswordOtpState.getMaskedEmail());
+        }
+        if (!model.containsAttribute("passwordOtpExpiresAtEpochMs")) {
+            model.addAttribute("passwordOtpExpiresAtEpochMs", toEpochMillis(activePasswordOtpState == null ? null : activePasswordOtpState.getExpiresAt()));
+        }
+        if (!model.containsAttribute("passwordOtpResendAvailableAtEpochMs")) {
+            model.addAttribute("passwordOtpResendAvailableAtEpochMs", toEpochMillis(activePasswordOtpState == null ? null : activePasswordOtpState.getResendAvailableAt()));
+        }
+        if (!model.containsAttribute("openPasswordOtpPanel")) {
+            model.addAttribute("openPasswordOtpPanel", false);
+        }
     }
 
     private void applyOtpStateFlashAttributes(StudentProfileOtpState otpState,
@@ -293,6 +372,17 @@ public class StudentController {
         redirectAttributes.addFlashAttribute("otpMaskedEmail", maskEmail(otpState.getDestinationEmail()));
         redirectAttributes.addFlashAttribute("otpExpiresAtEpochMs", toEpochMillis(otpState.getExpiresAt()));
         redirectAttributes.addFlashAttribute("otpResendAvailableAtEpochMs", toEpochMillis(otpState.getResendAvailableAt()));
+    }
+
+    private void applyPasswordOtpStateFlashAttributes(StudentPasswordOtpState otpState,
+                                                      RedirectAttributes redirectAttributes) {
+        if (otpState == null) {
+            return;
+        }
+        redirectAttributes.addFlashAttribute("hasPendingPasswordOtp", true);
+        redirectAttributes.addFlashAttribute("passwordOtpMaskedEmail", otpState.getMaskedEmail());
+        redirectAttributes.addFlashAttribute("passwordOtpExpiresAtEpochMs", toEpochMillis(otpState.getExpiresAt()));
+        redirectAttributes.addFlashAttribute("passwordOtpResendAvailableAtEpochMs", toEpochMillis(otpState.getResendAvailableAt()));
     }
 
     private void populateAddressModelAttributes(String prefix, String address, Model model) {
