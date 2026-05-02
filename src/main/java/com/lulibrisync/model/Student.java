@@ -11,6 +11,7 @@ import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import com.lulibrisync.util.DisplayFormatUtils;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -130,6 +131,10 @@ public class Student {
         this.dateOfBirth = dateOfBirth;
     }
 
+    public String getDateOfBirthDisplay() {
+        return DisplayFormatUtils.formatDate(dateOfBirth);
+    }
+
     public String getQrCodePath() {
         return qrCodePath;
     }
@@ -144,6 +149,10 @@ public class Student {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getCreatedAtDisplay() {
+        return DisplayFormatUtils.formatDateTime(createdAt);
     }
 
     public LocalDateTime getUpdatedAt() {

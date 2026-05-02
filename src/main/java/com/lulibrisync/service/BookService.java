@@ -89,10 +89,11 @@ public class BookService {
                            Integer quantity,
                            String shelfLocation,
                            String description,
+                           String coverImage,
                            boolean digital,
                            String ebookPath) {
         Book book = new Book();
-        applyBookDetails(book, title, isbn, barcode, categoryId, authorId, publicationYear, quantity, shelfLocation, description, digital, ebookPath, true);
+        applyBookDetails(book, title, isbn, barcode, categoryId, authorId, publicationYear, quantity, shelfLocation, description, coverImage, digital, ebookPath, true);
         book.setAvailableQuantity(book.getQuantity());
         return bookRepository.save(book);
     }
@@ -122,10 +123,11 @@ public class BookService {
                            Integer quantity,
                            String shelfLocation,
                            String description,
+                           String coverImage,
                            boolean digital,
                            String ebookPath) {
         Book book = getBookById(bookId);
-        applyBookDetails(book, title, isbn, barcode, categoryId, authorId, publicationYear, quantity, shelfLocation, description, digital, ebookPath, false);
+        applyBookDetails(book, title, isbn, barcode, categoryId, authorId, publicationYear, quantity, shelfLocation, description, coverImage, digital, ebookPath, false);
         return bookRepository.save(book);
     }
 
@@ -189,6 +191,7 @@ public class BookService {
                                   Integer quantity,
                                   String shelfLocation,
                                   String description,
+                                  String coverImage,
                                   boolean digital,
                                   String ebookPath,
                                   boolean creating) {
@@ -228,7 +231,8 @@ public class BookService {
         book.setAvailableQuantity(creating ? normalizedQuantity : Math.max(0, normalizedQuantity - borrowedCount));
         book.setShelfLocation(blankToNull(shelfLocation));
         book.setDescription(blankToNull(description));
-        book.setDigital(digital);
+        book.setCoverImage(blankToNull(coverImage));
+        book.setDigital(digital || blankToNull(ebookPath) != null);
         book.setEbookPath(blankToNull(ebookPath));
 
         book.setCategory(categoryId == null ? null : getCategoryById(categoryId));

@@ -1,6 +1,7 @@
 package com.lulibrisync.service;
 
 import com.lulibrisync.dto.AdminDashboardChartPoint;
+import com.lulibrisync.model.AdminNotificationType;
 import com.lulibrisync.model.Book;
 import com.lulibrisync.model.IssueRecord;
 import com.lulibrisync.model.IssueStatus;
@@ -21,6 +22,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -36,9 +38,11 @@ public class IssueService {
     private final StudentService studentService;
     private final ReservationService reservationService;
     private final EmailNotificationService emailNotificationService;
+    private final AdminNotificationService adminNotificationService;
     private final FineService fineService;
     private final CirculationPolicyService circulationPolicyService;
     private final BigDecimal dailyFine;
+    private final BigDecimal reserveDailyFine;
 
     public IssueService(IssueRecordRepository issueRecordRepository,
                         BookRepository bookRepository,
@@ -47,9 +51,11 @@ public class IssueService {
                         StudentService studentService,
                         ReservationService reservationService,
                         EmailNotificationService emailNotificationService,
+                        AdminNotificationService adminNotificationService,
                         FineService fineService,
                         CirculationPolicyService circulationPolicyService,
-                        @org.springframework.beans.factory.annotation.Value("${lulibrisync.circulation.daily-fine:10.00}") BigDecimal dailyFine) {
+                        @org.springframework.beans.factory.annotation.Value("${lulibrisync.circulation.daily-fine:2.00}") BigDecimal dailyFine,
+                        @org.springframework.beans.factory.annotation.Value("${lulibrisync.circulation.reserve-daily-fine:50.00}") BigDecimal reserveDailyFine) {
         this.issueRecordRepository = issueRecordRepository;
         this.bookRepository = bookRepository;
         this.studentRepository = studentRepository;
@@ -57,9 +63,11 @@ public class IssueService {
         this.studentService = studentService;
         this.reservationService = reservationService;
         this.emailNotificationService = emailNotificationService;
+        this.adminNotificationService = adminNotificationService;
         this.fineService = fineService;
         this.circulationPolicyService = circulationPolicyService;
-        this.dailyFine = dailyFine == null ? new BigDecimal("10.00") : dailyFine;
+        this.dailyFine = dailyFine == null ? new BigDecimal("2.00") : dailyFine;
+        this.reserveDailyFine = reserveDailyFine == null ? new BigDecimal("50.00") : reserveDailyFine;
     }
 
     @Transactional
@@ -130,7 +138,8 @@ public class IssueService {
 
         LocalDateTime returnTimestamp = LocalDateTime.now();
         issueRecord.setReturnDate(returnTimestamp);
-        issueRecord.setFineAmount(calculateFine(issueRecord.getDueDate(), returnTimestamp));
+        issueRecord.setReturnRequestedAt(null);
+        issueRecord.setFineAmount(calculateFine(issueRecord.getBook(), issueRecord.getDueDate(), returnTimestamp));
         issueRecord.setStatus(IssueStatus.RETURNED);
 
         Book book = issueRecord.getBook();
@@ -155,7 +164,7 @@ public class IssueService {
                 continue;
             }
 
-            BigDecimal fine = calculateFine(issueRecord.getDueDate(), now);
+            BigDecimal fine = calculateFine(issueRecord.getBook(), issueRecord.getDueDate(), now);
             if (now.isAfter(issueRecord.getDueDate())) {
                 issueRecord.setStatus(IssueStatus.OVERDUE);
                 issueRecord.setFineAmount(fine);
@@ -173,7 +182,11 @@ public class IssueService {
 
     public List<IssueRecord> getActiveIssues() {
         refreshOverdueStatuses();
-        return issueRecordRepository.findActiveIssuesOrdered(List.of(IssueStatus.ISSUED, IssueStatus.OVERDUE));
+        return issueRecordRepository.findActiveIssuesOrdered(List.of(IssueStatus.ISSUED, IssueStatus.OVERDUE)).stream()
+                .sorted(Comparator
+                        .comparing(IssueRecord::isReturnRequested).reversed()
+                        .thenComparing(IssueRecord::getDueDate, Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
     }
 
     public List<IssueRecord> getRecentIssues() {
@@ -216,6 +229,22 @@ public class IssueService {
             }
         }
         return activeIssueIds;
+    }
+
+    public Map<Long, Boolean> getActiveIssueReturnRequestedByBookIds(String email) {
+        Map<Long, Boolean> activeIssueReturnRequested = new LinkedHashMap<>();
+        for (IssueRecord issueRecord : getStudentIssues(email)) {
+            if (!issueRecord.isReturned() && !activeIssueReturnRequested.containsKey(issueRecord.getBook().getId())) {
+                activeIssueReturnRequested.put(issueRecord.getBook().getId(), issueRecord.isReturnRequested());
+            }
+        }
+        return activeIssueReturnRequested;
+    }
+
+    public long countPendingReturnRequests() {
+        return getActiveIssues().stream()
+                .filter(IssueRecord::isReturnRequested)
+                .count();
     }
 
     public Map<Long, LocalDate> getActiveIssueDueDatesForStudentBooks(String email) {
@@ -262,13 +291,46 @@ public class IssueService {
     }
 
     @Transactional
-    public IssueRecord returnBookByStudent(Long issueId, String email) {
+    public IssueRecord requestReturnByStudent(Long issueId, String email) {
         Student student = studentService.getStudentByEmail(email);
         IssueRecord issueRecord = getIssueById(issueId);
         if (!issueRecord.getStudent().getId().equals(student.getId())) {
-            throw new IllegalArgumentException("You can only return books issued to your account.");
+            throw new IllegalArgumentException("You can only manage return requests for your own loans.");
         }
-        return returnBook(issueId);
+        if (issueRecord.isReturned()) {
+            throw new IllegalArgumentException("This book has already been returned.");
+        }
+        if (issueRecord.isReturnRequested()) {
+            throw new IllegalArgumentException("A desk return request is already pending for this loan.");
+        }
+
+        issueRecord.setReturnRequestedAt(LocalDateTime.now());
+        IssueRecord savedIssueRecord = issueRecordRepository.save(issueRecord);
+        adminNotificationService.notifyAdmins(
+                AdminNotificationType.RETURN_REQUEST,
+                "New return request",
+                student.getUser().getName() + " requested a desk return for " + issueRecord.getBook().getTitle() + ".",
+                "/admin/issues#reservation-desk"
+        );
+        return savedIssueRecord;
+    }
+
+    @Transactional
+    public IssueRecord cancelReturnRequestByStudent(Long issueId, String email) {
+        Student student = studentService.getStudentByEmail(email);
+        IssueRecord issueRecord = getIssueById(issueId);
+        if (!issueRecord.getStudent().getId().equals(student.getId())) {
+            throw new IllegalArgumentException("You can only manage return requests for your own loans.");
+        }
+        if (issueRecord.isReturned()) {
+            throw new IllegalArgumentException("This book has already been returned.");
+        }
+        if (!issueRecord.isReturnRequested()) {
+            throw new IllegalArgumentException("There is no pending desk return request for this loan.");
+        }
+
+        issueRecord.setReturnRequestedAt(null);
+        return issueRecordRepository.save(issueRecord);
     }
 
     @Transactional
@@ -285,7 +347,7 @@ public class IssueService {
 
         if (!issueRecord.isReturned()) {
             LocalDateTime now = LocalDateTime.now();
-            BigDecimal fine = calculateFine(issueRecord.getDueDate(), now);
+            BigDecimal fine = calculateFine(issueRecord.getBook(), issueRecord.getDueDate(), now);
             if (now.isAfter(issueRecord.getDueDate())) {
                 issueRecord.setStatus(IssueStatus.OVERDUE);
                 issueRecord.setFineAmount(fine);
@@ -362,7 +424,7 @@ public class IssueService {
                 .toList();
     }
 
-    private BigDecimal calculateFine(LocalDateTime dueDate, LocalDateTime referenceDate) {
+    private BigDecimal calculateFine(Book book, LocalDateTime dueDate, LocalDateTime referenceDate) {
         if (dueDate == null || referenceDate == null || !referenceDate.isAfter(dueDate)) {
             return BigDecimal.ZERO;
         }
@@ -371,7 +433,25 @@ public class IssueService {
         if (overdueDays < 1) {
             overdueDays = 1;
         }
-        return dailyFine.multiply(BigDecimal.valueOf(overdueDays));
+        return resolveDailyFine(book).multiply(BigDecimal.valueOf(overdueDays));
+    }
+
+    private BigDecimal resolveDailyFine(Book book) {
+        return isReserveBook(book) ? reserveDailyFine : dailyFine;
+    }
+
+    private boolean isReserveBook(Book book) {
+        if (book == null) {
+            return false;
+        }
+
+        return containsReserveKeyword(book.getShelfLocation())
+                || (book.getCategory() != null && containsReserveKeyword(book.getCategory().getName()))
+                || containsReserveKeyword(book.getTitle());
+    }
+
+    private boolean containsReserveKeyword(String value) {
+        return value != null && value.toLowerCase(Locale.ENGLISH).contains("reserve");
     }
 
     private String blankToNull(String value) {

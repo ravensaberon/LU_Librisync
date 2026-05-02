@@ -7,10 +7,16 @@ import com.lulibrisync.service.DigitalLibraryService;
 import com.lulibrisync.service.IssueService;
 import com.lulibrisync.service.ReservationService;
 import com.lulibrisync.service.StudentService;
+import com.lulibrisync.util.PaginationUtils;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.util.StringUtils;
 import org.springframework.ui.Model;
+import org.springframework.core.io.Resource;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,6 +30,9 @@ import java.util.Map;
 
 @Controller
 public class BookController {
+
+    private static final int ADMIN_BOOKS_PAGE_SIZE = 10;
+    private static final int STUDENT_CATALOG_PAGE_SIZE = 12;
 
     private final BookService bookService;
     private final ReservationService reservationService;
@@ -50,13 +59,23 @@ public class BookController {
     }
 
     @GetMapping("/admin/books")
-    public String adminBooks(@RequestParam(required = false) Long editId, Model model) {
+    public String adminBooks(@RequestParam(required = false) Long editId,
+                             @RequestParam(defaultValue = "1") Integer page,
+                             Model model) {
         populateBookManagementModel(model);
         var books = bookService.getAllBooks();
+        var booksPage = PaginationUtils.paginate(books, page, ADMIN_BOOKS_PAGE_SIZE);
+        Map<Long, Boolean> readableBookCoverByBookId = new LinkedHashMap<>();
+        for (var book : booksPage.getItems()) {
+            readableBookCoverByBookId.put(book.getId(), digitalLibraryService.hasReadableBookCover(book));
+        }
+        model.addAttribute("books", booksPage.getItems());
+        model.addAttribute("booksPage", booksPage);
         model.addAttribute("bookCount", books.size());
         model.addAttribute("digitalBookCount", books.stream().filter(book -> book.isDigital()).count());
         model.addAttribute("availableBookCount", books.stream().mapToInt(book -> book.getAvailableQuantity() == null ? 0 : book.getAvailableQuantity()).sum());
         model.addAttribute("totalCopyCount", books.stream().mapToInt(book -> book.getQuantity() == null ? 0 : book.getQuantity()).sum());
+        model.addAttribute("readableBookCoverByBookId", readableBookCoverByBookId);
         if (editId != null) {
             model.addAttribute("editBook", bookService.getBookById(editId));
         }
@@ -73,16 +92,20 @@ public class BookController {
                              @RequestParam(required = false) Integer quantity,
                              @RequestParam(required = false) String shelfLocation,
                              @RequestParam(required = false) String description,
+                             @RequestParam(required = false) MultipartFile coverImageFile,
                              @RequestParam(defaultValue = "false") boolean digital,
                              @RequestParam(required = false) String ebookPath,
                              @RequestParam(required = false) MultipartFile ebookFile,
+                             @RequestParam(defaultValue = "1") Integer page,
                              Authentication authentication,
                              RedirectAttributes redirectAttributes) {
         String storedEbookPath = null;
+        String storedCoverImagePath = null;
         boolean hasManualEbookPath = StringUtils.hasText(ebookPath);
         try {
+            storedCoverImagePath = digitalLibraryService.storeBookCoverFile(title, coverImageFile);
             storedEbookPath = digitalLibraryService.storeEbookFile(title, ebookFile);
-            var book = bookService.createBook(title, isbn, barcode, categoryId, authorId, publicationYear, quantity, shelfLocation, description, digital || storedEbookPath != null || hasManualEbookPath, storedEbookPath != null ? storedEbookPath : ebookPath);
+            var book = bookService.createBook(title, isbn, barcode, categoryId, authorId, publicationYear, quantity, shelfLocation, description, storedCoverImagePath, digital || storedEbookPath != null || hasManualEbookPath, storedEbookPath != null ? storedEbookPath : ebookPath);
             auditLogService.log(
                     authentication.getName(),
                     "BOOK_CREATED",
@@ -93,11 +116,12 @@ public class BookController {
             );
             redirectAttributes.addFlashAttribute("success", "Book added to library successfully.");
         } catch (IllegalArgumentException exception) {
+            digitalLibraryService.deleteManagedBookCover(storedCoverImagePath);
             digitalLibraryService.deleteManagedEbook(storedEbookPath);
             redirectAttributes.addFlashAttribute("openBookModal", true);
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
         }
-        return "redirect:/admin/books";
+        return "redirect:/admin/books?page=" + Math.max(1, page);
     }
 
     @PostMapping("/admin/books/{bookId}/update")
@@ -110,20 +134,31 @@ public class BookController {
                              @RequestParam(required = false) Integer quantity,
                              @RequestParam(required = false) String shelfLocation,
                              @RequestParam(required = false) String description,
+                             @RequestParam(required = false) MultipartFile coverImageFile,
                              @RequestParam(defaultValue = "false") boolean digital,
                              @RequestParam(required = false) String ebookPath,
                              @RequestParam(required = false) MultipartFile ebookFile,
                              @org.springframework.web.bind.annotation.PathVariable Long bookId,
+                             @RequestParam(defaultValue = "1") Integer page,
                              Authentication authentication,
                              RedirectAttributes redirectAttributes) {
         String storedEbookPath = null;
+        String storedCoverImagePath = null;
         String previousManagedEbookPath = null;
+        String previousManagedCoverImagePath = null;
         boolean hasManualEbookPath = StringUtils.hasText(ebookPath);
         try {
             var existingBook = bookService.getBookById(bookId);
             previousManagedEbookPath = existingBook.getEbookPath();
+            previousManagedCoverImagePath = existingBook.getCoverImage();
+            storedCoverImagePath = digitalLibraryService.storeBookCoverFile(title, coverImageFile);
             storedEbookPath = digitalLibraryService.storeEbookFile(title, ebookFile);
-            var updatedBook = bookService.updateBook(bookId, title, isbn, barcode, categoryId, authorId, publicationYear, quantity, shelfLocation, description, digital || storedEbookPath != null || hasManualEbookPath, storedEbookPath != null ? storedEbookPath : ebookPath);
+            var updatedBook = bookService.updateBook(bookId, title, isbn, barcode, categoryId, authorId, publicationYear, quantity, shelfLocation, description, storedCoverImagePath != null ? storedCoverImagePath : previousManagedCoverImagePath, digital || storedEbookPath != null || hasManualEbookPath, storedEbookPath != null ? storedEbookPath : ebookPath);
+            if (storedCoverImagePath != null
+                    && digitalLibraryService.isManagedBookCoverPath(previousManagedCoverImagePath)
+                    && (previousManagedCoverImagePath == null || !previousManagedCoverImagePath.equals(updatedBook.getCoverImage()))) {
+                digitalLibraryService.deleteManagedBookCover(previousManagedCoverImagePath);
+            }
             if (storedEbookPath != null
                     && digitalLibraryService.isManagedEbookPath(previousManagedEbookPath)
                     && (previousManagedEbookPath == null || !previousManagedEbookPath.equals(updatedBook.getEbookPath()))) {
@@ -139,22 +174,25 @@ public class BookController {
                     "Title: " + updatedBook.getTitle() + " | Available: " + updatedBook.getAvailableQuantity() + "/" + updatedBook.getQuantity()
             );
             redirectAttributes.addFlashAttribute("success", "Book updated successfully.");
-            return "redirect:/admin/books";
+            return "redirect:/admin/books?page=" + Math.max(1, page);
         } catch (IllegalArgumentException exception) {
+            digitalLibraryService.deleteManagedBookCover(storedCoverImagePath);
             digitalLibraryService.deleteManagedEbook(storedEbookPath);
             redirectAttributes.addFlashAttribute("openBookModal", true);
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
-            return "redirect:/admin/books?editId=" + bookId;
+            return "redirect:/admin/books?editId=" + bookId + "&page=" + Math.max(1, page);
         }
     }
 
     @PostMapping("/admin/books/{bookId}/delete")
     public String deleteBook(@org.springframework.web.bind.annotation.PathVariable Long bookId,
+                             @RequestParam(defaultValue = "1") Integer page,
                              Authentication authentication,
                              RedirectAttributes redirectAttributes) {
         try {
             var book = bookService.getBookById(bookId);
             bookService.deleteBook(bookId);
+            digitalLibraryService.deleteManagedBookCover(book.getCoverImage());
             digitalLibraryService.deleteManagedEbook(book.getEbookPath());
             auditLogService.log(
                     authentication.getName(),
@@ -168,7 +206,27 @@ public class BookController {
         } catch (IllegalArgumentException exception) {
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
         }
-        return "redirect:/admin/books";
+        return "redirect:/admin/books?page=" + Math.max(1, page);
+    }
+
+    @GetMapping("/books/{bookId}/cover")
+    public ResponseEntity<Resource> bookCover(@PathVariable Long bookId) {
+        var book = bookService.getBookById(bookId);
+        Resource coverResource = digitalLibraryService.getBookCoverResource(book);
+
+        String coverImagePath = book.getCoverImage();
+        String lowerPath = coverImagePath == null ? "" : coverImagePath.toLowerCase();
+        MediaType contentType = MediaType.IMAGE_JPEG;
+        if (lowerPath.endsWith(".png")) {
+            contentType = MediaType.IMAGE_PNG;
+        } else if (lowerPath.endsWith(".webp")) {
+            contentType = MediaType.parseMediaType("image/webp");
+        }
+
+        return ResponseEntity.ok()
+                .contentType(contentType)
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline().filename(book.getTitle() + "-cover").build().toString())
+                .body(coverResource);
     }
 
     @GetMapping("/student/catalog")
@@ -177,21 +235,26 @@ public class BookController {
                                  @RequestParam(required = false) Long authorId,
                                  @RequestParam(required = false) String isbn,
                                  @RequestParam(defaultValue = "false") boolean availableOnly,
+                                 @RequestParam(defaultValue = "1") Integer page,
                                  Authentication authentication,
                                  Model model) {
         reservationService.syncReadyReservations();
         var books = bookService.searchBooks(keyword, categoryId, authorId, isbn, availableOnly);
+        var booksPage = PaginationUtils.paginate(books, page, STUDENT_CATALOG_PAGE_SIZE);
         Map<Long, Integer> readyReservationCountsByBook = reservationService.getReadyReservationCountsByBook();
         Map<Long, Integer> walkInBorrowableCopyCountByBook = new LinkedHashMap<>();
         Map<Long, Boolean> readableEbookByBookId = new LinkedHashMap<>();
-        for (var book : books) {
+        Map<Long, Boolean> readableBookCoverByBookId = new LinkedHashMap<>();
+        for (var book : booksPage.getItems()) {
             int availableCopies = book.getAvailableQuantity() == null ? 0 : Math.max(0, book.getAvailableQuantity());
             int readyReservations = readyReservationCountsByBook.getOrDefault(book.getId(), 0);
             walkInBorrowableCopyCountByBook.put(book.getId(), Math.max(0, availableCopies - readyReservations));
             readableEbookByBookId.put(book.getId(), digitalLibraryService.hasReadableEbook(book));
+            readableBookCoverByBookId.put(book.getId(), digitalLibraryService.hasReadableBookCover(book));
         }
 
-        model.addAttribute("books", books);
+        model.addAttribute("books", booksPage.getItems());
+        model.addAttribute("booksPage", booksPage);
         model.addAttribute("categories", bookService.getAllCategories());
         model.addAttribute("authors", bookService.getAllAuthors());
         model.addAttribute("keyword", keyword);
@@ -202,12 +265,14 @@ public class BookController {
         model.addAttribute("studentActiveIssueStatusByBookId", issueService.getActiveIssueStatusesForStudentBooks(authentication.getName()));
         model.addAttribute("studentActiveIssueIdByBookId", issueService.getActiveIssueIdsForStudentBooks(authentication.getName()));
         model.addAttribute("studentActiveIssueDueDateByBookId", issueService.getActiveIssueDueDatesForStudentBooks(authentication.getName()));
+        model.addAttribute("studentActiveIssueReturnRequestedByBookId", issueService.getActiveIssueReturnRequestedByBookIds(authentication.getName()));
         model.addAttribute("studentReservationStatusByBookId", reservationService.getReservationStatusesForStudentBooks(authentication.getName()));
         model.addAttribute("reservationQueueSizes", reservationService.getActiveQueueSizesByBook());
         model.addAttribute("readyReservationCountsByBook", readyReservationCountsByBook);
         model.addAttribute("walkInBorrowableCopyCountByBook", walkInBorrowableCopyCountByBook);
         model.addAttribute("readableEbookByBookId", readableEbookByBookId);
-        model.addAttribute("nextAvailableDateByBookId", issueService.getNextAvailableDatesByBookIds(books.stream().map(book -> book.getId()).toList()));
+        model.addAttribute("readableBookCoverByBookId", readableBookCoverByBookId);
+        model.addAttribute("nextAvailableDateByBookId", issueService.getNextAvailableDatesByBookIds(booksPage.getItems().stream().map(book -> book.getId()).toList()));
         model.addAttribute("todayDate", LocalDate.now());
         model.addAttribute("reservationScheduleMaxDate", LocalDate.now().plusDays(reservationService.getMaxPreferredPickupDays()));
         model.addAttribute("defaultBorrowDueDate", LocalDate.now().plusDays(circulationPolicyService.getMaxLoanDays()));
@@ -220,18 +285,16 @@ public class BookController {
                                     Authentication authentication,
                                     RedirectAttributes redirectAttributes) {
         try {
-            var student = studentService.getStudentByEmail(authentication.getName());
-            LocalDate dueDate = LocalDate.now().plusDays(circulationPolicyService.getMaxLoanDays());
-            var issueRecord = issueService.issueBook(bookId, student.getId(), dueDate, authentication.getName(), "Self-service catalog checkout");
+            var reservation = reservationService.placeBorrowRequest(bookId, authentication.getName());
             auditLogService.log(
                     authentication.getName(),
-                    "SELF_SERVICE_BORROW",
-                    "ISSUE_RECORD",
-                    issueRecord.getId().toString(),
-                    "Student borrowed a book",
-                    "Issue code: " + issueRecord.getQrIssueCode() + " | Book: " + issueRecord.getBook().getTitle()
+                    "BORROW_REQUEST_CREATED",
+                    "RESERVATION",
+                    reservation.getId().toString(),
+                    "Student requested a physical checkout",
+                    "Book: " + reservation.getBook().getTitle() + " | Status: " + reservation.getStatus()
             );
-            redirectAttributes.addFlashAttribute("success", "Book borrowed successfully. Due on " + dueDate + ".");
+            redirectAttributes.addFlashAttribute("success", "Borrow request approved. Please show your ID at the circulation desk within " + reservationService.getBorrowRequestWindowMinutes() + " minutes.");
         } catch (IllegalArgumentException exception) {
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
         }
@@ -239,7 +302,6 @@ public class BookController {
     }
 
     private void populateBookManagementModel(Model model) {
-        model.addAttribute("books", bookService.getAllBooks());
         model.addAttribute("categories", bookService.getAllCategories());
         model.addAttribute("authors", bookService.getAllAuthors());
     }

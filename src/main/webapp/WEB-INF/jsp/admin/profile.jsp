@@ -7,6 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Admin Profile</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="${pageContext.request.contextPath}/css/app.css">
 </head>
 <body>
@@ -20,7 +21,6 @@
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/dashboard">Dashboard</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/books">Books</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/issues">Issue / Return</a>
-            <a class="nav-pill" href="${pageContext.request.contextPath}/admin/reservations">Reservations</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/students">Students</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/fines">Fines</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/reports">Reports</a>
@@ -28,7 +28,7 @@
             <a class="nav-pill active" href="${pageContext.request.contextPath}/admin/profile">Profile</a>
             <form method="post" action="${pageContext.request.contextPath}/logout">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                <button class="nav-pill warm border-0" type="submit">Logout</button>
+                <button class="nav-pill warm border-0" type="submit" aria-label="Logout" title="Logout"><span class="nav-pill-icon"><i class="bi bi-power" aria-hidden="true"></i></span><span class="nav-pill-label">Logout</span></button>
             </form>
         </div>
     </div>
@@ -75,7 +75,10 @@
         </div>
         <div class="info-tile">
             <span class="info-tile-label">Created</span>
-            <span class="info-tile-value">${adminUser.createdAt}</span>
+            <span class="info-tile-value info-tile-value-stack">
+                <span>${adminUser.createdAtDateDisplay}</span>
+                <span>${adminUser.createdAtTimeDisplay}</span>
+            </span>
         </div>
     </section>
 
@@ -123,3 +126,4 @@
 <script src="${pageContext.request.contextPath}/js/app.js"></script>
 </body>
 </html>
+

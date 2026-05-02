@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS issue_records (
     issue_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     due_date DATETIME NOT NULL,
     return_date DATETIME NULL,
+    return_requested_at DATETIME NULL,
     status ENUM('ISSUED', 'RETURNED', 'OVERDUE') NOT NULL DEFAULT 'ISSUED',
     fine_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     remarks VARCHAR(255),
@@ -89,6 +90,7 @@ CREATE TABLE IF NOT EXISTS reservations (
     student_id BIGINT NOT NULL,
     queue_position INT NOT NULL DEFAULT 1,
     status ENUM('PENDING', 'READY', 'CLAIMED', 'CANCELLED') NOT NULL DEFAULT 'PENDING',
+    request_type ENUM('BORROW', 'RESERVATION') NOT NULL DEFAULT 'RESERVATION',
     reserved_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     expires_at DATETIME NULL,
     preferred_pickup_date DATE NULL,
@@ -131,6 +133,19 @@ CREATE TABLE IF NOT EXISTS email_notifications (
     status ENUM('PENDING', 'SENT', 'FAILED') NOT NULL DEFAULT 'PENDING',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_email_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS admin_notifications (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    admin_user_id BIGINT NOT NULL,
+    notification_type VARCHAR(30) NOT NULL,
+    title VARCHAR(180) NOT NULL,
+    message TEXT NOT NULL,
+    link_url VARCHAR(255),
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    read_at DATETIME NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_admin_notifications_user FOREIGN KEY (admin_user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS audit_logs (

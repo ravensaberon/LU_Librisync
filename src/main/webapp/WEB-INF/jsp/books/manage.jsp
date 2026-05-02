@@ -21,7 +21,6 @@
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/dashboard">Dashboard</a>
             <a class="nav-pill active" href="${pageContext.request.contextPath}/admin/books">Books</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/issues">Issue / Return</a>
-            <a class="nav-pill" href="${pageContext.request.contextPath}/admin/reservations">Reservations</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/students">Students</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/fines">Fines</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/reports">Reports</a>
@@ -29,7 +28,7 @@
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/profile">Profile</a>
             <form method="post" action="${pageContext.request.contextPath}/logout">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                <button class="nav-pill warm border-0" type="submit">Logout</button>
+                <button class="nav-pill warm border-0" type="submit" aria-label="Logout" title="Logout"><span class="nav-pill-icon"><i class="bi bi-power" aria-hidden="true"></i></span><span class="nav-pill-label">Logout</span></button>
             </form>
         </div>
     </div>
@@ -60,7 +59,7 @@
                     <i class="bi bi-journal-plus me-2"></i>Add book to the library
                 </button>
                 <c:if test="${not empty editBook}">
-                    <a class="action-link" href="${pageContext.request.contextPath}/admin/books">Exit edit mode</a>
+                    <a class="action-link" href="${pageContext.request.contextPath}/admin/books?page=${booksPage.page}">Exit edit mode</a>
                 </c:if>
             </div>
         </div>
@@ -110,10 +109,24 @@
                 <c:forEach items="${books}" var="book">
                     <tr>
                         <td>
-                            <strong>${book.title}</strong>
-                            <c:if test="${not empty book.publicationYear}">
-                                <div class="muted-text">${book.publicationYear}</div>
-                            </c:if>
+                            <div class="book-title-cell">
+                                <div class="book-title-cover">
+                                    <c:choose>
+                                        <c:when test="${readableBookCoverByBookId[book.id]}">
+                                            <img src="${pageContext.request.contextPath}/books/${book.id}/cover" alt="${book.title} cover">
+                                        </c:when>
+                                        <c:otherwise>
+                                            <i class="bi bi-book-half"></i>
+                                        </c:otherwise>
+                                    </c:choose>
+                                </div>
+                                <div>
+                                    <strong>${book.title}</strong>
+                                    <c:if test="${not empty book.publicationYear}">
+                                        <div class="muted-text">${book.publicationYear}</div>
+                                    </c:if>
+                                </div>
+                            </div>
                         </td>
                         <td>
                             <div>${book.isbn}</div>
@@ -147,11 +160,12 @@
                             <button class="icon-action" type="button" title="View book QR code" data-bs-toggle="modal" data-bs-target="#bookQrModal" data-book-title="${book.title}" data-book-isbn="${book.isbn}" data-book-code="${book.scanCode}" data-book-code-label="${book.scanCodeLabel}">
                                 <i class="bi bi-qr-code"></i>
                             </button>
-                            <a class="icon-action" href="${pageContext.request.contextPath}/admin/books?editId=${book.id}" title="Edit book">
+                            <a class="icon-action" href="${pageContext.request.contextPath}/admin/books?editId=${book.id}&page=${booksPage.page}" title="Edit book">
                                 <i class="bi bi-pencil-square"></i>
                             </a>
                             <form method="post" action="${pageContext.request.contextPath}/admin/books/${book.id}/delete">
                                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                                <input type="hidden" name="page" value="${booksPage.page}">
                                 <button class="icon-action danger" type="submit" title="Delete book">
                                     <i class="bi bi-trash3"></i>
                                 </button>
@@ -167,6 +181,23 @@
                 </tbody>
             </table>
         </div>
+        <c:if test="${booksPage.totalPages > 1}">
+            <nav class="mt-4" aria-label="Book inventory pages">
+                <ul class="pagination justify-content-center mb-0">
+                    <li class="page-item <c:if test='${!booksPage.hasPrevious}'>disabled</c:if>">
+                        <a class="page-link" href="${pageContext.request.contextPath}/admin/books?page=${booksPage.previousPage}<c:if test='${not empty editBook}'>&editId=${editBook.id}</c:if>">Previous</a>
+                    </li>
+                    <c:forEach begin="${booksPage.startPage}" end="${booksPage.endPage}" var="pageNumber">
+                        <li class="page-item <c:if test='${pageNumber == booksPage.page}'>active</c:if>">
+                            <a class="page-link" href="${pageContext.request.contextPath}/admin/books?page=${pageNumber}<c:if test='${not empty editBook}'>&editId=${editBook.id}</c:if>">${pageNumber}</a>
+                        </li>
+                    </c:forEach>
+                    <li class="page-item <c:if test='${!booksPage.hasNext}'>disabled</c:if>">
+                        <a class="page-link" href="${pageContext.request.contextPath}/admin/books?page=${booksPage.nextPage}<c:if test='${not empty editBook}'>&editId=${editBook.id}</c:if>">Next</a>
+                    </li>
+                </ul>
+            </nav>
+        </c:if>
     </section>
 
     <div class="modal fade" id="bookQrModal" tabindex="-1" aria-hidden="true">
@@ -231,6 +262,7 @@
             <form method="post" action="${bookFormAction}" class="row g-3" enctype="multipart/form-data">
                 <div class="modal-body">
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                    <input type="hidden" name="page" value="${booksPage.page}">
 
                     <div class="row g-3">
                         <div class="col-md-6">
@@ -279,13 +311,20 @@
                             <label class="form-label" for="shelfLocation">Shelf location</label>
                             <input class="form-control" id="shelfLocation" name="shelfLocation" value="${editBook.shelfLocation}">
                         </div>
-                        <div class="col-md-5">
+                        <div class="col-md-4">
+                            <label class="form-label" for="coverImageFile">Book cover</label>
+                            <input class="form-control" id="coverImageFile" name="coverImageFile" type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp">
+                        </div>
+                        <div class="col-md-4">
                             <label class="form-label" for="ebookPath">E-book path</label>
                             <input class="form-control" id="ebookPath" name="ebookPath" value="${editBook.ebookPath}" placeholder="Optional PDF or file path">
                         </div>
                         <div class="col-md-4">
                             <label class="form-label" for="ebookFile">Upload PDF</label>
                             <input class="form-control" id="ebookFile" name="ebookFile" type="file" accept="application/pdf,.pdf">
+                        </div>
+                        <div class="col-12">
+                            <small class="muted-text">Digital PDF stays readable in the student catalog even when all physical copies are occupied. Cover upload is optional but recommended.</small>
                         </div>
                         <div class="col-md-3 d-flex align-items-end">
                             <div class="form-check">
@@ -301,7 +340,7 @@
                 </div>
                 <div class="modal-footer">
                     <c:if test="${not empty editBook}">
-                        <a class="btn btn-warm me-auto" href="${pageContext.request.contextPath}/admin/books">Back to add mode</a>
+                        <a class="btn btn-warm me-auto" href="${pageContext.request.contextPath}/admin/books?page=${booksPage.page}">Back to add mode</a>
                     </c:if>
                     <button class="btn btn-warm" type="button" data-bs-dismiss="modal">Close</button>
                     <button class="btn btn-brand" type="submit">
@@ -369,3 +408,5 @@
 </script>
 </body>
 </html>
+
+

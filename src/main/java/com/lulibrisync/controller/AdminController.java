@@ -13,11 +13,13 @@ import com.lulibrisync.repository.IssueRecordRepository;
 import com.lulibrisync.repository.UserRepository;
 import com.lulibrisync.service.AuditLogService;
 import com.lulibrisync.service.AdminService;
+import com.lulibrisync.service.AdminNotificationService;
 import com.lulibrisync.service.AuthService;
 import com.lulibrisync.service.FineService;
 import com.lulibrisync.service.IssueService;
 import com.lulibrisync.service.ReservationService;
 import com.lulibrisync.service.StudentService;
+import com.lulibrisync.util.PaginationUtils;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -37,12 +39,15 @@ import java.util.Map;
 @RequestMapping("/admin")
 public class AdminController {
 
+    private static final int STUDENT_DIRECTORY_PAGE_SIZE = 10;
+
     private final BookRepository bookRepository;
     private final UserRepository userRepository;
     private final IssueRecordRepository issueRecordRepository;
     private final IssueService issueService;
     private final StudentService studentService;
     private final AdminService adminService;
+    private final AdminNotificationService adminNotificationService;
     private final AuthService authService;
     private final ReservationService reservationService;
     private final FineService fineService;
@@ -54,6 +59,7 @@ public class AdminController {
                            IssueService issueService,
                            StudentService studentService,
                            AdminService adminService,
+                           AdminNotificationService adminNotificationService,
                            AuthService authService,
                            ReservationService reservationService,
                            FineService fineService,
@@ -64,6 +70,7 @@ public class AdminController {
         this.issueService = issueService;
         this.studentService = studentService;
         this.adminService = adminService;
+        this.adminNotificationService = adminNotificationService;
         this.authService = authService;
         this.reservationService = reservationService;
         this.fineService = fineService;
@@ -71,7 +78,7 @@ public class AdminController {
     }
 
     @GetMapping("/dashboard")
-    public String dashboard(Model model) {
+    public String dashboard(Authentication authentication, Model model) {
         issueService.refreshOverdueStatuses();
         long issuedCount = issueRecordRepository.countByStatus(IssueStatus.ISSUED);
         long overdueCount = issueRecordRepository.countByStatus(IssueStatus.OVERDUE);
@@ -96,14 +103,26 @@ public class AdminController {
         model.addAttribute("blockedBorrowerCount", blockedBorrowerCount);
         model.addAttribute("recentAuditLogs", auditLogService.getRecentLogs().stream().limit(8).toList());
         model.addAttribute("recentOutstandingFines", fineService.getRecentOutstandingFines());
+        model.addAttribute("recentAdminNotifications", adminNotificationService.getRecentNotifications(authentication.getName()));
+        model.addAttribute("unreadAdminNotificationCount", adminNotificationService.countUnreadNotifications(authentication.getName()));
         return "admin/dashboard";
+    }
+
+    @PostMapping("/notifications/read-all")
+    public String markAllNotificationsRead(Authentication authentication,
+                                           RedirectAttributes redirectAttributes) {
+        adminNotificationService.markAllAsRead(authentication.getName());
+        redirectAttributes.addFlashAttribute("success", "Notifications marked as read.");
+        return "redirect:/admin/dashboard";
     }
 
     @GetMapping("/students")
     public String students(@RequestParam(required = false) String studentId,
                            @RequestParam(required = false) String modalStudentId,
+                           @RequestParam(defaultValue = "1") Integer page,
                            Model model) {
         List<Student> students = studentService.searchStudents(studentId);
+        var studentsPage = PaginationUtils.paginate(students, page, STUDENT_DIRECTORY_PAGE_SIZE);
         Map<String, BorrowerStanding> borrowerStandingByStudentId = students.stream()
                 .collect(java.util.stream.Collectors.toMap(
                         Student::getStudentId,
@@ -121,7 +140,8 @@ public class AdminController {
                 .filter(student -> UserStatus.ACTIVE.equals(student.getUser().getStatus()))
                 .count();
 
-        model.addAttribute("students", students);
+        model.addAttribute("students", studentsPage.getItems());
+        model.addAttribute("studentsPage", studentsPage);
         model.addAttribute("studentIdFilter", studentId);
         model.addAttribute("userStatuses", studentService.getAvailableStatuses());
         model.addAttribute("modalStudentId", modalStudentId);

@@ -15,13 +15,12 @@
     <div class="app-nav">
         <div>
             <span class="tag-chip">Circulation Desk</span>
-            <div class="brand-title mt-2">Issue and return books</div>
+            <div class="brand-title mt-2">Issue and Return Books</div>
         </div>
         <div class="nav-links">
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/dashboard">Dashboard</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/books">Books</a>
             <a class="nav-pill active" href="${pageContext.request.contextPath}/admin/issues">Issue / Return</a>
-            <a class="nav-pill" href="${pageContext.request.contextPath}/admin/reservations">Reservations</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/students">Students</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/fines">Fines</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/reports">Reports</a>
@@ -29,7 +28,7 @@
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/profile">Profile</a>
             <form method="post" action="${pageContext.request.contextPath}/logout">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                <button class="nav-pill warm border-0" type="submit">Logout</button>
+                <button class="nav-pill warm border-0" type="submit" aria-label="Logout" title="Logout"><span class="nav-pill-icon"><i class="bi bi-power" aria-hidden="true"></i></span><span class="nav-pill-label">Logout</span></button>
             </form>
         </div>
     </div>
@@ -44,83 +43,66 @@
     <section class="stat-grid mb-4">
         <div class="metric-card">
             <div class="metric-value">${activeIssueCount}</div>
-            <div class="metric-label">Active desk records</div>
+            <div class="metric-label">Active Desk Records</div>
         </div>
         <div class="metric-card">
             <div class="metric-value">${overdueIssueCount}</div>
-            <div class="metric-label">Overdue active records</div>
+            <div class="metric-label">Overdue Active Records</div>
         </div>
         <div class="metric-card">
             <div class="metric-value">${historyCount}</div>
-            <div class="metric-label">Total circulation history</div>
+            <div class="metric-label">Total Circulation History</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">${pendingReturnRequestCount}</div>
+            <div class="metric-label">Pending Return Confirmations</div>
         </div>
         <div class="metric-card">
             <div class="metric-value">${maxLoanDays}</div>
-            <div class="metric-label">Max loan days</div>
+            <div class="metric-label">Max Loan Days</div>
         </div>
         <div class="metric-card">
             <div class="metric-value">${maxActiveLoans}</div>
-            <div class="metric-label">Max active loans per borrower</div>
+            <div class="metric-label">Max Active Loans Per Borrower</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">${reservationCount}</div>
+            <div class="metric-label">Reservation Desk Records</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">${readyReservationCount}</div>
+            <div class="metric-label">Reservations Ready To Issue</div>
         </div>
     </section>
 
-    <section class="panel-card mb-4">
-        <div class="section-title">Issue a new book</div>
-        <form method="post" action="${pageContext.request.contextPath}/admin/issues" class="row g-3">
-            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-
-            <div class="col-md-4">
-                <label class="form-label" for="bookId">Book</label>
-                <select class="form-select" id="bookId" name="bookId" required>
-                    <option value="">Select book</option>
-                    <c:forEach items="${availableBooks}" var="book">
-                        <option value="${book.id}" data-barcode="${book.barcode}" data-isbn="${book.isbn}">${book.title} (${book.availableQuantity} available)</option>
-                    </c:forEach>
-                </select>
-                <div class="d-flex flex-wrap gap-2 mt-2">
-                    <button class="btn btn-warm scanner-trigger" type="button" data-bs-toggle="modal" data-bs-target="#issueBookScannerModal">
-                        <i class="bi bi-upc-scan"></i>Scan book QR
-                    </button>
-                    <span class="form-note">Use the camera to scan the LU Librisync QR label on the book and match it directly to this circulation form.</span>
-                </div>
+    <section class="hero-card mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+            <div>
+                <span class="tag-chip">Circulation Workspace</span>
+                <h1 class="fw-bold mt-3 mb-2">Issue, Return, And Release Books</h1>
+                <p class="muted-text mb-0">Manage direct issue transactions, reservation pickup releases, and circulation history from one admin desk view.</p>
             </div>
-            <div class="col-md-4">
-                <label class="form-label" for="studentId">Student</label>
-                <select class="form-select" id="studentId" name="studentId" required>
-                    <option value="">Select student</option>
-                    <c:forEach items="${students}" var="student">
-                        <option value="${student.id}">${student.studentId} - ${student.user.name}</option>
-                    </c:forEach>
-                </select>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label" for="dueDate">Due date</label>
-                <input class="form-control" id="dueDate" name="dueDate" type="date" value="${defaultDueDate}" required>
-            </div>
-            <div class="col-12">
-                <label class="form-label" for="remarks">Remarks</label>
-                <input class="form-control" id="remarks" name="remarks" placeholder="Optional note for this issue transaction">
-                <div class="form-note mt-2">Circulation policy currently allows up to ${maxLoanDays} days per issue and ${maxActiveLoans} active loans per borrower.</div>
-            </div>
-            <div class="col-12">
-                <button class="btn btn-brand" type="submit"><i class="bi bi-box-arrow-right me-2"></i>Issue book</button>
-            </div>
-        </form>
+            <button class="btn btn-brand" type="button" data-bs-toggle="modal" data-bs-target="#issueBookFormModal">
+                <i class="bi bi-journal-plus me-2"></i>Issue A New Book
+            </button>
+        </div>
     </section>
 
     <c:if test="${not empty editIssue}">
         <section class="panel-card mb-4">
             <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
                 <div>
-                    <div class="section-title mb-2">Edit issue record</div>
+                    <div class="section-title mb-2">Edit Issue Record</div>
                     <p class="helper-copy">
                         Adjust due dates or internal remarks for an existing circulation record without deleting the transaction history.
                     </p>
                 </div>
-                <a class="action-link" href="${pageContext.request.contextPath}/admin/issues">Cancel editing</a>
+                <a class="action-link" href="${pageContext.request.contextPath}/admin/issues?activePage=${activeIssuesPage.page}&historyPage=${issueHistoryPage.page}">Cancel editing</a>
             </div>
             <form method="post" action="${pageContext.request.contextPath}/admin/issues/${editIssue.id}/update" class="row g-3">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                <input type="hidden" name="activePage" value="${activeIssuesPage.page}">
+                <input type="hidden" name="historyPage" value="${issueHistoryPage.page}">
                 <div class="col-md-6">
                     <label class="form-label">Book</label>
                     <input class="form-control" value="${editIssue.book.title}" readonly>
@@ -147,14 +129,31 @@
                 </div>
                 <div class="col-12 d-flex flex-wrap gap-2">
                     <button class="btn btn-brand" type="submit"><i class="bi bi-save2 me-2"></i>Update issue record</button>
-                    <a class="btn btn-warm" href="${pageContext.request.contextPath}/admin/issues">Back to circulation desk</a>
+                    <a class="btn btn-warm" href="${pageContext.request.contextPath}/admin/issues?activePage=${activeIssuesPage.page}&historyPage=${issueHistoryPage.page}">Back To Circulation Desk</a>
                 </div>
             </form>
         </section>
     </c:if>
 
-    <section class="panel-card mb-4">
-        <div class="section-title">Active issue records</div>
+    <section class="dashboard-tab-shell mb-4" data-issue-desk-tabs>
+        <div class="dashboard-tab-nav" role="tablist" aria-label="Issue and return sections">
+            <button class="dashboard-tab-button is-active" type="button" role="tab" aria-selected="true" aria-controls="issue-active-panel" data-issue-desk-tab-button data-issue-desk-tab-target="issue-active-panel">
+                <i class="bi bi-arrow-left-right"></i>
+                <span>Active Issue Records</span>
+            </button>
+            <button class="dashboard-tab-button" type="button" role="tab" aria-selected="false" aria-controls="issue-reservation-panel" data-issue-desk-tab-button data-issue-desk-tab-target="issue-reservation-panel">
+                <i class="bi bi-bookmark-check"></i>
+                <span>Reservation Desk Release</span>
+            </button>
+            <button class="dashboard-tab-button" type="button" role="tab" aria-selected="false" aria-controls="issue-history-panel" data-issue-desk-tab-button data-issue-desk-tab-target="issue-history-panel">
+                <i class="bi bi-clock-history"></i>
+                <span>Circulation History</span>
+            </button>
+        </div>
+    </section>
+
+    <section class="panel-card mb-4 dashboard-tab-panel is-active" id="issue-active-panel" role="tabpanel" data-issue-desk-tab-panel>
+        <div class="section-title">Active Issue Records</div>
         <div class="table-responsive">
             <table class="table align-middle">
                 <thead>
@@ -178,26 +177,43 @@
                         <td>${issue.book.title}</td>
                         <td>${issue.student.studentId} - ${issue.student.user.name}</td>
                         <td>${issue.issuedBy.name}</td>
-                        <td>${issue.issueDate}</td>
-                        <td>${issue.dueDate}</td>
-                        <td><span class="tag-chip">${issue.status}</span></td>
+                        <td>${issue.issueDateDisplay}</td>
+                        <td>${issue.dueDateDisplay}</td>
+                        <td>
+                            <div class="d-flex flex-wrap gap-2">
+                                <span class="tag-chip">${issue.status}</span>
+                                <c:if test="${issue.returnRequested}">
+                                    <span class="tag-chip warn">Return Requested</span>
+                                </c:if>
+                            </div>
+                        </td>
                         <td>${issue.fineAmount}</td>
-                        <td class="muted-text">${issue.remarks}</td>
+                        <td class="muted-text">
+                            <c:if test="${issue.returnRequested}">
+                                Student asked for desk return confirmation.
+                                <c:if test="${not empty issue.remarks}"><br></c:if>
+                            </c:if>
+                            ${issue.remarks}
+                        </td>
                         <td class="table-actions">
                             <button class="icon-action" type="button" title="View QR code" data-bs-toggle="modal" data-bs-target="#issueQrModal" data-issue-code="${issue.qrIssueCode}" data-book-title="${issue.book.title}" data-student-name="${issue.student.user.name}">
                                 <i class="bi bi-qr-code"></i>
                             </button>
-                            <a class="icon-action" href="${pageContext.request.contextPath}/admin/issues?editId=${issue.id}" title="Edit issue record">
+                            <a class="icon-action" href="${pageContext.request.contextPath}/admin/issues?editId=${issue.id}&activePage=${activeIssuesPage.page}&historyPage=${issueHistoryPage.page}" title="Edit issue record">
                                 <i class="bi bi-pencil-square"></i>
                             </a>
                             <form method="post" action="${pageContext.request.contextPath}/admin/issues/${issue.id}/return">
                                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                                <button class="icon-action" type="submit" title="Mark returned">
+                                <input type="hidden" name="activePage" value="${activeIssuesPage.page}">
+                                <input type="hidden" name="historyPage" value="${issueHistoryPage.page}">
+                                <button class="icon-action" type="submit" title="Confirm return at desk">
                                     <i class="bi bi-arrow-return-left"></i>
                                 </button>
                             </form>
                             <form method="post" action="${pageContext.request.contextPath}/admin/issues/${issue.id}/delete">
                                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                                <input type="hidden" name="activePage" value="${activeIssuesPage.page}">
+                                <input type="hidden" name="historyPage" value="${issueHistoryPage.page}">
                                 <button class="icon-action danger" type="submit" title="Delete issue record">
                                     <i class="bi bi-trash3"></i>
                                 </button>
@@ -213,10 +229,195 @@
                 </tbody>
             </table>
         </div>
+        <c:if test="${activeIssuesPage.totalPages > 1}">
+            <nav class="mt-4" aria-label="Active issue record pages">
+                <ul class="pagination justify-content-center mb-0">
+                    <li class="page-item <c:if test='${!activeIssuesPage.hasPrevious}'>disabled</c:if>">
+                        <a class="page-link" href="${pageContext.request.contextPath}/admin/issues?activePage=${activeIssuesPage.previousPage}&historyPage=${issueHistoryPage.page}<c:if test='${not empty editIssue}'>&editId=${editIssue.id}</c:if>">Previous</a>
+                    </li>
+                    <c:forEach begin="${activeIssuesPage.startPage}" end="${activeIssuesPage.endPage}" var="pageNumber">
+                        <li class="page-item <c:if test='${pageNumber == activeIssuesPage.page}'>active</c:if>">
+                            <a class="page-link" href="${pageContext.request.contextPath}/admin/issues?activePage=${pageNumber}&historyPage=${issueHistoryPage.page}<c:if test='${not empty editIssue}'>&editId=${editIssue.id}</c:if>">${pageNumber}</a>
+                        </li>
+                    </c:forEach>
+                    <li class="page-item <c:if test='${!activeIssuesPage.hasNext}'>disabled</c:if>">
+                        <a class="page-link" href="${pageContext.request.contextPath}/admin/issues?activePage=${activeIssuesPage.nextPage}&historyPage=${issueHistoryPage.page}<c:if test='${not empty editIssue}'>&editId=${editIssue.id}</c:if>">Next</a>
+                    </li>
+                </ul>
+            </nav>
+        </c:if>
     </section>
 
-    <section class="panel-card">
-        <div class="section-title">Circulation history</div>
+    <section class="panel-card mb-4 dashboard-tab-panel" id="issue-reservation-panel" role="tabpanel" data-issue-desk-tab-panel hidden>
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+            <div>
+                <div class="section-title mb-2">Reservation Desk Release</div>
+                <p class="helper-copy mb-0">Pending and ready reservations are handled here so circulation, pickup confirmation, and issue recording stay in one workspace.</p>
+            </div>
+            <button class="btn btn-warm scanner-trigger" type="button" data-bs-toggle="modal" data-bs-target="#reservationQrScannerModal">
+                <i class="bi bi-qr-code-scan me-2"></i>Scan Student Pickup QR
+            </button>
+        </div>
+
+        <div class="table-responsive mb-4">
+            <table class="table align-middle">
+                <thead>
+                <tr>
+                    <th>Book</th>
+                    <th>Student</th>
+                    <th>Status</th>
+                    <th>Requested at</th>
+                    <th>Pickup until</th>
+                    <th>Desk release</th>
+                    <th>Cancel</th>
+                </tr>
+                </thead>
+                <tbody>
+                <c:forEach items="${borrowRequests}" var="reservation">
+                    <tr>
+                        <td>${reservation.book.title}</td>
+                        <td>${reservation.student.studentId} - ${reservation.student.user.name}</td>
+                        <td><span class="tag-chip">${reservation.status}</span></td>
+                        <td>${reservation.reservedAtDisplay}</td>
+                        <td>${reservation.expiresAtDisplay}</td>
+                        <td>
+                            <c:choose>
+                                <c:when test="${reservation.status.name() == 'READY'}">
+                                    <form method="post" action="${pageContext.request.contextPath}/admin/reservations/${reservation.id}/claim" class="d-grid gap-2">
+                                        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                                        <input type="hidden" name="borrowPage" value="${borrowRequestsPage.page}">
+                                        <input type="hidden" name="queuePage" value="${queueReservationsPage.page}">
+                                        <input class="form-control form-control-sm" name="dueDate" type="date" value="${defaultDueDate}" required>
+                                        <input class="form-control form-control-sm" name="remarks" placeholder="Optional remarks">
+                                        <button class="btn btn-brand" type="submit"><i class="bi bi-box-arrow-right me-2"></i>Confirm pickup and issue</button>
+                                    </form>
+                                </c:when>
+                                <c:otherwise>
+                                    <span class="muted-text">Desk release unlocks when the reservation becomes READY.</span>
+                                </c:otherwise>
+                            </c:choose>
+                        </td>
+                        <td>
+                            <c:if test="${reservation.active}">
+                                <form method="post" action="${pageContext.request.contextPath}/admin/reservations/${reservation.id}/cancel">
+                                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                                    <input type="hidden" name="borrowPage" value="${borrowRequestsPage.page}">
+                                    <input type="hidden" name="queuePage" value="${queueReservationsPage.page}">
+                                    <button class="btn btn-warm" type="submit">Cancel</button>
+                                </form>
+                            </c:if>
+                        </td>
+                    </tr>
+                </c:forEach>
+                <c:if test="${empty borrowRequests}">
+                    <tr>
+                        <td colspan="7" class="text-center muted-text">No active borrow requests available yet.</td>
+                    </tr>
+                </c:if>
+                </tbody>
+            </table>
+        </div>
+
+        <c:if test="${borrowRequestsPage.totalPages > 1}">
+            <nav class="mb-4" aria-label="Admin borrow request pages">
+                <ul class="pagination justify-content-center mb-0">
+                    <li class="page-item <c:if test='${!borrowRequestsPage.hasPrevious}'>disabled</c:if>">
+                        <a class="page-link" href="${pageContext.request.contextPath}/admin/issues?activePage=${activeIssuesPage.page}&historyPage=${issueHistoryPage.page}&reservationBorrowPage=${borrowRequestsPage.previousPage}&reservationQueuePage=${queueReservationsPage.page}#reservation-desk">Previous</a>
+                    </li>
+                    <c:forEach begin="${borrowRequestsPage.startPage}" end="${borrowRequestsPage.endPage}" var="pageNumber">
+                        <li class="page-item <c:if test='${pageNumber == borrowRequestsPage.page}'>active</c:if>">
+                            <a class="page-link" href="${pageContext.request.contextPath}/admin/issues?activePage=${activeIssuesPage.page}&historyPage=${issueHistoryPage.page}&reservationBorrowPage=${pageNumber}&reservationQueuePage=${queueReservationsPage.page}#reservation-desk">${pageNumber}</a>
+                        </li>
+                    </c:forEach>
+                    <li class="page-item <c:if test='${!borrowRequestsPage.hasNext}'>disabled</c:if>">
+                        <a class="page-link" href="${pageContext.request.contextPath}/admin/issues?activePage=${activeIssuesPage.page}&historyPage=${issueHistoryPage.page}&reservationBorrowPage=${borrowRequestsPage.nextPage}&reservationQueuePage=${queueReservationsPage.page}#reservation-desk">Next</a>
+                    </li>
+                </ul>
+            </nav>
+        </c:if>
+
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                <tr>
+                    <th>Book</th>
+                    <th>Student</th>
+                    <th>Queue</th>
+                    <th>Status</th>
+                    <th>Reserved at</th>
+                    <th>Pickup until</th>
+                    <th>Desk release</th>
+                    <th>Cancel</th>
+                </tr>
+                </thead>
+                <tbody>
+                <c:forEach items="${queueReservations}" var="reservation">
+                    <tr>
+                        <td>${reservation.book.title}</td>
+                        <td>${reservation.student.studentId} - ${reservation.student.user.name}</td>
+                        <td>${reservation.queuePosition}</td>
+                        <td><span class="tag-chip">${reservation.status}</span></td>
+                        <td>${reservation.reservedAtDisplay}</td>
+                        <td>${reservation.expiresAtDisplay}</td>
+                        <td>
+                            <c:choose>
+                                <c:when test="${reservation.status.name() == 'READY'}">
+                                    <form method="post" action="${pageContext.request.contextPath}/admin/reservations/${reservation.id}/claim" class="d-grid gap-2">
+                                        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                                        <input type="hidden" name="borrowPage" value="${borrowRequestsPage.page}">
+                                        <input type="hidden" name="queuePage" value="${queueReservationsPage.page}">
+                                        <input class="form-control form-control-sm" name="dueDate" type="date" value="${defaultDueDate}" required>
+                                        <input class="form-control form-control-sm" name="remarks" placeholder="Optional remarks">
+                                        <button class="btn btn-brand" type="submit"><i class="bi bi-box-arrow-right me-2"></i>Confirm pickup and issue</button>
+                                    </form>
+                                </c:when>
+                                <c:otherwise>
+                                    <span class="muted-text">Desk release unlocks when the reservation becomes READY.</span>
+                                </c:otherwise>
+                            </c:choose>
+                        </td>
+                        <td>
+                            <c:if test="${reservation.active}">
+                                <form method="post" action="${pageContext.request.contextPath}/admin/reservations/${reservation.id}/cancel">
+                                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                                    <input type="hidden" name="borrowPage" value="${borrowRequestsPage.page}">
+                                    <input type="hidden" name="queuePage" value="${queueReservationsPage.page}">
+                                    <button class="btn btn-warm" type="submit">Cancel</button>
+                                </form>
+                            </c:if>
+                        </td>
+                    </tr>
+                </c:forEach>
+                <c:if test="${empty queueReservations}">
+                    <tr>
+                        <td colspan="8" class="text-center muted-text">No queue reservation records available yet.</td>
+                    </tr>
+                </c:if>
+                </tbody>
+            </table>
+        </div>
+
+        <c:if test="${queueReservationsPage.totalPages > 1}">
+            <nav class="mt-4" aria-label="Admin reservation queue pages">
+                <ul class="pagination justify-content-center mb-0">
+                    <li class="page-item <c:if test='${!queueReservationsPage.hasPrevious}'>disabled</c:if>">
+                        <a class="page-link" href="${pageContext.request.contextPath}/admin/issues?activePage=${activeIssuesPage.page}&historyPage=${issueHistoryPage.page}&reservationBorrowPage=${borrowRequestsPage.page}&reservationQueuePage=${queueReservationsPage.previousPage}#reservation-desk">Previous</a>
+                    </li>
+                    <c:forEach begin="${queueReservationsPage.startPage}" end="${queueReservationsPage.endPage}" var="pageNumber">
+                        <li class="page-item <c:if test='${pageNumber == queueReservationsPage.page}'>active</c:if>">
+                            <a class="page-link" href="${pageContext.request.contextPath}/admin/issues?activePage=${activeIssuesPage.page}&historyPage=${issueHistoryPage.page}&reservationBorrowPage=${borrowRequestsPage.page}&reservationQueuePage=${pageNumber}#reservation-desk">${pageNumber}</a>
+                        </li>
+                    </c:forEach>
+                    <li class="page-item <c:if test='${!queueReservationsPage.hasNext}'>disabled</c:if>">
+                        <a class="page-link" href="${pageContext.request.contextPath}/admin/issues?activePage=${activeIssuesPage.page}&historyPage=${issueHistoryPage.page}&reservationBorrowPage=${borrowRequestsPage.page}&reservationQueuePage=${queueReservationsPage.nextPage}#reservation-desk">Next</a>
+                    </li>
+                </ul>
+            </nav>
+        </c:if>
+    </section>
+
+    <section class="panel-card dashboard-tab-panel" id="issue-history-panel" role="tabpanel" data-issue-desk-tab-panel hidden>
+        <div class="section-title">Circulation History</div>
         <div class="table-responsive">
             <table class="table align-middle">
                 <thead>
@@ -239,9 +440,9 @@
                         <td>${issue.book.title}</td>
                         <td>${issue.student.studentId} - ${issue.student.user.name}</td>
                         <td>${issue.issuedBy.name}</td>
-                        <td>${issue.issueDate}</td>
-                        <td>${issue.dueDate}</td>
-                        <td>${issue.returnDate}</td>
+                        <td>${issue.issueDateDisplay}</td>
+                        <td>${issue.dueDateDisplay}</td>
+                        <td>${issue.returnDateDisplay}</td>
                         <td><span class="tag-chip">${issue.status}</span></td>
                         <td>${issue.fineAmount}</td>
                     </tr>
@@ -254,7 +455,84 @@
                 </tbody>
             </table>
         </div>
+        <c:if test="${issueHistoryPage.totalPages > 1}">
+            <nav class="mt-4" aria-label="Circulation history pages">
+                <ul class="pagination justify-content-center mb-0">
+                    <li class="page-item <c:if test='${!issueHistoryPage.hasPrevious}'>disabled</c:if>">
+                        <a class="page-link" href="${pageContext.request.contextPath}/admin/issues?activePage=${activeIssuesPage.page}&historyPage=${issueHistoryPage.previousPage}<c:if test='${not empty editIssue}'>&editId=${editIssue.id}</c:if>">Previous</a>
+                    </li>
+                    <c:forEach begin="${issueHistoryPage.startPage}" end="${issueHistoryPage.endPage}" var="pageNumber">
+                        <li class="page-item <c:if test='${pageNumber == issueHistoryPage.page}'>active</c:if>">
+                            <a class="page-link" href="${pageContext.request.contextPath}/admin/issues?activePage=${activeIssuesPage.page}&historyPage=${pageNumber}<c:if test='${not empty editIssue}'>&editId=${editIssue.id}</c:if>">${pageNumber}</a>
+                        </li>
+                    </c:forEach>
+                    <li class="page-item <c:if test='${!issueHistoryPage.hasNext}'>disabled</c:if>">
+                        <a class="page-link" href="${pageContext.request.contextPath}/admin/issues?activePage=${activeIssuesPage.page}&historyPage=${issueHistoryPage.nextPage}<c:if test='${not empty editIssue}'>&editId=${editIssue.id}</c:if>">Next</a>
+                    </li>
+                </ul>
+            </nav>
+        </c:if>
     </section>
+
+    <div class="modal fade" id="issueBookFormModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header modal-header-brand">
+                    <div>
+                        <span class="modal-kicker">Issue Book</span>
+                        <h2 class="h4 mb-1 mt-2">Create A New Circulation Record</h2>
+                        <p class="modal-subtitle mb-0">Choose the book and borrower, set the due date, and confirm the issue transaction from this modal.</p>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="post" action="${pageContext.request.contextPath}/admin/issues" class="row g-3">
+                    <div class="modal-body">
+                        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label" for="bookId">Book</label>
+                                <select class="form-select" id="bookId" name="bookId" required>
+                                    <option value="">Select book</option>
+                                    <c:forEach items="${availableBooks}" var="book">
+                                        <option value="${book.id}" data-barcode="${book.barcode}" data-isbn="${book.isbn}">${book.title} (${book.availableQuantity} available)</option>
+                                    </c:forEach>
+                                </select>
+                                <div class="d-flex flex-wrap gap-2 mt-2">
+                                    <button class="btn btn-warm scanner-trigger" type="button" data-bs-toggle="modal" data-bs-target="#issueBookScannerModal">
+                                        <i class="bi bi-upc-scan"></i>Scan book QR
+                                    </button>
+                                    <span class="form-note">Use the camera to scan the LU Librisync QR label on the book and match it directly to this circulation form.</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="studentId">Student</label>
+                                <select class="form-select" id="studentId" name="studentId" required>
+                                    <option value="">Select student</option>
+                                    <c:forEach items="${students}" var="student">
+                                        <option value="${student.id}">${student.studentId} - ${student.user.name}</option>
+                                    </c:forEach>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="dueDate">Due date</label>
+                                <input class="form-control" id="dueDate" name="dueDate" type="date" value="${defaultDueDate}" required>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="remarks">Remarks</label>
+                                <input class="form-control" id="remarks" name="remarks" placeholder="Optional note for this issue transaction">
+                                <div class="form-note mt-2">Circulation policy currently allows up to ${maxLoanDays} days per issue and ${maxActiveLoans} active loans per borrower.</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-warm" type="button" data-bs-dismiss="modal">Close</button>
+                        <button class="btn btn-brand" type="submit"><i class="bi bi-box-arrow-right me-2"></i>Issue Book</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <div class="modal fade" id="issueBookScannerModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -328,6 +606,54 @@
             </div>
         </div>
     </div>
+
+    <div class="modal fade" id="reservationQrScannerModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header modal-header-brand">
+                    <div>
+                        <span class="modal-kicker">Pickup Scan</span>
+                        <h2 class="h4 mb-1 mt-2">Scan A Student Reservation QR</h2>
+                        <p class="modal-subtitle mb-0">Set the due date once, then scan the student's QR so the desk release can be recorded automatically.</p>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form id="reservationQrClaimForm" method="post" action="${pageContext.request.contextPath}/admin/reservations/claim-by-qr" class="row g-3 mb-3">
+                        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                        <input type="hidden" name="borrowPage" value="${borrowRequestsPage.page}">
+                        <input type="hidden" name="queuePage" value="${queueReservationsPage.page}">
+                        <input type="hidden" name="qrCode" id="reservationQrCodeField">
+                        <div class="col-md-4">
+                            <label class="form-label" for="reservationScannerDueDate">Due date</label>
+                            <input class="form-control" id="reservationScannerDueDate" name="dueDate" type="date" value="${defaultDueDate}" required>
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label" for="reservationScannerRemarks">Remarks</label>
+                            <input class="form-control" id="reservationScannerRemarks" name="remarks" placeholder="Optional remarks for the issued copy">
+                        </div>
+                    </form>
+                    <div class="scanner-shell">
+                        <video id="reservationScannerVideo" autoplay muted playsinline></video>
+                        <div class="scanner-overlay"></div>
+                        <div class="scanner-target scanner-target-qr"></div>
+                    </div>
+                    <div class="scanner-status" id="reservationScannerStatus">
+                        Camera scanner is preparing. Hold the student pickup QR inside the highlighted frame.
+                    </div>
+                    <div class="scanner-upload">
+                        <div class="scanner-upload-actions">
+                            <label class="btn btn-warm mb-0" for="reservationScannerUpload">
+                                <i class="bi bi-image me-2"></i>Upload QR from gallery
+                            </label>
+                            <input class="d-none" id="reservationScannerUpload" type="file" accept="image/*">
+                            <span class="form-note">You can also choose a saved screenshot of the student's QR code.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -337,6 +663,46 @@
 <script src="${pageContext.request.contextPath}/js/app.js"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function () {
+        const issueBookFormModalElement = document.getElementById("issueBookFormModal");
+        if (issueBookFormModalElement) {
+            const shouldOpenIssueBookModal = ${not empty error and empty editIssue ? 'true' : 'false'};
+            if (shouldOpenIssueBookModal) {
+                bootstrap.Modal.getOrCreateInstance(issueBookFormModalElement).show();
+            }
+        }
+
+        const deskTabButtons = document.querySelectorAll("[data-issue-desk-tab-button]");
+        const deskTabPanels = document.querySelectorAll("[data-issue-desk-tab-panel]");
+
+        function activateDeskTab(targetId) {
+            Array.prototype.forEach.call(deskTabButtons, function (button) {
+                const isActive = button.getAttribute("data-issue-desk-tab-target") === targetId;
+                button.classList.toggle("is-active", isActive);
+                button.setAttribute("aria-selected", isActive ? "true" : "false");
+                button.setAttribute("tabindex", isActive ? "0" : "-1");
+            });
+
+            Array.prototype.forEach.call(deskTabPanels, function (panel) {
+                const isActive = panel.id === targetId;
+                panel.hidden = !isActive;
+                panel.classList.toggle("is-active", isActive);
+            });
+        }
+
+        Array.prototype.forEach.call(deskTabButtons, function (button) {
+            button.addEventListener("click", function () {
+                activateDeskTab(button.getAttribute("data-issue-desk-tab-target"));
+            });
+        });
+
+        if (window.location.hash === "#reservation-desk") {
+            activateDeskTab("issue-reservation-panel");
+        } else if (window.location.hash === "#circulation-history") {
+            activateDeskTab("issue-history-panel");
+        } else {
+            activateDeskTab("issue-active-panel");
+        }
+
         const scannerModalElement = document.getElementById("issueBookScannerModal");
         const bookSelectElement = document.getElementById("bookId");
         const uploadInput = document.getElementById("issueScannerUpload");
@@ -435,7 +801,65 @@
 
             window.LuLibrisyncQr.downloadCanvas(currentIssueQrCanvas, downloadIssueQrButton.dataset.filename);
         });
+
+        const reservationScannerModalElement = document.getElementById("reservationQrScannerModal");
+        const reservationScannerUploadInput = document.getElementById("reservationScannerUpload");
+        const reservationQrCodeField = document.getElementById("reservationQrCodeField");
+        const reservationClaimForm = document.getElementById("reservationQrClaimForm");
+        const reservationScanner = window.LuLibrisyncQr.createScanner({
+            videoElement: document.getElementById("reservationScannerVideo"),
+            statusElement: document.getElementById("reservationScannerStatus"),
+            formats: ["qr_code"],
+            liveMessage: "Scanner is live. Aim the camera at the student's pickup QR and hold it steady.",
+            qrFallbackMessage: "QR-only scanning is active on this browser. Aim the camera at the student's reservation QR.",
+            unsupportedMessage: "This browser cannot decode live QR codes. You can still upload a saved QR image.",
+            permissionMessage: "Camera access was blocked or unavailable. Please allow camera use, then try again.",
+            fileSuccessMessage: "QR image decoded successfully. Recording the desk release now.",
+            onDetected: submitClaimFromQr,
+            onScanError: function () {
+                window.LuLibrisyncQr.setStatus(
+                    document.getElementById("reservationScannerStatus"),
+                    "Camera access is active, but the current frame could not be decoded yet.",
+                    true
+                );
+            }
+        });
+
+        function submitClaimFromQr(rawValue) {
+            const detectedCode = (rawValue || "").trim();
+            if (!detectedCode) {
+                return;
+            }
+
+            reservationQrCodeField.value = detectedCode;
+            reservationScanner.setStatus("Reservation QR detected. Recording the pickup and issuing the book now.", false);
+            reservationScanner.stop();
+            reservationClaimForm.requestSubmit();
+        }
+
+        reservationScannerModalElement.addEventListener("shown.bs.modal", function () {
+            reservationScanner.start();
+        });
+
+        reservationScannerModalElement.addEventListener("hidden.bs.modal", function () {
+            reservationScanner.stop();
+            reservationScanner.setStatus("Camera scanner is preparing. Hold the student pickup QR inside the highlighted frame.", false);
+            reservationScannerUploadInput.value = "";
+            reservationQrCodeField.value = "";
+        });
+
+        reservationScannerUploadInput.addEventListener("change", function (event) {
+            const selectedFile = event.target.files && event.target.files[0];
+            if (!selectedFile) {
+                return;
+            }
+
+            reservationScanner.decodeFile(selectedFile);
+            reservationScannerUploadInput.value = "";
+        });
     });
 </script>
 </body>
 </html>
+
+

@@ -20,12 +20,12 @@
         <div class="nav-links">
             <a class="nav-pill active" href="${pageContext.request.contextPath}/student/dashboard">Dashboard</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/student/catalog">Catalog</a>
-            <a class="nav-pill" href="${pageContext.request.contextPath}/student/reservations">Reservations</a>
+            <a class="nav-pill" href="${pageContext.request.contextPath}/student/reservations">Pickup requests</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/student/profile">Profile</a>
-            <a class="nav-pill" href="${pageContext.request.contextPath}/student/history">Borrowing history</a>
+            <a class="nav-pill" href="${pageContext.request.contextPath}/student/history">Borrowed books</a>
             <form method="post" action="${pageContext.request.contextPath}/logout">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                <button class="nav-pill warm border-0" type="submit">Logout</button>
+                <button class="nav-pill warm border-0" type="submit" aria-label="Logout" title="Logout"><span class="nav-pill-icon"><i class="bi bi-power" aria-hidden="true"></i></span><span class="nav-pill-label">Logout</span></button>
             </form>
         </div>
     </div>
@@ -181,8 +181,8 @@
                         <c:forEach items="${issueRecords}" var="issue">
                             <tr>
                                 <td>${issue.book.title}</td>
-                                <td>${issue.issueDate}</td>
-                                <td>${issue.dueDate}</td>
+                                <td>${issue.issueDateDisplay}</td>
+                                <td>${issue.dueDateDisplay}</td>
                                 <td><span class="tag-chip">${issue.status}</span></td>
                                 <td>${issue.fineAmount}</td>
                             </tr>
@@ -268,3 +268,5 @@
 <script src="${pageContext.request.contextPath}/js/app.js"></script>
 </body>
 </html>
+
+

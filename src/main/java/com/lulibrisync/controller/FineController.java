@@ -3,6 +3,7 @@ package com.lulibrisync.controller;
 import com.lulibrisync.model.Fine;
 import com.lulibrisync.model.FineStatus;
 import com.lulibrisync.service.FineService;
+import com.lulibrisync.util.PaginationUtils;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -21,6 +22,8 @@ import java.util.Locale;
 @RequestMapping("/admin/fines")
 public class FineController {
 
+    private static final int FINE_LEDGER_PAGE_SIZE = 10;
+
     private final FineService fineService;
 
     public FineController(FineService fineService) {
@@ -30,18 +33,21 @@ public class FineController {
     @GetMapping
     public String fines(@RequestParam(required = false) FineStatus status,
                         @RequestParam(required = false) String studentKeyword,
+                        @RequestParam(defaultValue = "1") Integer page,
                         Model model) {
         List<Fine> fineRecords = fineService.getAllFines().stream()
                 .filter(fine -> status == null || fine.getStatus() == status)
                 .filter(fine -> matchesStudentFilter(fine, studentKeyword))
                 .toList();
+        var finesPage = PaginationUtils.paginate(fineRecords, page, FINE_LEDGER_PAGE_SIZE);
 
         BigDecimal filteredOutstandingTotal = fineRecords.stream()
                 .filter(fine -> FineStatus.UNPAID.equals(fine.getStatus()))
                 .map(Fine::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        model.addAttribute("fines", fineRecords);
+        model.addAttribute("fines", finesPage.getItems());
+        model.addAttribute("finesPage", finesPage);
         model.addAttribute("selectedStatus", status);
         model.addAttribute("studentKeyword", studentKeyword);
         model.addAttribute("fineStatuses", FineStatus.values());
@@ -58,6 +64,9 @@ public class FineController {
 
     @PostMapping("/{fineId}/pay")
     public String markFinePaid(@PathVariable Long fineId,
+                               @RequestParam(defaultValue = "1") Integer page,
+                               @RequestParam(required = false) FineStatus status,
+                               @RequestParam(required = false) String studentKeyword,
                                Authentication authentication,
                                RedirectAttributes redirectAttributes) {
         try {
@@ -66,11 +75,14 @@ public class FineController {
         } catch (IllegalArgumentException exception) {
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
         }
-        return "redirect:/admin/fines";
+        return buildFineRedirect(page, status, studentKeyword);
     }
 
     @PostMapping("/{fineId}/waive")
     public String waiveFine(@PathVariable Long fineId,
+                            @RequestParam(defaultValue = "1") Integer page,
+                            @RequestParam(required = false) FineStatus status,
+                            @RequestParam(required = false) String studentKeyword,
                             Authentication authentication,
                             RedirectAttributes redirectAttributes) {
         try {
@@ -79,7 +91,7 @@ public class FineController {
         } catch (IllegalArgumentException exception) {
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
         }
-        return "redirect:/admin/fines";
+        return buildFineRedirect(page, status, studentKeyword);
     }
 
     private boolean matchesStudentFilter(Fine fine, String studentKeyword) {
@@ -91,5 +103,17 @@ public class FineController {
         return fine.getStudent().getStudentId().toLowerCase(Locale.ENGLISH).contains(normalizedKeyword)
                 || fine.getStudent().getUser().getName().toLowerCase(Locale.ENGLISH).contains(normalizedKeyword)
                 || fine.getStudent().getUser().getEmail().toLowerCase(Locale.ENGLISH).contains(normalizedKeyword);
+    }
+
+    private String buildFineRedirect(Integer page, FineStatus status, String studentKeyword) {
+        StringBuilder redirect = new StringBuilder("redirect:/admin/fines?page=")
+                .append(page == null ? 1 : Math.max(1, page));
+        if (status != null) {
+            redirect.append("&status=").append(status.name());
+        }
+        if (studentKeyword != null && !studentKeyword.isBlank()) {
+            redirect.append("&studentKeyword=").append(studentKeyword.trim());
+        }
+        return redirect.toString();
     }
 }

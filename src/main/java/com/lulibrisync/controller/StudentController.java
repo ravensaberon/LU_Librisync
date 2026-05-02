@@ -1,7 +1,12 @@
 package com.lulibrisync.controller;
 
+<<<<<<< HEAD
 import com.lulibrisync.dto.StudentPasswordOtpDispatchResult;
 import com.lulibrisync.dto.StudentPasswordOtpState;
+=======
+import com.lulibrisync.dto.PasswordResetOtpDispatchResult;
+import com.lulibrisync.dto.PasswordResetOtpState;
+>>>>>>> 68cfa95363c4194ddda2068f525c4fb2c549a372
 import com.lulibrisync.dto.StudentProfileOtpDispatchResult;
 import com.lulibrisync.dto.StudentProfileOtpState;
 import com.lulibrisync.dto.StudentProfileUpdateRequest;
@@ -11,14 +16,17 @@ import com.lulibrisync.model.Student;
 import com.lulibrisync.service.AuthService;
 import com.lulibrisync.service.FineService;
 import com.lulibrisync.service.IssueService;
+import com.lulibrisync.service.PasswordResetService;
 import com.lulibrisync.service.ReservationService;
 import com.lulibrisync.service.StudentProfileImageService;
 import com.lulibrisync.service.StudentProfileOtpService;
 import com.lulibrisync.service.StudentPasswordChangeOtpService;
 import com.lulibrisync.service.StudentService;
+import com.lulibrisync.util.PaginationUtils;
 import org.springframework.core.io.Resource;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.Authentication;
@@ -27,23 +35,37 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.servlet.http.HttpSession;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 @Controller
 public class StudentController {
 
+    private static final int STUDENT_ACTIVE_HISTORY_PAGE_SIZE = 8;
+    private static final int STUDENT_HISTORY_PAGE_SIZE = 10;
+    private static final int STUDENT_RETURN_REQUESTS_PAGE_SIZE = 8;
+    private static final int STUDENT_RETURNED_HISTORY_PAGE_SIZE = 10;
+    private static final String PASSWORD_RESET_VERIFIED_TOKEN_SESSION_KEY = "studentPasswordResetVerifiedTokenId";
+
     private final StudentService studentService;
     private final IssueService issueService;
     private final ReservationService reservationService;
     private final StudentProfileOtpService studentProfileOtpService;
+<<<<<<< HEAD
     private final StudentPasswordChangeOtpService studentPasswordChangeOtpService;
+=======
+    private final PasswordResetService passwordResetService;
+>>>>>>> 68cfa95363c4194ddda2068f525c4fb2c549a372
     private final FineService fineService;
     private final StudentProfileImageService studentProfileImageService;
     private final AuthService authService;
@@ -52,7 +74,11 @@ public class StudentController {
                              IssueService issueService,
                              ReservationService reservationService,
                              StudentProfileOtpService studentProfileOtpService,
+<<<<<<< HEAD
                              StudentPasswordChangeOtpService studentPasswordChangeOtpService,
+=======
+                             PasswordResetService passwordResetService,
+>>>>>>> 68cfa95363c4194ddda2068f525c4fb2c549a372
                              FineService fineService,
                              StudentProfileImageService studentProfileImageService,
                              AuthService authService) {
@@ -60,7 +86,11 @@ public class StudentController {
         this.issueService = issueService;
         this.reservationService = reservationService;
         this.studentProfileOtpService = studentProfileOtpService;
+<<<<<<< HEAD
         this.studentPasswordChangeOtpService = studentPasswordChangeOtpService;
+=======
+        this.passwordResetService = passwordResetService;
+>>>>>>> 68cfa95363c4194ddda2068f525c4fb2c549a372
         this.fineService = fineService;
         this.studentProfileImageService = studentProfileImageService;
         this.authService = authService;
@@ -221,6 +251,7 @@ public class StudentController {
         return "redirect:/student/profile";
     }
 
+<<<<<<< HEAD
     @PostMapping("/student/profile/password/request-otp")
     public String requestPasswordChangeOtp(Authentication authentication,
                                            @RequestParam String currentPassword,
@@ -291,21 +322,151 @@ public class StudentController {
                     && latestOtpState.getExpiresAt().isAfter(LocalDateTime.now());
             redirectAttributes.addFlashAttribute("openPasswordOtpPanel", hasActiveOtp);
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
+=======
+    @GetMapping("/student/password/state")
+    @ResponseBody
+    public Map<String, Object> studentPasswordState(Authentication authentication,
+                                                    HttpSession session) {
+        Student student = studentService.getStudentByEmail(authentication.getName());
+        PasswordResetOtpState otpState = passwordResetService.getActiveOtpState(student.getUser().getEmail());
+        return buildPasswordStateResponse(otpState, isPasswordOtpVerified(session));
+    }
+
+    @PostMapping("/student/password/request-otp")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> requestStudentPasswordOtp(Authentication authentication,
+                                                                         HttpSession session) {
+        Student student = studentService.getStudentByEmail(authentication.getName());
+        clearPasswordOtpVerification(session);
+        try {
+            PasswordResetOtpDispatchResult dispatchResult = passwordResetService.requestOtp(student.getUser().getEmail());
+            Map<String, Object> response = buildPasswordStateResponse(dispatchResult.getOtpState(), false);
+            response.put("success", true);
+            if (dispatchResult.isCooldownActive()) {
+                response.put("message", "Please wait before requesting another OTP.");
+            } else if (dispatchResult.isDelivered()) {
+                response.put("message", "An OTP has been sent to your registered email.");
+            } else {
+                response.put("message", "Unable to send OTP email right now.");
+            }
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException exception) {
+            return buildPasswordErrorResponse(exception.getMessage(), HttpStatus.BAD_REQUEST);
         }
-        return "redirect:/student/profile#password-security";
+    }
+
+    @PostMapping("/student/password/resend-otp")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> resendStudentPasswordOtp(Authentication authentication,
+                                                                        HttpSession session) {
+        Student student = studentService.getStudentByEmail(authentication.getName());
+        clearPasswordOtpVerification(session);
+        try {
+            PasswordResetOtpDispatchResult dispatchResult = passwordResetService.resendOtp(student.getUser().getEmail());
+            Map<String, Object> response = buildPasswordStateResponse(dispatchResult.getOtpState(), false);
+            response.put("success", true);
+            if (dispatchResult.isCooldownActive()) {
+                response.put("message", "Please wait before requesting another OTP.");
+            } else if (dispatchResult.isDelivered()) {
+                response.put("message", "A new OTP has been sent to your registered email.");
+            } else {
+                response.put("message", "Unable to send OTP email right now.");
+            }
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException exception) {
+            return buildPasswordErrorResponse(exception.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @PostMapping("/student/password/verify-otp")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> verifyStudentPasswordOtp(Authentication authentication,
+                                                                        @RequestParam(required = false) String otpCode,
+                                                                        HttpSession session) {
+        Student student = studentService.getStudentByEmail(authentication.getName());
+        try {
+            Long verifiedTokenId = passwordResetService.verifyOtp(student.getUser().getEmail(), otpCode);
+            session.setAttribute(PASSWORD_RESET_VERIFIED_TOKEN_SESSION_KEY, verifiedTokenId);
+            PasswordResetOtpState otpState = passwordResetService.getActiveOtpState(student.getUser().getEmail());
+            Map<String, Object> response = buildPasswordStateResponse(otpState, true);
+            response.put("success", true);
+            response.put("message", "OTP verified. You can now set a new password.");
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException exception) {
+            clearPasswordOtpVerification(session);
+            return buildPasswordErrorResponse(exception.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @PostMapping("/student/password/update")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> updateStudentPassword(Authentication authentication,
+                                                                     @RequestParam(required = false) String newPassword,
+                                                                     @RequestParam(required = false) String confirmPassword,
+                                                                     HttpSession session) {
+        Student student = studentService.getStudentByEmail(authentication.getName());
+        try {
+            passwordResetService.updatePasswordWithVerifiedOtp(
+                    student.getUser().getEmail(),
+                    getVerifiedPasswordTokenId(session),
+                    newPassword,
+                    confirmPassword
+            );
+            clearPasswordOtpVerification(session);
+            Map<String, Object> response = buildPasswordStateResponse(null, false);
+            response.put("success", true);
+            response.put("message", "Password changed successfully.");
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException exception) {
+            return buildPasswordErrorResponse(exception.getMessage(), HttpStatus.BAD_REQUEST);
+>>>>>>> 68cfa95363c4194ddda2068f525c4fb2c549a372
+        }
     }
 
     @GetMapping("/student/history")
-    public String history(Authentication authentication, Model model) {
+    public String history(Authentication authentication,
+                          @RequestParam(defaultValue = "all") String tab,
+                          @RequestParam(defaultValue = "1") Integer activePage,
+                          @RequestParam(defaultValue = "1") Integer historyPage,
+                          @RequestParam(defaultValue = "1") Integer requestPage,
+                          @RequestParam(defaultValue = "1") Integer returnedPage,
+                          Model model) {
         Student student = studentService.getStudentByEmail(authentication.getName());
         List<IssueRecord> issueRecords = issueService.getStudentIssues(authentication.getName());
+        List<IssueRecord> activeIssues = issueRecords.stream()
+                .filter(record -> !record.isReturned())
+                .toList();
+        List<IssueRecord> returnRequestIssues = issueRecords.stream()
+                .filter(IssueRecord::isReturnRequested)
+                .toList();
+        List<IssueRecord> returnedIssues = issueRecords.stream()
+                .filter(IssueRecord::isReturned)
+                .toList();
+        var activeIssuesPage = PaginationUtils.paginate(activeIssues, activePage, STUDENT_ACTIVE_HISTORY_PAGE_SIZE);
+        var historyIssuesPage = PaginationUtils.paginate(issueRecords, historyPage, STUDENT_HISTORY_PAGE_SIZE);
+        var returnRequestIssuesPage = PaginationUtils.paginate(returnRequestIssues, requestPage, STUDENT_RETURN_REQUESTS_PAGE_SIZE);
+        var returnedIssuesPage = PaginationUtils.paginate(returnedIssues, returnedPage, STUDENT_RETURNED_HISTORY_PAGE_SIZE);
         model.addAttribute("student", student);
-        model.addAttribute("issueRecords", issueRecords);
+        model.addAttribute("activeIssues", activeIssuesPage.getItems());
+        model.addAttribute("activeIssuesPage", activeIssuesPage);
+        model.addAttribute("historyIssues", historyIssuesPage.getItems());
+        model.addAttribute("historyIssuesPage", historyIssuesPage);
+        model.addAttribute("returnRequestIssues", returnRequestIssuesPage.getItems());
+        model.addAttribute("returnRequestIssuesPage", returnRequestIssuesPage);
+        model.addAttribute("returnedIssues", returnedIssuesPage.getItems());
+        model.addAttribute("returnedIssuesPage", returnedIssuesPage);
         model.addAttribute("borrowerStanding", studentService.getBorrowerStanding(student));
         model.addAttribute("outstandingFineTotal", fineService.getOutstandingFineTotalByStudent(student.getId()));
-        model.addAttribute("activeCount", issueRecords.stream().filter(record -> !record.isReturned()).count());
+        model.addAttribute("activeCount", activeIssues.size());
         model.addAttribute("overdueCount", issueRecords.stream().filter(record -> IssueStatus.OVERDUE.equals(record.getStatus())).count());
+        model.addAttribute("returnRequestCount", returnRequestIssues.size());
+        model.addAttribute("returnedCount", returnedIssues.size());
         model.addAttribute("reservationCount", reservationService.getStudentReservations(authentication.getName()).stream().filter(reservation -> reservation.isActive()).count());
+        String normalizedTab = switch (tab == null ? "" : tab.toLowerCase()) {
+            case "current", "requests", "returned", "all" -> tab.toLowerCase();
+            default -> "all";
+        };
+        model.addAttribute("activeTab", normalizedTab);
         return "student/history";
     }
 
@@ -477,5 +638,43 @@ public class StudentController {
         return authentication != null
                 && authentication.getAuthorities().stream()
                 .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
+    }
+
+    private Map<String, Object> buildPasswordStateResponse(PasswordResetOtpState otpState,
+                                                           boolean verified) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("hasPendingOtp", otpState != null);
+        response.put("verified", verified);
+        response.put("maskedEmail", otpState == null ? null : otpState.getMaskedEmail());
+        response.put("expiresAtEpochMs", toEpochMillis(otpState == null ? null : otpState.getExpiresAt()));
+        response.put("resendAvailableAtEpochMs", toEpochMillis(otpState == null ? null : otpState.getResendAvailableAt()));
+        return response;
+    }
+
+    private ResponseEntity<Map<String, Object>> buildPasswordErrorResponse(String message,
+                                                                           HttpStatus status) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("success", false);
+        response.put("message", message);
+        return ResponseEntity.status(status).body(response);
+    }
+
+    private void clearPasswordOtpVerification(HttpSession session) {
+        session.removeAttribute(PASSWORD_RESET_VERIFIED_TOKEN_SESSION_KEY);
+    }
+
+    private boolean isPasswordOtpVerified(HttpSession session) {
+        return getVerifiedPasswordTokenId(session) != null;
+    }
+
+    private Long getVerifiedPasswordTokenId(HttpSession session) {
+        Object value = session.getAttribute(PASSWORD_RESET_VERIFIED_TOKEN_SESSION_KEY);
+        if (value instanceof Long longValue) {
+            return longValue;
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        return null;
     }
 }

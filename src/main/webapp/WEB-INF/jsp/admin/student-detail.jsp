@@ -27,7 +27,7 @@
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/profile">Profile</a>
             <form method="post" action="${pageContext.request.contextPath}/logout">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                <button class="nav-pill warm border-0" type="submit">Logout</button>
+                <button class="nav-pill warm border-0" type="submit" aria-label="Logout" title="Logout"><span class="nav-pill-icon"><i class="bi bi-power" aria-hidden="true"></i></span><span class="nav-pill-label">Logout</span></button>
             </form>
         </div>
     </div>
@@ -70,7 +70,7 @@
         </div>
         <div class="info-tile">
             <span class="info-tile-label">Date of Birth</span>
-            <span class="info-tile-value">${student.dateOfBirth}</span>
+            <span class="info-tile-value">${student.dateOfBirthDisplay}</span>
         </div>
         <div class="info-tile">
             <span class="info-tile-label">Account Status</span>
@@ -255,8 +255,8 @@
                         <tr>
                             <td>${issue.book.title}</td>
                             <td>${issue.qrIssueCode}</td>
-                            <td>${issue.issueDate}</td>
-                            <td>${issue.dueDate}</td>
+                            <td>${issue.issueDateDisplay}</td>
+                            <td>${issue.dueDateDisplay}</td>
                             <td><span class="tag-chip">${issue.status}</span></td>
                             <td>${issue.fineAmount}</td>
                         </tr>
@@ -316,9 +316,9 @@
                         <td>${issue.book.title}</td>
                         <td>${issue.qrIssueCode}</td>
                         <td>${issue.issuedBy.name}</td>
-                        <td>${issue.issueDate}</td>
-                        <td>${issue.dueDate}</td>
-                        <td>${issue.returnDate}</td>
+                        <td>${issue.issueDateDisplay}</td>
+                        <td>${issue.dueDateDisplay}</td>
+                        <td>${issue.returnDateDisplay}</td>
                         <td><span class="tag-chip">${issue.status}</span></td>
                         <td>${issue.fineAmount}</td>
                     </tr>
@@ -356,3 +356,5 @@
 </script>
 </body>
 </html>
+
+

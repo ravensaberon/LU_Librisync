@@ -14,6 +14,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
+import com.lulibrisync.util.DisplayFormatUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -49,6 +50,9 @@ public class IssueRecord {
 
     @Column(name = "return_date")
     private LocalDateTime returnDate;
+
+    @Column(name = "return_requested_at")
+    private LocalDateTime returnRequestedAt;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -87,6 +91,11 @@ public class IssueRecord {
     @Transient
     public boolean isReturned() {
         return IssueStatus.RETURNED.equals(status);
+    }
+
+    @Transient
+    public boolean isReturnRequested() {
+        return returnRequestedAt != null && !isReturned();
     }
 
     public Long getId() {
@@ -137,6 +146,10 @@ public class IssueRecord {
         this.issueDate = issueDate;
     }
 
+    public String getIssueDateDisplay() {
+        return DisplayFormatUtils.formatDateTime(issueDate);
+    }
+
     public LocalDateTime getDueDate() {
         return dueDate;
     }
@@ -145,12 +158,28 @@ public class IssueRecord {
         this.dueDate = dueDate;
     }
 
+    public String getDueDateDisplay() {
+        return DisplayFormatUtils.formatDateTime(dueDate);
+    }
+
     public LocalDateTime getReturnDate() {
         return returnDate;
     }
 
     public void setReturnDate(LocalDateTime returnDate) {
         this.returnDate = returnDate;
+    }
+
+    public String getReturnDateDisplay() {
+        return DisplayFormatUtils.formatDateTime(returnDate);
+    }
+
+    public LocalDateTime getReturnRequestedAt() {
+        return returnRequestedAt;
+    }
+
+    public void setReturnRequestedAt(LocalDateTime returnRequestedAt) {
+        this.returnRequestedAt = returnRequestedAt;
     }
 
     public IssueStatus getStatus() {

@@ -269,10 +269,10 @@ window.LuLibrisyncAddress = (function () {
     if (navBrand) {
         navBrand.classList.add("app-nav-brand");
     }
-
+    normalizeNavigationOrder(navLinks);
     enhanceNavigationLinks(navLinks);
 
-    var shellMeta = buildShellMeta(navBrand, profileLink);
+    var shellMeta = buildShellMeta(navBrand, profileLink, navLinks, logoutForm);
     var topbar = buildTopbar(shellMeta);
     var navBackdrop = document.createElement("button");
     navBackdrop.type = "button";
@@ -383,14 +383,17 @@ window.LuLibrisyncAddress = (function () {
 
     syncSidebarState();
 
-    function buildShellMeta(brand, currentProfileLink) {
+    function buildShellMeta(brand, currentProfileLink, currentNavLinks, currentLogoutForm) {
         var kicker = brand ? getTextContent(brand.querySelector(".tag-chip")) : "";
         var title = brand ? getTextContent(brand.querySelector(".brand-title")) : "";
+        var activeNavLink = currentNavLinks ? currentNavLinks.querySelector(".nav-pill.active .nav-pill-label, .nav-pill.active") : null;
         var isStudent = currentProfileLink.getAttribute("href").indexOf("/student/") !== -1;
+        var csrfInput = currentLogoutForm ? currentLogoutForm.querySelector('input[type="hidden"]') : null;
+        var baseHref = currentProfileLink.getAttribute("href").replace(/\/profile(?:#.*)?$/, "");
 
         return {
             kicker: kicker || (isStudent ? "Student Portal" : "Admin Console"),
-            title: title || document.title,
+            title: "LU Librisync",
             accountLabel: isStudent ? "Student menu" : "Admin menu",
             accountSubtitle: "Profile, security, and session",
             accountInitial: isStudent ? "S" : "A",
@@ -398,7 +401,14 @@ window.LuLibrisyncAddress = (function () {
             logoUrl: resolveAssetUrl("/assets/images/logo.png"),
             avatarUrl: isStudent ? currentProfileLink.getAttribute("href") + "/avatar?v=" + Date.now() : "",
             profileHref: currentProfileLink.getAttribute("href"),
-            passwordHref: currentProfileLink.getAttribute("href") + "#password-security"
+            passwordHref: currentProfileLink.getAttribute("href"),
+            passwordStateHref: baseHref + "/password/state",
+            passwordRequestOtpHref: baseHref + "/password/request-otp",
+            passwordResendOtpHref: baseHref + "/password/resend-otp",
+            passwordVerifyOtpHref: baseHref + "/password/verify-otp",
+            passwordUpdateHref: baseHref + "/password/update",
+            csrfParamName: csrfInput ? csrfInput.getAttribute("name") : "",
+            csrfToken: csrfInput ? csrfInput.value : ""
         };
     }
 
@@ -534,7 +544,11 @@ window.LuLibrisyncAddress = (function () {
         var list = document.createElement("div");
         list.className = "shell-panel-list";
         list.appendChild(createActionLink("profile", "View profile", "Open your account details page.", meta.profileHref));
-        list.appendChild(createActionLink("shield", "Change password", "Manage your password and account security.", meta.passwordHref));
+        if (meta.isStudent) {
+            list.appendChild(createPasswordAction(meta));
+        } else {
+            list.appendChild(createActionLink("shield", "Change password", "Manage your password and account security.", meta.passwordHref));
+        }
         list.appendChild(createLogoutAction(currentLogoutForm));
 
         panel.appendChild(list);
@@ -617,6 +631,295 @@ window.LuLibrisyncAddress = (function () {
         return link;
     }
 
+    function createPasswordAction(meta) {
+        var button = document.createElement("button");
+        button.type = "button";
+        button.className = "shell-panel-item shell-panel-button";
+        button.appendChild(createPanelIcon("shield"));
+
+        var copy = document.createElement("span");
+        copy.className = "shell-panel-item-copy";
+
+        var heading = document.createElement("strong");
+        heading.textContent = "Change password";
+
+        var note = document.createElement("span");
+        note.textContent = "Verify with OTP before setting a new password.";
+
+        copy.appendChild(heading);
+        copy.appendChild(note);
+        button.appendChild(copy);
+        button.addEventListener("click", function () {
+            openStudentPasswordModal(meta);
+        });
+        return button;
+    }
+
+    function openStudentPasswordModal(meta) {
+        closePanels();
+
+        if (!window.Swal || typeof window.Swal.fire !== "function") {
+            window.location.href = meta.passwordHref;
+            return;
+        }
+
+        var state = {
+            hasPendingOtp: false,
+            verified: false,
+            maskedEmail: "",
+            expiresAtEpochMs: null,
+            resendAvailableAtEpochMs: null,
+            message: "",
+            messageType: "info"
+        };
+        var countdownTimer = null;
+
+        function formatCountdown(targetEpochMs) {
+            if (!targetEpochMs) {
+                return "not active";
+            }
+
+            var remainingMs = targetEpochMs - Date.now();
+            if (remainingMs <= 0) {
+                return "00:00";
+            }
+
+            var totalSeconds = Math.floor(remainingMs / 1000);
+            var minutes = Math.floor(totalSeconds / 60);
+            var seconds = totalSeconds % 60;
+            return String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0");
+        }
+
+        function mergeState(nextState) {
+            state.hasPendingOtp = !!nextState.hasPendingOtp;
+            state.verified = !!nextState.verified;
+            state.maskedEmail = nextState.maskedEmail || "";
+            state.expiresAtEpochMs = nextState.expiresAtEpochMs || null;
+            state.resendAvailableAtEpochMs = nextState.resendAvailableAtEpochMs || null;
+        }
+
+        function render() {
+            var container = document.getElementById("studentPasswordFlow");
+            if (!container) {
+                return;
+            }
+
+            var alertMarkup = "";
+            if (state.message) {
+                alertMarkup = '<div class="alert alert-' + state.messageType + ' mb-3">' + escapeHtml(state.message) + "</div>";
+            }
+
+            var otpPanelMarkup = "";
+            if (state.hasPendingOtp || state.verified) {
+                otpPanelMarkup =
+                    '<div class="otp-panel mb-3">' +
+                    '  <div class="otp-panel-icon">' + getShellIcon("shield") + "</div>" +
+                    "  <div>" +
+                    "    <strong>" + escapeHtml(state.maskedEmail || "Registered email") + "</strong>" +
+                    '    <div class="small muted-text">' +
+                    '      OTP expires in <strong id="studentPasswordOtpExpiry">calculating...</strong>' +
+                    '      <span class="mx-1">|</span>' +
+                    '      New OTP in <strong id="studentPasswordOtpResend">calculating...</strong>' +
+                    "    </div>" +
+                    "  </div>" +
+                    "</div>";
+            }
+
+            var otpInputMarkup = "";
+            if (state.hasPendingOtp && !state.verified) {
+                otpInputMarkup =
+                    '<div class="mb-3">' +
+                    '  <label class="form-label" for="studentPasswordOtpCode">6-digit OTP</label>' +
+                    '  <input class="form-control form-control-lg otp-input" id="studentPasswordOtpCode" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" placeholder="Enter OTP">' +
+                    "</div>" +
+                    '<div class="d-flex flex-wrap gap-2 mb-3">' +
+                    '  <button class="btn btn-brand" type="button" id="studentPasswordVerifyOtpButton">Verify OTP</button>' +
+                    '  <button class="btn btn-warm" type="button" id="studentPasswordResendOtpButton">Resend OTP</button>' +
+                    "</div>";
+            }
+
+            var passwordFormMarkup = "";
+            if (state.verified) {
+                passwordFormMarkup =
+                    '<div class="mb-3">' +
+                    '  <label class="form-label" for="studentPasswordNew">New password</label>' +
+                    '  <input class="form-control form-control-lg" id="studentPasswordNew" type="password" placeholder="Enter new password">' +
+                    "</div>" +
+                    '<div class="mb-3">' +
+                    '  <label class="form-label" for="studentPasswordConfirm">Confirm new password</label>' +
+                    '  <input class="form-control form-control-lg" id="studentPasswordConfirm" type="password" placeholder="Confirm new password">' +
+                    "</div>" +
+                    '<button class="btn btn-brand w-100" type="button" id="studentPasswordUpdateButton">Update password</button>';
+            }
+
+            var requestButtonMarkup = "";
+            if (!state.hasPendingOtp && !state.verified) {
+                requestButtonMarkup = '<button class="btn btn-brand w-100" type="button" id="studentPasswordRequestOtpButton">Send OTP</button>';
+            }
+
+            container.innerHTML =
+                '<p class="muted-text mb-3">For security, we will send an OTP to your registered email before allowing a password change.</p>' +
+                alertMarkup +
+                otpPanelMarkup +
+                otpInputMarkup +
+                passwordFormMarkup +
+                requestButtonMarkup;
+
+            bindPasswordModalActions(meta);
+            updatePasswordModalCountdowns();
+        }
+
+        function updatePasswordModalCountdowns() {
+            var expiryLabel = document.getElementById("studentPasswordOtpExpiry");
+            var resendLabel = document.getElementById("studentPasswordOtpResend");
+            var resendButton = document.getElementById("studentPasswordResendOtpButton");
+
+            if (expiryLabel) {
+                expiryLabel.textContent = formatCountdown(state.expiresAtEpochMs);
+            }
+            if (resendLabel) {
+                resendLabel.textContent = formatCountdown(state.resendAvailableAtEpochMs);
+            }
+            if (resendButton) {
+                resendButton.disabled = !!(state.resendAvailableAtEpochMs && state.resendAvailableAtEpochMs > Date.now());
+            }
+        }
+
+        function bindPasswordModalActions(currentMeta) {
+            var requestButton = document.getElementById("studentPasswordRequestOtpButton");
+            var resendButton = document.getElementById("studentPasswordResendOtpButton");
+            var verifyButton = document.getElementById("studentPasswordVerifyOtpButton");
+            var updateButton = document.getElementById("studentPasswordUpdateButton");
+
+            if (requestButton) {
+                requestButton.addEventListener("click", function () {
+                    postPasswordAction(currentMeta.passwordRequestOtpHref, {});
+                });
+            }
+            if (resendButton) {
+                resendButton.addEventListener("click", function () {
+                    postPasswordAction(currentMeta.passwordResendOtpHref, {});
+                });
+            }
+            if (verifyButton) {
+                verifyButton.addEventListener("click", function () {
+                    postPasswordAction(currentMeta.passwordVerifyOtpHref, {
+                        otpCode: document.getElementById("studentPasswordOtpCode").value
+                    });
+                });
+            }
+            if (updateButton) {
+                updateButton.addEventListener("click", function () {
+                    postPasswordAction(currentMeta.passwordUpdateHref, {
+                        newPassword: document.getElementById("studentPasswordNew").value,
+                        confirmPassword: document.getElementById("studentPasswordConfirm").value
+                    }, true);
+                });
+            }
+        }
+
+        function escapeHtml(value) {
+            return String(value || "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        function requestPasswordState() {
+            return fetch(meta.passwordStateHref, {
+                headers: {
+                    "Accept": "application/json"
+                },
+                credentials: "same-origin"
+            }).then(function (response) {
+                if (!response.ok) {
+                    throw new Error("Unable to load password change status.");
+                }
+                return response.json();
+            });
+        }
+
+        function postPasswordAction(url, payload, closeOnSuccess) {
+            var body = new URLSearchParams();
+            if (meta.csrfParamName && meta.csrfToken) {
+                body.append(meta.csrfParamName, meta.csrfToken);
+            }
+            Object.keys(payload || {}).forEach(function (key) {
+                body.append(key, payload[key] == null ? "" : payload[key]);
+            });
+
+            return fetch(url, {
+                method: "POST",
+                headers: {
+                    "Accept": "application/json",
+                    "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
+                },
+                credentials: "same-origin",
+                body: body.toString()
+            })
+                .then(function (response) {
+                    return response.json().catch(function () {
+                        return {};
+                    }).then(function (json) {
+                        if (!response.ok || json.success === false) {
+                            throw new Error(json.message || "Unable to complete this action.");
+                        }
+                        return json;
+                    });
+                })
+                .then(function (json) {
+                    mergeState(json);
+                    state.message = json.message || "";
+                    state.messageType = closeOnSuccess ? "success" : "info";
+                    render();
+
+                    if (closeOnSuccess) {
+                        window.Swal.close();
+                        window.Swal.fire({
+                            icon: "success",
+                            title: "Password updated",
+                            text: json.message || "Password changed successfully.",
+                            confirmButtonColor: "#0f7f34"
+                        });
+                    }
+                })
+                .catch(function (error) {
+                    state.message = error.message || "Unable to complete this action.";
+                    state.messageType = "danger";
+                    render();
+                });
+        }
+
+        window.Swal.fire({
+            title: "Change password",
+            html: '<div id="studentPasswordFlow" class="text-start"></div>',
+            showConfirmButton: false,
+            showCloseButton: true,
+            width: "42rem",
+            didOpen: function () {
+                requestPasswordState()
+                    .then(function (json) {
+                        mergeState(json);
+                        render();
+                    })
+                    .catch(function (error) {
+                        state.message = error.message || "Unable to load password change status.";
+                        state.messageType = "danger";
+                        render();
+                    });
+
+                countdownTimer = window.setInterval(updatePasswordModalCountdowns, 1000);
+            },
+            willClose: function () {
+                if (countdownTimer) {
+                    window.clearInterval(countdownTimer);
+                }
+            }
+        });
+    }
+
     function createLogoutAction(currentLogoutForm) {
         var form = document.createElement("form");
         form.method = (currentLogoutForm.getAttribute("method") || "post").toLowerCase();
@@ -676,6 +979,22 @@ window.LuLibrisyncAddress = (function () {
             item.appendChild(icon);
             item.appendChild(text);
         });
+    }
+
+    function normalizeNavigationOrder(container) {
+        if (!container) {
+            return;
+        }
+
+        var profileLink = container.querySelector('a[href*="/profile"]');
+        var logoutForm = container.querySelector('form[action*="/logout"]');
+
+        if (profileLink) {
+            container.appendChild(profileLink);
+        }
+        if (logoutForm) {
+            container.appendChild(logoutForm);
+        }
     }
 
     function resolveNavIcon(item) {
@@ -777,7 +1096,7 @@ window.LuLibrisyncAddress = (function () {
             history: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"></path><path d="M3.05 13A9 9 0 1 0 6 6.3L3 8"></path><path d="M12 7v5l4 2"></path></svg>',
             profile: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 0 0-16 0"></path><circle cx="12" cy="8" r="4"></circle></svg>',
             shield: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>',
-            logout: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="m16 17 5-5-5-5"></path><path d="M21 12H9"></path></svg>',
+            logout: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10"></path><path d="M18.36 5.64a9 9 0 1 1-12.72 0"></path></svg>',
             alert: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"></path><path d="M12 17h.01"></path><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path></svg>',
             check: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m20 6-11 11-5-5"></path></svg>'
         };

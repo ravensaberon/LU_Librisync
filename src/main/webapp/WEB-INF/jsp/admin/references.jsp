@@ -21,7 +21,6 @@
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/dashboard">Dashboard</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/books">Books</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/issues">Issue / Return</a>
-            <a class="nav-pill" href="${pageContext.request.contextPath}/admin/reservations">Reservations</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/students">Students</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/fines">Fines</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/reports">Reports</a>
@@ -29,7 +28,7 @@
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/profile">Profile</a>
             <form method="post" action="${pageContext.request.contextPath}/logout">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                <button class="nav-pill warm border-0" type="submit">Logout</button>
+                <button class="nav-pill warm border-0" type="submit" aria-label="Logout" title="Logout"><span class="nav-pill-icon"><i class="bi bi-power" aria-hidden="true"></i></span><span class="nav-pill-label">Logout</span></button>
             </form>
         </div>
     </div>
@@ -153,7 +152,7 @@
                         <tr>
                             <td><strong>${category.name}</strong></td>
                             <td class="muted-text">${category.description}</td>
-                            <td>${category.createdAt}</td>
+                            <td>${category.createdAtDisplay}</td>
                             <td class="table-actions">
                                 <a class="icon-action" href="${pageContext.request.contextPath}/admin/references?editCategoryId=${category.id}" title="Edit category">
                                     <i class="bi bi-pencil-square"></i>
@@ -194,7 +193,7 @@
                         <tr>
                             <td><strong>${author.name}</strong></td>
                             <td class="muted-text">${author.bio}</td>
-                            <td>${author.createdAt}</td>
+                            <td>${author.createdAtDisplay}</td>
                             <td class="table-actions">
                                 <a class="icon-action" href="${pageContext.request.contextPath}/admin/references?editAuthorId=${author.id}" title="Edit author">
                                     <i class="bi bi-pencil-square"></i>
@@ -223,3 +222,4 @@
 <script src="${pageContext.request.contextPath}/js/app.js"></script>
 </body>
 </html>
+

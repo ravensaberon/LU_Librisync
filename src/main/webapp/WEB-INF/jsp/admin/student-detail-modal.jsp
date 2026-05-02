@@ -250,8 +250,8 @@
                     <tr>
                         <td>${issue.book.title}</td>
                         <td>${issue.qrIssueCode}</td>
-                        <td>${issue.issueDate}</td>
-                        <td>${issue.dueDate}</td>
+                        <td>${issue.issueDateDisplay}</td>
+                        <td>${issue.dueDateDisplay}</td>
                         <td><span class="tag-chip">${issue.status}</span></td>
                         <td>${issue.fineAmount}</td>
                     </tr>
@@ -286,7 +286,7 @@
                         <td>${fine.issueRecord.book.title}</td>
                         <td>${fine.amount}</td>
                         <td><span class="tag-chip">${fine.status}</span></td>
-                        <td>${fine.calculatedAt}</td>
+                        <td>${fine.calculatedAtDisplay}</td>
                     </tr>
                 </c:forEach>
                 <c:if test="${empty studentFines}">
@@ -321,9 +321,9 @@
                         <td>${issue.book.title}</td>
                         <td>${issue.qrIssueCode}</td>
                         <td>${issue.issuedBy.name}</td>
-                        <td>${issue.issueDate}</td>
-                        <td>${issue.dueDate}</td>
-                        <td>${issue.returnDate}</td>
+                        <td>${issue.issueDateDisplay}</td>
+                        <td>${issue.dueDateDisplay}</td>
+                        <td>${issue.returnDateDisplay}</td>
                         <td><span class="tag-chip">${issue.status}</span></td>
                         <td>${issue.fineAmount}</td>
                     </tr>
