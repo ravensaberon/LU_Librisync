@@ -18,6 +18,7 @@ import com.lulibrisync.service.FineService;
 import com.lulibrisync.service.IssueService;
 import com.lulibrisync.service.ReservationService;
 import com.lulibrisync.service.StudentService;
+import com.lulibrisync.util.PaginationUtils;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -36,6 +37,8 @@ import java.util.Map;
 @Controller
 @RequestMapping("/admin")
 public class AdminController {
+
+    private static final int STUDENT_DIRECTORY_PAGE_SIZE = 10;
 
     private final BookRepository bookRepository;
     private final UserRepository userRepository;
@@ -102,8 +105,10 @@ public class AdminController {
     @GetMapping("/students")
     public String students(@RequestParam(required = false) String studentId,
                            @RequestParam(required = false) String modalStudentId,
+                           @RequestParam(defaultValue = "1") Integer page,
                            Model model) {
         List<Student> students = studentService.searchStudents(studentId);
+        var studentsPage = PaginationUtils.paginate(students, page, STUDENT_DIRECTORY_PAGE_SIZE);
         Map<String, BorrowerStanding> borrowerStandingByStudentId = students.stream()
                 .collect(java.util.stream.Collectors.toMap(
                         Student::getStudentId,
@@ -121,7 +126,8 @@ public class AdminController {
                 .filter(student -> UserStatus.ACTIVE.equals(student.getUser().getStatus()))
                 .count();
 
-        model.addAttribute("students", students);
+        model.addAttribute("students", studentsPage.getItems());
+        model.addAttribute("studentsPage", studentsPage);
         model.addAttribute("studentIdFilter", studentId);
         model.addAttribute("userStatuses", studentService.getAvailableStatuses());
         model.addAttribute("modalStudentId", modalStudentId);

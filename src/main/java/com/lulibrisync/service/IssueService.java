@@ -21,6 +21,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -130,6 +131,7 @@ public class IssueService {
 
         LocalDateTime returnTimestamp = LocalDateTime.now();
         issueRecord.setReturnDate(returnTimestamp);
+        issueRecord.setReturnRequestedAt(null);
         issueRecord.setFineAmount(calculateFine(issueRecord.getDueDate(), returnTimestamp));
         issueRecord.setStatus(IssueStatus.RETURNED);
 
@@ -173,7 +175,11 @@ public class IssueService {
 
     public List<IssueRecord> getActiveIssues() {
         refreshOverdueStatuses();
-        return issueRecordRepository.findActiveIssuesOrdered(List.of(IssueStatus.ISSUED, IssueStatus.OVERDUE));
+        return issueRecordRepository.findActiveIssuesOrdered(List.of(IssueStatus.ISSUED, IssueStatus.OVERDUE)).stream()
+                .sorted(Comparator
+                        .comparing(IssueRecord::isReturnRequested).reversed()
+                        .thenComparing(IssueRecord::getDueDate, Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
     }
 
     public List<IssueRecord> getRecentIssues() {
@@ -216,6 +222,22 @@ public class IssueService {
             }
         }
         return activeIssueIds;
+    }
+
+    public Map<Long, Boolean> getActiveIssueReturnRequestedByBookIds(String email) {
+        Map<Long, Boolean> activeIssueReturnRequested = new LinkedHashMap<>();
+        for (IssueRecord issueRecord : getStudentIssues(email)) {
+            if (!issueRecord.isReturned() && !activeIssueReturnRequested.containsKey(issueRecord.getBook().getId())) {
+                activeIssueReturnRequested.put(issueRecord.getBook().getId(), issueRecord.isReturnRequested());
+            }
+        }
+        return activeIssueReturnRequested;
+    }
+
+    public long countPendingReturnRequests() {
+        return getActiveIssues().stream()
+                .filter(IssueRecord::isReturnRequested)
+                .count();
     }
 
     public Map<Long, LocalDate> getActiveIssueDueDatesForStudentBooks(String email) {
@@ -262,13 +284,39 @@ public class IssueService {
     }
 
     @Transactional
-    public IssueRecord returnBookByStudent(Long issueId, String email) {
+    public IssueRecord requestReturnByStudent(Long issueId, String email) {
         Student student = studentService.getStudentByEmail(email);
         IssueRecord issueRecord = getIssueById(issueId);
         if (!issueRecord.getStudent().getId().equals(student.getId())) {
-            throw new IllegalArgumentException("You can only return books issued to your account.");
+            throw new IllegalArgumentException("You can only manage return requests for your own loans.");
         }
-        return returnBook(issueId);
+        if (issueRecord.isReturned()) {
+            throw new IllegalArgumentException("This book has already been returned.");
+        }
+        if (issueRecord.isReturnRequested()) {
+            throw new IllegalArgumentException("A desk return request is already pending for this loan.");
+        }
+
+        issueRecord.setReturnRequestedAt(LocalDateTime.now());
+        return issueRecordRepository.save(issueRecord);
+    }
+
+    @Transactional
+    public IssueRecord cancelReturnRequestByStudent(Long issueId, String email) {
+        Student student = studentService.getStudentByEmail(email);
+        IssueRecord issueRecord = getIssueById(issueId);
+        if (!issueRecord.getStudent().getId().equals(student.getId())) {
+            throw new IllegalArgumentException("You can only manage return requests for your own loans.");
+        }
+        if (issueRecord.isReturned()) {
+            throw new IllegalArgumentException("This book has already been returned.");
+        }
+        if (!issueRecord.isReturnRequested()) {
+            throw new IllegalArgumentException("There is no pending desk return request for this loan.");
+        }
+
+        issueRecord.setReturnRequestedAt(null);
+        return issueRecordRepository.save(issueRecord);
     }
 
     @Transactional

@@ -27,6 +27,8 @@ public class DatabaseSchemaInitializer implements ApplicationRunner {
         try (Connection connection = dataSource.getConnection();
              Statement statement = connection.createStatement()) {
             ensurePreferredPickupDateColumn(statement);
+            ensureReservationRequestTypeColumn(statement);
+            ensureIssueReturnRequestColumn(statement);
         }
     }
 
@@ -45,5 +47,39 @@ public class DatabaseSchemaInitializer implements ApplicationRunner {
 
         statement.executeUpdate("ALTER TABLE reservations ADD COLUMN preferred_pickup_date DATE NULL AFTER expires_at");
         logger.info("Added reservations.preferred_pickup_date column for scheduled pickup support.");
+    }
+
+    private void ensureIssueReturnRequestColumn(Statement statement) throws Exception {
+        try (ResultSet tables = statement.executeQuery("SHOW TABLES LIKE 'issue_records'")) {
+            if (!tables.next()) {
+                return;
+            }
+        }
+
+        try (ResultSet columns = statement.executeQuery("SHOW COLUMNS FROM issue_records LIKE 'return_requested_at'")) {
+            if (columns.next()) {
+                return;
+            }
+        }
+
+        statement.executeUpdate("ALTER TABLE issue_records ADD COLUMN return_requested_at DATETIME NULL AFTER return_date");
+        logger.info("Added issue_records.return_requested_at column for desk-confirmed returns.");
+    }
+
+    private void ensureReservationRequestTypeColumn(Statement statement) throws Exception {
+        try (ResultSet tables = statement.executeQuery("SHOW TABLES LIKE 'reservations'")) {
+            if (!tables.next()) {
+                return;
+            }
+        }
+
+        try (ResultSet columns = statement.executeQuery("SHOW COLUMNS FROM reservations LIKE 'request_type'")) {
+            if (!columns.next()) {
+                statement.executeUpdate("ALTER TABLE reservations ADD COLUMN request_type VARCHAR(20) NOT NULL DEFAULT 'RESERVATION' AFTER status");
+                logger.info("Added reservations.request_type column for borrow-vs-reservation flows.");
+            }
+        }
+
+        statement.executeUpdate("UPDATE reservations SET request_type = 'RESERVATION' WHERE request_type IS NULL OR request_type = ''");
     }
 }

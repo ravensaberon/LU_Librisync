@@ -15,10 +15,17 @@ import jakarta.persistence.Table;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 
 @Entity
 @Table(name = "reservations")
 public class Reservation {
+
+    private static final DateTimeFormatter DISPLAY_DATE_TIME_FORMATTER =
+            DateTimeFormatter.ofPattern("MMMM d, yyyy h:mm a", Locale.ENGLISH);
+    private static final DateTimeFormatter DISPLAY_DATE_FORMATTER =
+            DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.ENGLISH);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -38,6 +45,10 @@ public class Reservation {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ReservationStatus status = ReservationStatus.PENDING;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "request_type", nullable = false, length = 20)
+    private ReservationRequestType requestType = ReservationRequestType.RESERVATION;
 
     @Column(name = "reserved_at", nullable = false)
     private LocalDateTime reservedAt;
@@ -62,6 +73,14 @@ public class Reservation {
 
     public boolean isActive() {
         return ReservationStatus.PENDING.equals(status) || ReservationStatus.READY.equals(status);
+    }
+
+    public boolean isBorrowRequest() {
+        return ReservationRequestType.BORROW.equals(requestType);
+    }
+
+    public boolean isQueueReservation() {
+        return ReservationRequestType.RESERVATION.equals(requestType);
     }
 
     public Long getId() {
@@ -104,6 +123,14 @@ public class Reservation {
         this.status = status;
     }
 
+    public ReservationRequestType getRequestType() {
+        return requestType;
+    }
+
+    public void setRequestType(ReservationRequestType requestType) {
+        this.requestType = requestType;
+    }
+
     public LocalDateTime getReservedAt() {
         return reservedAt;
     }
@@ -112,12 +139,20 @@ public class Reservation {
         this.reservedAt = reservedAt;
     }
 
+    public String getReservedAtDisplay() {
+        return reservedAt == null ? "" : DISPLAY_DATE_TIME_FORMATTER.format(reservedAt);
+    }
+
     public LocalDateTime getExpiresAt() {
         return expiresAt;
     }
 
     public void setExpiresAt(LocalDateTime expiresAt) {
         this.expiresAt = expiresAt;
+    }
+
+    public String getExpiresAtDisplay() {
+        return expiresAt == null ? "" : DISPLAY_DATE_TIME_FORMATTER.format(expiresAt);
     }
 
     public LocalDateTime getCreatedAt() {
@@ -134,5 +169,9 @@ public class Reservation {
 
     public void setPreferredPickupDate(LocalDate preferredPickupDate) {
         this.preferredPickupDate = preferredPickupDate;
+    }
+
+    public String getPreferredPickupDateDisplay() {
+        return preferredPickupDate == null ? "" : DISPLAY_DATE_FORMATTER.format(preferredPickupDate);
     }
 }

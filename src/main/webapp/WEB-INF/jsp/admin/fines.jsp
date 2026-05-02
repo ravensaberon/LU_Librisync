@@ -164,11 +164,11 @@
                                 </c:otherwise>
                             </c:choose>
                         </td>
-                        <td>${fine.calculatedAt}</td>
+                        <td>${fine.calculatedAtDisplay}</td>
                         <td>
                             <c:choose>
                                 <c:when test="${not empty fine.paidAt}">
-                                    ${fine.paidAt}
+                                    ${fine.paidAtDisplay}
                                 </c:when>
                                 <c:otherwise>
                                     <span class="muted-text">Pending</span>
@@ -184,6 +184,9 @@
                                       data-confirm-button-text="Yes, mark as paid"
                                       data-confirm-cancel-text="Review first">
                                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                                    <input type="hidden" name="page" value="${finesPage.page}">
+                                    <input type="hidden" name="studentKeyword" value="${studentKeyword}">
+                                    <input type="hidden" name="status" value="${selectedStatus}">
                                     <button class="icon-action" type="submit" title="Mark as paid">
                                         <i class="bi bi-cash-coin"></i>
                                     </button>
@@ -195,6 +198,9 @@
                                       data-confirm-button-text="Yes, waive fine"
                                       data-confirm-cancel-text="Keep unpaid">
                                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                                    <input type="hidden" name="page" value="${finesPage.page}">
+                                    <input type="hidden" name="studentKeyword" value="${studentKeyword}">
+                                    <input type="hidden" name="status" value="${selectedStatus}">
                                     <button class="icon-action" type="submit" title="Waive fine">
                                         <i class="bi bi-receipt-cutoff"></i>
                                     </button>
@@ -214,6 +220,23 @@
                 </tbody>
             </table>
         </div>
+        <c:if test="${finesPage.totalPages > 1}">
+            <nav class="mt-4" aria-label="Fine ledger pages">
+                <ul class="pagination justify-content-center mb-0">
+                    <li class="page-item <c:if test='${!finesPage.hasPrevious}'>disabled</c:if>">
+                        <a class="page-link" href="${pageContext.request.contextPath}/admin/fines?page=${finesPage.previousPage}&studentKeyword=${studentKeyword}&status=${selectedStatus}">Previous</a>
+                    </li>
+                    <c:forEach begin="${finesPage.startPage}" end="${finesPage.endPage}" var="pageNumber">
+                        <li class="page-item <c:if test='${pageNumber == finesPage.page}'>active</c:if>">
+                            <a class="page-link" href="${pageContext.request.contextPath}/admin/fines?page=${pageNumber}&studentKeyword=${studentKeyword}&status=${selectedStatus}">${pageNumber}</a>
+                        </li>
+                    </c:forEach>
+                    <li class="page-item <c:if test='${!finesPage.hasNext}'>disabled</c:if>">
+                        <a class="page-link" href="${pageContext.request.contextPath}/admin/fines?page=${finesPage.nextPage}&studentKeyword=${studentKeyword}&status=${selectedStatus}">Next</a>
+                    </li>
+                </ul>
+            </nav>
+        </c:if>
     </section>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>

@@ -21,9 +21,9 @@
         <div class="nav-links">
             <a class="nav-pill" href="${pageContext.request.contextPath}/student/dashboard">Dashboard</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/student/catalog">Catalog</a>
-            <a class="nav-pill" href="${pageContext.request.contextPath}/student/reservations">Reservations</a>
+            <a class="nav-pill" href="${pageContext.request.contextPath}/student/reservations">Pickup requests</a>
             <a class="nav-pill active" href="${pageContext.request.contextPath}/student/profile">Profile</a>
-            <a class="nav-pill" href="${pageContext.request.contextPath}/student/history">Borrowing history</a>
+            <a class="nav-pill" href="${pageContext.request.contextPath}/student/history">Borrowed books</a>
             <form method="post" action="${pageContext.request.contextPath}/logout">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
                 <button class="nav-pill warm border-0" type="submit">Logout</button>
@@ -87,77 +87,33 @@
         </div>
     </section>
 
-    <section class="panel-grid profile-overview-grid mb-4">
-        <article class="panel-card profile-summary-card">
-            <div class="profile-summary-header">
-                <div>
-                    <div class="section-title mb-1">Profile overview</div>
-                    <p class="muted-text mb-0">A cleaner view of your current library account details.</p>
-                </div>
-                <span class="tag-chip">${student.user.status}</span>
+    <section class="panel-card profile-summary-card mb-4">
+        <div class="profile-summary-header">
+            <div>
+                <div class="section-title mb-1">Profile overview</div>
+                <p class="muted-text mb-0">A cleaner view of your current library account details.</p>
             </div>
+            <span class="tag-chip">${student.user.status}</span>
+        </div>
 
-            <div class="profile-highlight-grid">
-                <div class="profile-highlight-tile">
-                    <span class="profile-highlight-label">Program</span>
-                    <strong>${empty student.course ? 'Not set' : student.course}</strong>
-                </div>
-                <div class="profile-highlight-tile">
-                    <span class="profile-highlight-label">Year level</span>
-                    <strong>${empty student.yearLevel ? 'Not set' : student.yearLevel}</strong>
-                </div>
-                <div class="profile-highlight-tile">
-                    <span class="profile-highlight-label">Phone</span>
-                    <strong>${empty student.phone ? 'Not provided' : student.phone}</strong>
-                </div>
-                <div class="profile-highlight-tile">
-                    <span class="profile-highlight-label">Birthday</span>
-                    <strong>${empty student.dateOfBirth ? 'Not provided' : student.dateOfBirth}</strong>
-                </div>
+        <div class="profile-highlight-grid">
+            <div class="profile-highlight-tile">
+                <span class="profile-highlight-label">Program</span>
+                <strong>${empty student.course ? 'Not set' : student.course}</strong>
             </div>
-        </article>
-
-        <article class="panel-card profile-security-card" id="password-security">
-            <div class="section-title mb-3">Account security</div>
-            <c:choose>
-                <c:when test="${hasPendingProfileOtp}">
-                    <div class="profile-pending-otp mb-4">
-                        <i class="bi bi-hourglass-split"></i>
-                        <div>
-                            <strong>Pending verification</strong>
-                            <p class="mb-1">You still have a profile update waiting for OTP confirmation.</p>
-                            <div class="small muted-text">
-                                OTP expires in <strong id="profileOtpExpiryCountdown">calculating...</strong>
-                                <span class="mx-1">|</span>
-                                New OTP in <strong id="profileOtpResendCountdown">calculating...</strong>
-                            </div>
-                        </div>
-                    </div>
-                </c:when>
-                <c:otherwise>
-                    <p class="muted-text mb-4">No pending verification.</p>
-                </c:otherwise>
-            </c:choose>
-
-            <form method="post" action="${pageContext.request.contextPath}/student/profile/password" class="row g-3">
-                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                <div class="col-12">
-                    <label class="form-label" for="studentCurrentPassword">Current password</label>
-                    <input class="form-control" id="studentCurrentPassword" name="currentPassword" type="password" required>
-                </div>
-                <div class="col-12">
-                    <label class="form-label" for="studentNewPassword">New password</label>
-                    <input class="form-control" id="studentNewPassword" name="newPassword" type="password" required>
-                </div>
-                <div class="col-12">
-                    <label class="form-label" for="studentConfirmPassword">Confirm new password</label>
-                    <input class="form-control" id="studentConfirmPassword" name="confirmPassword" type="password" required>
-                </div>
-                <div class="col-12">
-                    <button class="btn btn-warm" type="submit">Update password</button>
-                </div>
-            </form>
-        </article>
+            <div class="profile-highlight-tile">
+                <span class="profile-highlight-label">Year level</span>
+                <strong>${empty student.yearLevel ? 'Not set' : student.yearLevel}</strong>
+            </div>
+            <div class="profile-highlight-tile">
+                <span class="profile-highlight-label">Phone</span>
+                <strong>${empty student.phone ? 'Not provided' : student.phone}</strong>
+            </div>
+            <div class="profile-highlight-tile">
+                <span class="profile-highlight-label">Birthday</span>
+                <strong>${empty student.dateOfBirth ? 'Not provided' : student.dateOfBirthDisplay}</strong>
+            </div>
+        </div>
     </section>
 
     <section class="panel-grid panel-grid-equal mb-4">
@@ -229,7 +185,7 @@
                 </div>
                 <div class="profile-detail-item">
                     <span class="profile-detail-label">Date of birth</span>
-                    <strong class="profile-detail-value">${empty student.dateOfBirth ? 'Not provided' : student.dateOfBirth}</strong>
+                    <strong class="profile-detail-value">${empty student.dateOfBirth ? 'Not provided' : student.dateOfBirthDisplay}</strong>
                 </div>
                 <div class="profile-detail-item">
                     <span class="profile-detail-label">Account status</span>
@@ -281,7 +237,7 @@
                 </div>
                 <div class="profile-detail-item">
                     <span class="profile-detail-label">Created at</span>
-                    <strong class="profile-detail-value">${student.createdAt}</strong>
+                    <strong class="profile-detail-value">${student.createdAtDisplay}</strong>
                 </div>
                 <div class="profile-detail-item">
                     <span class="profile-detail-label">Last updated</span>

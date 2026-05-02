@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Lob;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import com.lulibrisync.util.DisplayFormatUtils;
 
 import java.time.LocalDateTime;
 
@@ -63,5 +64,9 @@ public class Author {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getCreatedAtDisplay() {
+        return DisplayFormatUtils.formatDateTime(createdAt);
     }
 }

@@ -5,6 +5,7 @@ import com.lulibrisync.service.CirculationPolicyService;
 import com.lulibrisync.service.IssueService;
 import com.lulibrisync.service.ReservationService;
 import com.lulibrisync.service.StudentService;
+import com.lulibrisync.util.PaginationUtils;
 import com.lulibrisync.model.ReservationStatus;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.Authentication;
@@ -21,6 +22,8 @@ import java.time.LocalDate;
 
 @Controller
 public class ReservationController {
+
+    private static final int RESERVATION_SECTION_PAGE_SIZE = 8;
 
     private final ReservationService reservationService;
     private final IssueService issueService;
@@ -41,12 +44,23 @@ public class ReservationController {
     }
 
     @GetMapping("/student/reservations")
-    public String studentReservations(Authentication authentication, Model model) {
+    public String studentReservations(Authentication authentication,
+                                      @RequestParam(defaultValue = "borrow") String tab,
+                                      @RequestParam(defaultValue = "1") Integer borrowPage,
+                                      @RequestParam(defaultValue = "1") Integer queuePage,
+                                      Model model) {
         reservationService.syncReadyReservations();
-        model.addAttribute("reservations", reservationService.getStudentReservations(authentication.getName()));
-        model.addAttribute("defaultBorrowDueDate", LocalDate.now().plusDays(circulationPolicyService.getMaxLoanDays()));
-        model.addAttribute("maxLoanDays", circulationPolicyService.getMaxLoanDays());
+        var borrowRequests = reservationService.getStudentBorrowRequests(authentication.getName());
+        var queueReservations = reservationService.getStudentQueueReservations(authentication.getName());
+        var borrowRequestsPage = PaginationUtils.paginate(borrowRequests, borrowPage, RESERVATION_SECTION_PAGE_SIZE);
+        var queueReservationsPage = PaginationUtils.paginate(queueReservations, queuePage, RESERVATION_SECTION_PAGE_SIZE);
+        model.addAttribute("borrowRequests", borrowRequestsPage.getItems());
+        model.addAttribute("borrowRequestsPage", borrowRequestsPage);
+        model.addAttribute("queueReservations", queueReservationsPage.getItems());
+        model.addAttribute("queueReservationsPage", queueReservationsPage);
+        model.addAttribute("borrowRequestWindowMinutes", reservationService.getBorrowRequestWindowMinutes());
         model.addAttribute("reservationScheduleMaxDate", LocalDate.now().plusDays(reservationService.getMaxPreferredPickupDays()));
+        model.addAttribute("activeTab", "queue".equalsIgnoreCase(tab) ? "queue" : "borrow");
         return "student/reservations";
     }
 
@@ -68,7 +82,7 @@ public class ReservationController {
                             + " | Preferred pickup: " + reservation.getPreferredPickupDate()
             );
             if (ReservationStatus.READY.equals(reservation.getStatus())) {
-                redirectAttributes.addFlashAttribute("success", "Reservation placed. Your pickup hold is already ready to borrow.");
+                redirectAttributes.addFlashAttribute("success", "Reservation placed. A copy is now ready for desk pickup and staff release.");
             } else {
                 redirectAttributes.addFlashAttribute("success", "Reservation placed for " + reservation.getPreferredPickupDate() + ".");
             }
@@ -80,37 +94,22 @@ public class ReservationController {
 
     @PostMapping("/student/reservations/{reservationId}/claim")
     public String claimStudentReservation(@PathVariable Long reservationId,
+                                          @RequestParam(defaultValue = "borrow") String tab,
+                                          @RequestParam(defaultValue = "1") Integer borrowPage,
+                                          @RequestParam(defaultValue = "1") Integer queuePage,
                                           Authentication authentication,
                                           RedirectAttributes redirectAttributes) {
-        try {
-            var reservation = reservationService.getReservationById(reservationId);
-            var student = studentService.getStudentByEmail(authentication.getName());
-            if (!reservation.getStudent().getId().equals(student.getId())) {
-                throw new IllegalArgumentException("You can only claim your own reservation.");
-            }
-            if (!ReservationStatus.READY.equals(reservation.getStatus())) {
-                throw new IllegalArgumentException("This reservation is not ready to claim yet.");
-            }
-
-            LocalDate dueDate = LocalDate.now().plusDays(circulationPolicyService.getMaxLoanDays());
-            var issueRecord = issueService.issueBook(reservation.getBook().getId(), student.getId(), dueDate, authentication.getName(), "Self-service reservation claim");
-            auditLogService.log(
-                    authentication.getName(),
-                    "SELF_SERVICE_RESERVATION_CLAIM",
-                    "RESERVATION",
-                    reservationId.toString(),
-                    "Student claimed a ready reservation",
-                    "Reservation " + reservationId + " issued as " + issueRecord.getQrIssueCode()
-            );
-            redirectAttributes.addFlashAttribute("success", "Reserved book borrowed successfully. Due on " + dueDate + ".");
-        } catch (IllegalArgumentException exception) {
-            redirectAttributes.addFlashAttribute("error", exception.getMessage());
-        }
-        return "redirect:/student/reservations";
+        redirectAttributes.addFlashAttribute("info", "Please proceed to the circulation desk. Staff must confirm the physical pickup before the book is issued to your account.");
+        return "redirect:/student/reservations?tab=" + ("queue".equalsIgnoreCase(tab) ? "queue" : "borrow")
+                + "&borrowPage=" + Math.max(1, borrowPage)
+                + "&queuePage=" + Math.max(1, queuePage);
     }
 
     @PostMapping("/student/reservations/{reservationId}/cancel")
     public String cancelStudentReservation(@PathVariable Long reservationId,
+                                           @RequestParam(defaultValue = "borrow") String tab,
+                                           @RequestParam(defaultValue = "1") Integer borrowPage,
+                                           @RequestParam(defaultValue = "1") Integer queuePage,
                                            Authentication authentication,
                                            RedirectAttributes redirectAttributes) {
         try {
@@ -127,18 +126,31 @@ public class ReservationController {
         } catch (IllegalArgumentException exception) {
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
         }
-        return "redirect:/student/reservations";
+        return "redirect:/student/reservations?tab=" + ("queue".equalsIgnoreCase(tab) ? "queue" : "borrow")
+                + "&borrowPage=" + Math.max(1, borrowPage)
+                + "&queuePage=" + Math.max(1, queuePage);
     }
 
     @GetMapping("/admin/reservations")
-    public String adminReservations(Model model) {
+    public String adminReservations(@RequestParam(defaultValue = "1") Integer borrowPage,
+                                    @RequestParam(defaultValue = "1") Integer queuePage,
+                                    Model model) {
         reservationService.syncReadyReservations();
-        var reservations = reservationService.getAllReservations();
-        model.addAttribute("reservations", reservations);
+        var borrowRequests = reservationService.getBorrowRequests();
+        var queueReservations = reservationService.getQueueReservations();
+        var borrowRequestsPage = PaginationUtils.paginate(borrowRequests, borrowPage, RESERVATION_SECTION_PAGE_SIZE);
+        var queueReservationsPage = PaginationUtils.paginate(queueReservations, queuePage, RESERVATION_SECTION_PAGE_SIZE);
+        model.addAttribute("borrowRequests", borrowRequestsPage.getItems());
+        model.addAttribute("borrowRequestsPage", borrowRequestsPage);
+        model.addAttribute("queueReservations", queueReservationsPage.getItems());
+        model.addAttribute("queueReservationsPage", queueReservationsPage);
         model.addAttribute("defaultDueDate", LocalDate.now().plusDays(7));
-        model.addAttribute("reservationCount", reservations.size());
-        model.addAttribute("pendingReservationCount", reservations.stream().filter(reservation -> reservation.getStatus().name().equals("PENDING")).count());
-        model.addAttribute("readyReservationCount", reservations.stream().filter(reservation -> reservation.getStatus().name().equals("READY")).count());
+        model.addAttribute("reservationCount", borrowRequests.size() + queueReservations.size());
+        model.addAttribute("borrowRequestCount", borrowRequests.stream().filter(reservation -> reservation.getStatus() == ReservationStatus.READY).count());
+        model.addAttribute("pendingReservationCount", queueReservations.stream().filter(reservation -> reservation.getStatus().name().equals("PENDING")).count());
+        model.addAttribute("readyReservationCount", borrowRequests.stream().filter(reservation -> reservation.getStatus().name().equals("READY")).count()
+                + queueReservations.stream().filter(reservation -> reservation.getStatus().name().equals("READY")).count());
+        model.addAttribute("borrowRequestWindowMinutes", reservationService.getBorrowRequestWindowMinutes());
         return "admin/reservations";
     }
 
@@ -146,6 +158,8 @@ public class ReservationController {
     public String claimReservation(@PathVariable Long reservationId,
                                    @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDate,
                                    @RequestParam(required = false) String remarks,
+                                   @RequestParam(defaultValue = "1") Integer borrowPage,
+                                   @RequestParam(defaultValue = "1") Integer queuePage,
                                    Authentication authentication,
                                    RedirectAttributes redirectAttributes) {
         try {
@@ -156,18 +170,20 @@ public class ReservationController {
                     "RESERVATION_CLAIMED",
                     "RESERVATION",
                     reservationId.toString(),
-                    "Reserved book issued",
+                    "Reserved book issued by staff",
                     "Reservation claimed and issued as " + issueRecord.getQrIssueCode()
             );
-            redirectAttributes.addFlashAttribute("success", "Reserved book issued successfully.");
+            redirectAttributes.addFlashAttribute("success", "Reserved book released and issued successfully.");
         } catch (IllegalArgumentException exception) {
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
         }
-        return "redirect:/admin/reservations";
+        return "redirect:/admin/reservations?borrowPage=" + Math.max(1, borrowPage) + "&queuePage=" + Math.max(1, queuePage);
     }
 
     @PostMapping("/admin/reservations/{reservationId}/cancel")
     public String cancelAdminReservation(@PathVariable Long reservationId,
+                                         @RequestParam(defaultValue = "1") Integer borrowPage,
+                                         @RequestParam(defaultValue = "1") Integer queuePage,
                                          Authentication authentication,
                                          RedirectAttributes redirectAttributes) {
         try {
@@ -184,6 +200,6 @@ public class ReservationController {
         } catch (IllegalArgumentException exception) {
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
         }
-        return "redirect:/admin/reservations";
+        return "redirect:/admin/reservations?borrowPage=" + Math.max(1, borrowPage) + "&queuePage=" + Math.max(1, queuePage);
     }
 }

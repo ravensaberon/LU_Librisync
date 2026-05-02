@@ -281,7 +281,7 @@
                                     <div class="audit-item-badge"><i class="bi bi-shield-check"></i></div>
                                     <div>
                                         <div class="audit-item-heading">${log.summary}</div>
-                                        <div class="audit-item-meta">${log.action} | ${empty log.actorName ? 'System' : log.actorName} | ${log.createdAt}</div>
+                                        <div class="audit-item-meta">${log.action} | ${empty log.actorName ? 'System' : log.actorName} | ${log.createdAtDisplay}</div>
                                         <c:if test="${not empty log.details}">
                                             <div class="audit-item-copy">${log.details}</div>
                                         </c:if>
@@ -316,7 +316,7 @@
                             <tr>
                                 <td>${issue.book.title}</td>
                                 <td>${issue.student.user.name}</td>
-                                <td>${issue.dueDate}</td>
+                                <td>${issue.dueDateDisplay}</td>
                                 <td><span class="tag-chip">${issue.status}</span></td>
                                 <td>${issue.fineAmount}</td>
                             </tr>
@@ -351,7 +351,7 @@
                                 <td>${fine.student.studentId} - ${fine.student.user.name}</td>
                                 <td>${fine.issueRecord.book.title}</td>
                                 <td>${fine.amount}</td>
-                                <td>${fine.calculatedAt}</td>
+                                <td>${fine.calculatedAtDisplay}</td>
                             </tr>
                         </c:forEach>
                         <c:if test="${empty recentOutstandingFines}">

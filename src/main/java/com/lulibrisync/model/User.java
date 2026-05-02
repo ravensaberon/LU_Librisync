@@ -11,6 +11,7 @@ import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import com.lulibrisync.util.DisplayFormatUtils;
 
 import java.time.LocalDateTime;
 
@@ -125,6 +126,10 @@ public class User {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getCreatedAtDisplay() {
+        return DisplayFormatUtils.formatDateTime(createdAt);
     }
 
     public LocalDateTime getUpdatedAt() {

@@ -153,7 +153,7 @@
                         <tr>
                             <td><strong>${category.name}</strong></td>
                             <td class="muted-text">${category.description}</td>
-                            <td>${category.createdAt}</td>
+                            <td>${category.createdAtDisplay}</td>
                             <td class="table-actions">
                                 <a class="icon-action" href="${pageContext.request.contextPath}/admin/references?editCategoryId=${category.id}" title="Edit category">
                                     <i class="bi bi-pencil-square"></i>
@@ -194,7 +194,7 @@
                         <tr>
                             <td><strong>${author.name}</strong></td>
                             <td class="muted-text">${author.bio}</td>
-                            <td>${author.createdAt}</td>
+                            <td>${author.createdAtDisplay}</td>
                             <td class="table-actions">
                                 <a class="icon-action" href="${pageContext.request.contextPath}/admin/references?editAuthorId=${author.id}" title="Edit author">
                                     <i class="bi bi-pencil-square"></i>

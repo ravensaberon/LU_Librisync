@@ -127,25 +127,48 @@ public class EmailNotificationService {
         }
 
         User recipient = reservation.getStudent().getUser();
-        String subject = "Reservation Ready | Reservation #" + reservation.getId() + " | " + reservation.getBook().getTitle();
-        String body = """
-                Hello %s,
+        String subject;
+        String body;
 
-                Your reserved library book is now ready for claiming.
+        if (reservation.isBorrowRequest()) {
+            subject = "Borrow Request Ready | Request #" + reservation.getId() + " | " + reservation.getBook().getTitle();
+            body = """
+                    Hello %s,
 
-                Book title: %s
-                Student ID: %s
-                Queue position: %s
-                Claim until: %s
+                    Your borrow request is now active at the circulation desk.
 
-                Please visit the library before the claim window expires.
-                """.formatted(
-                recipient.getName(),
-                reservation.getBook().getTitle(),
-                reservation.getStudent().getStudentId(),
-                reservation.getQueuePosition(),
-                reservation.getExpiresAt() == null ? "As soon as possible" : DATE_TIME_FORMATTER.format(reservation.getExpiresAt())
-        );
+                    Book title: %s
+                    Student ID: %s
+                    Show your ID before: %s
+
+                    Please go to the circulation desk before the hold window expires.
+                    """.formatted(
+                    recipient.getName(),
+                    reservation.getBook().getTitle(),
+                    reservation.getStudent().getStudentId(),
+                    reservation.getExpiresAt() == null ? "As soon as possible" : DATE_TIME_FORMATTER.format(reservation.getExpiresAt())
+            );
+        } else {
+            subject = "Reservation Ready | Reservation #" + reservation.getId() + " | " + reservation.getBook().getTitle();
+            body = """
+                    Hello %s,
+
+                    Your reserved library book is now ready for claiming.
+
+                    Book title: %s
+                    Student ID: %s
+                    Queue position: %s
+                    Claim until: %s
+
+                    Please visit the library before the claim window expires.
+                    """.formatted(
+                    recipient.getName(),
+                    reservation.getBook().getTitle(),
+                    reservation.getStudent().getStudentId(),
+                    reservation.getQueuePosition(),
+                    reservation.getExpiresAt() == null ? "As soon as possible" : DATE_TIME_FORMATTER.format(reservation.getExpiresAt())
+            );
+        }
 
         upsertPendingNotification(recipient, EmailNotificationType.RESERVATION_READY, subject, body, LocalDateTime.now().plusMinutes(1));
     }
@@ -155,7 +178,9 @@ public class EmailNotificationService {
         if (reservation == null || reservation.getStudent() == null || reservation.getStudent().getUser() == null) {
             return;
         }
-        String subject = "Reservation Ready | Reservation #" + reservation.getId() + " | " + reservation.getBook().getTitle();
+        String subject = reservation.isBorrowRequest()
+                ? "Borrow Request Ready | Request #" + reservation.getId() + " | " + reservation.getBook().getTitle()
+                : "Reservation Ready | Reservation #" + reservation.getId() + " | " + reservation.getBook().getTitle();
         emailNotificationRepository.findByUser_IdAndNotificationTypeAndSubjectAndStatus(
                         reservation.getStudent().getUser().getId(),
                         EmailNotificationType.RESERVATION_READY,

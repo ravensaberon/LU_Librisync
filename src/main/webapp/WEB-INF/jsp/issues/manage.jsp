@@ -55,6 +55,10 @@
             <div class="metric-label">Total circulation history</div>
         </div>
         <div class="metric-card">
+            <div class="metric-value">${pendingReturnRequestCount}</div>
+            <div class="metric-label">Pending return confirmations</div>
+        </div>
+        <div class="metric-card">
             <div class="metric-value">${maxLoanDays}</div>
             <div class="metric-label">Max loan days</div>
         </div>
@@ -117,10 +121,12 @@
                         Adjust due dates or internal remarks for an existing circulation record without deleting the transaction history.
                     </p>
                 </div>
-                <a class="action-link" href="${pageContext.request.contextPath}/admin/issues">Cancel editing</a>
+                <a class="action-link" href="${pageContext.request.contextPath}/admin/issues?activePage=${activeIssuesPage.page}&historyPage=${issueHistoryPage.page}">Cancel editing</a>
             </div>
             <form method="post" action="${pageContext.request.contextPath}/admin/issues/${editIssue.id}/update" class="row g-3">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                <input type="hidden" name="activePage" value="${activeIssuesPage.page}">
+                <input type="hidden" name="historyPage" value="${issueHistoryPage.page}">
                 <div class="col-md-6">
                     <label class="form-label">Book</label>
                     <input class="form-control" value="${editIssue.book.title}" readonly>
@@ -147,7 +153,7 @@
                 </div>
                 <div class="col-12 d-flex flex-wrap gap-2">
                     <button class="btn btn-brand" type="submit"><i class="bi bi-save2 me-2"></i>Update issue record</button>
-                    <a class="btn btn-warm" href="${pageContext.request.contextPath}/admin/issues">Back to circulation desk</a>
+                    <a class="btn btn-warm" href="${pageContext.request.contextPath}/admin/issues?activePage=${activeIssuesPage.page}&historyPage=${issueHistoryPage.page}">Back to circulation desk</a>
                 </div>
             </form>
         </section>
@@ -178,26 +184,43 @@
                         <td>${issue.book.title}</td>
                         <td>${issue.student.studentId} - ${issue.student.user.name}</td>
                         <td>${issue.issuedBy.name}</td>
-                        <td>${issue.issueDate}</td>
-                        <td>${issue.dueDate}</td>
-                        <td><span class="tag-chip">${issue.status}</span></td>
+                        <td>${issue.issueDateDisplay}</td>
+                        <td>${issue.dueDateDisplay}</td>
+                        <td>
+                            <div class="d-flex flex-wrap gap-2">
+                                <span class="tag-chip">${issue.status}</span>
+                                <c:if test="${issue.returnRequested}">
+                                    <span class="tag-chip warn">Return requested</span>
+                                </c:if>
+                            </div>
+                        </td>
                         <td>${issue.fineAmount}</td>
-                        <td class="muted-text">${issue.remarks}</td>
+                        <td class="muted-text">
+                            <c:if test="${issue.returnRequested}">
+                                Student asked for desk return confirmation.
+                                <c:if test="${not empty issue.remarks}"><br></c:if>
+                            </c:if>
+                            ${issue.remarks}
+                        </td>
                         <td class="table-actions">
                             <button class="icon-action" type="button" title="View QR code" data-bs-toggle="modal" data-bs-target="#issueQrModal" data-issue-code="${issue.qrIssueCode}" data-book-title="${issue.book.title}" data-student-name="${issue.student.user.name}">
                                 <i class="bi bi-qr-code"></i>
                             </button>
-                            <a class="icon-action" href="${pageContext.request.contextPath}/admin/issues?editId=${issue.id}" title="Edit issue record">
+                            <a class="icon-action" href="${pageContext.request.contextPath}/admin/issues?editId=${issue.id}&activePage=${activeIssuesPage.page}&historyPage=${issueHistoryPage.page}" title="Edit issue record">
                                 <i class="bi bi-pencil-square"></i>
                             </a>
                             <form method="post" action="${pageContext.request.contextPath}/admin/issues/${issue.id}/return">
                                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                                <button class="icon-action" type="submit" title="Mark returned">
+                                <input type="hidden" name="activePage" value="${activeIssuesPage.page}">
+                                <input type="hidden" name="historyPage" value="${issueHistoryPage.page}">
+                                <button class="icon-action" type="submit" title="Confirm return at desk">
                                     <i class="bi bi-arrow-return-left"></i>
                                 </button>
                             </form>
                             <form method="post" action="${pageContext.request.contextPath}/admin/issues/${issue.id}/delete">
                                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                                <input type="hidden" name="activePage" value="${activeIssuesPage.page}">
+                                <input type="hidden" name="historyPage" value="${issueHistoryPage.page}">
                                 <button class="icon-action danger" type="submit" title="Delete issue record">
                                     <i class="bi bi-trash3"></i>
                                 </button>
@@ -213,6 +236,23 @@
                 </tbody>
             </table>
         </div>
+        <c:if test="${activeIssuesPage.totalPages > 1}">
+            <nav class="mt-4" aria-label="Active issue record pages">
+                <ul class="pagination justify-content-center mb-0">
+                    <li class="page-item <c:if test='${!activeIssuesPage.hasPrevious}'>disabled</c:if>">
+                        <a class="page-link" href="${pageContext.request.contextPath}/admin/issues?activePage=${activeIssuesPage.previousPage}&historyPage=${issueHistoryPage.page}<c:if test='${not empty editIssue}'>&editId=${editIssue.id}</c:if>">Previous</a>
+                    </li>
+                    <c:forEach begin="${activeIssuesPage.startPage}" end="${activeIssuesPage.endPage}" var="pageNumber">
+                        <li class="page-item <c:if test='${pageNumber == activeIssuesPage.page}'>active</c:if>">
+                            <a class="page-link" href="${pageContext.request.contextPath}/admin/issues?activePage=${pageNumber}&historyPage=${issueHistoryPage.page}<c:if test='${not empty editIssue}'>&editId=${editIssue.id}</c:if>">${pageNumber}</a>
+                        </li>
+                    </c:forEach>
+                    <li class="page-item <c:if test='${!activeIssuesPage.hasNext}'>disabled</c:if>">
+                        <a class="page-link" href="${pageContext.request.contextPath}/admin/issues?activePage=${activeIssuesPage.nextPage}&historyPage=${issueHistoryPage.page}<c:if test='${not empty editIssue}'>&editId=${editIssue.id}</c:if>">Next</a>
+                    </li>
+                </ul>
+            </nav>
+        </c:if>
     </section>
 
     <section class="panel-card">
@@ -239,9 +279,9 @@
                         <td>${issue.book.title}</td>
                         <td>${issue.student.studentId} - ${issue.student.user.name}</td>
                         <td>${issue.issuedBy.name}</td>
-                        <td>${issue.issueDate}</td>
-                        <td>${issue.dueDate}</td>
-                        <td>${issue.returnDate}</td>
+                        <td>${issue.issueDateDisplay}</td>
+                        <td>${issue.dueDateDisplay}</td>
+                        <td>${issue.returnDateDisplay}</td>
                         <td><span class="tag-chip">${issue.status}</span></td>
                         <td>${issue.fineAmount}</td>
                     </tr>
@@ -254,6 +294,23 @@
                 </tbody>
             </table>
         </div>
+        <c:if test="${issueHistoryPage.totalPages > 1}">
+            <nav class="mt-4" aria-label="Circulation history pages">
+                <ul class="pagination justify-content-center mb-0">
+                    <li class="page-item <c:if test='${!issueHistoryPage.hasPrevious}'>disabled</c:if>">
+                        <a class="page-link" href="${pageContext.request.contextPath}/admin/issues?activePage=${activeIssuesPage.page}&historyPage=${issueHistoryPage.previousPage}<c:if test='${not empty editIssue}'>&editId=${editIssue.id}</c:if>">Previous</a>
+                    </li>
+                    <c:forEach begin="${issueHistoryPage.startPage}" end="${issueHistoryPage.endPage}" var="pageNumber">
+                        <li class="page-item <c:if test='${pageNumber == issueHistoryPage.page}'>active</c:if>">
+                            <a class="page-link" href="${pageContext.request.contextPath}/admin/issues?activePage=${activeIssuesPage.page}&historyPage=${pageNumber}<c:if test='${not empty editIssue}'>&editId=${editIssue.id}</c:if>">${pageNumber}</a>
+                        </li>
+                    </c:forEach>
+                    <li class="page-item <c:if test='${!issueHistoryPage.hasNext}'>disabled</c:if>">
+                        <a class="page-link" href="${pageContext.request.contextPath}/admin/issues?activePage=${activeIssuesPage.page}&historyPage=${issueHistoryPage.nextPage}<c:if test='${not empty editIssue}'>&editId=${editIssue.id}</c:if>">Next</a>
+                    </li>
+                </ul>
+            </nav>
+        </c:if>
     </section>
 
     <div class="modal fade" id="issueBookScannerModal" tabindex="-1" aria-hidden="true">

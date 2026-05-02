@@ -70,7 +70,7 @@
         </div>
         <div class="info-tile">
             <span class="info-tile-label">Date of Birth</span>
-            <span class="info-tile-value">${student.dateOfBirth}</span>
+            <span class="info-tile-value">${student.dateOfBirthDisplay}</span>
         </div>
         <div class="info-tile">
             <span class="info-tile-label">Account Status</span>
@@ -255,8 +255,8 @@
                         <tr>
                             <td>${issue.book.title}</td>
                             <td>${issue.qrIssueCode}</td>
-                            <td>${issue.issueDate}</td>
-                            <td>${issue.dueDate}</td>
+                            <td>${issue.issueDateDisplay}</td>
+                            <td>${issue.dueDateDisplay}</td>
                             <td><span class="tag-chip">${issue.status}</span></td>
                             <td>${issue.fineAmount}</td>
                         </tr>
@@ -316,9 +316,9 @@
                         <td>${issue.book.title}</td>
                         <td>${issue.qrIssueCode}</td>
                         <td>${issue.issuedBy.name}</td>
-                        <td>${issue.issueDate}</td>
-                        <td>${issue.dueDate}</td>
-                        <td>${issue.returnDate}</td>
+                        <td>${issue.issueDateDisplay}</td>
+                        <td>${issue.dueDateDisplay}</td>
+                        <td>${issue.returnDateDisplay}</td>
                         <td><span class="tag-chip">${issue.status}</span></td>
                         <td>${issue.fineAmount}</td>
                     </tr>

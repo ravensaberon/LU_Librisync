@@ -76,6 +76,26 @@ public class PasswordResetService {
                 .orElse(null);
     }
 
+    @Transactional(readOnly = true)
+    public Long verifyOtp(String email, String otpCode) {
+        User user = findUserByEmail(email);
+        PasswordResetToken latestToken = passwordResetTokenRepository.findFirstByUser_IdAndUsedFalseOrderByCreatedAtDesc(user.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Request a password reset OTP first."));
+
+        if (latestToken.getExpiresAt() == null || !latestToken.getExpiresAt().isAfter(LocalDateTime.now())) {
+            throw new IllegalArgumentException("The OTP has expired. Request a new code to continue.");
+        }
+
+        if (otpCode == null || otpCode.trim().isBlank()) {
+            throw new IllegalArgumentException("Enter the 6-digit OTP.");
+        }
+        if (!hashOtp(otpCode.trim()).equals(latestToken.getToken())) {
+            throw new IllegalArgumentException("Invalid OTP. Please try again.");
+        }
+
+        return latestToken.getId();
+    }
+
     @Transactional
     public PasswordResetOtpDispatchResult requestOtp(String email) {
         User user = findUserByEmail(email);
@@ -150,6 +170,35 @@ public class PasswordResetService {
 
         latestToken.setUsed(true);
         passwordResetTokenRepository.save(latestToken);
+        expireOutstandingTokens(user.getId());
+    }
+
+    @Transactional
+    public void updatePasswordWithVerifiedOtp(String email,
+                                              Long tokenId,
+                                              String newPassword,
+                                              String confirmPassword) {
+        User user = findUserByEmail(email);
+        if (tokenId == null) {
+            throw new IllegalArgumentException("Verify the OTP first before changing your password.");
+        }
+
+        PasswordResetToken token = passwordResetTokenRepository.findById(tokenId)
+                .orElseThrow(() -> new IllegalArgumentException("The verified OTP session is no longer available."));
+
+        if (token.isUsed() || token.getUser() == null || !token.getUser().getId().equals(user.getId())) {
+            throw new IllegalArgumentException("Verify a new OTP before changing your password.");
+        }
+        if (token.getExpiresAt() == null || !token.getExpiresAt().isAfter(LocalDateTime.now())) {
+            throw new IllegalArgumentException("The verified OTP has expired. Request a new code to continue.");
+        }
+
+        String normalizedPassword = validateNewPassword(user, newPassword, confirmPassword);
+        user.setPasswordHash(passwordEncoder.encode(normalizedPassword));
+        userRepository.save(user);
+
+        token.setUsed(true);
+        passwordResetTokenRepository.save(token);
         expireOutstandingTokens(user.getId());
     }
 

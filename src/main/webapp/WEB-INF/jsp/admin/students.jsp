@@ -112,9 +112,6 @@
                         <a class="btn btn-warm" href="${pageContext.request.contextPath}/admin/students">Clear</a>
                     </c:if>
                 </form>
-                <button class="btn btn-brand" type="button" data-bs-toggle="modal" data-bs-target="#createStudentModal">
-                    <i class="bi bi-person-plus me-2"></i>Create student
-                </button>
             </div>
         </div>
 
@@ -181,113 +178,24 @@
                 </tbody>
             </table>
         </div>
+        <c:if test="${studentsPage.totalPages > 1}">
+            <nav class="mt-4" aria-label="Student directory pages">
+                <ul class="pagination justify-content-center mb-0">
+                    <li class="page-item <c:if test='${!studentsPage.hasPrevious}'>disabled</c:if>">
+                        <a class="page-link" href="${pageContext.request.contextPath}/admin/students?page=${studentsPage.previousPage}&studentId=${studentIdFilter}">Previous</a>
+                    </li>
+                    <c:forEach begin="${studentsPage.startPage}" end="${studentsPage.endPage}" var="pageNumber">
+                        <li class="page-item <c:if test='${pageNumber == studentsPage.page}'>active</c:if>">
+                            <a class="page-link" href="${pageContext.request.contextPath}/admin/students?page=${pageNumber}&studentId=${studentIdFilter}">${pageNumber}</a>
+                        </li>
+                    </c:forEach>
+                    <li class="page-item <c:if test='${!studentsPage.hasNext}'>disabled</c:if>">
+                        <a class="page-link" href="${pageContext.request.contextPath}/admin/students?page=${studentsPage.nextPage}&studentId=${studentIdFilter}">Next</a>
+                    </li>
+                </ul>
+            </nav>
+        </c:if>
     </section>
-</div>
-
-<div class="modal fade" id="createStudentModal" tabindex="-1" aria-labelledby="createStudentModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl">
-        <div class="modal-content">
-            <div class="modal-header modal-header-brand">
-                <div>
-                    <div class="modal-kicker">Create Student</div>
-                    <h2 class="modal-title h4 mb-1" id="createStudentModalLabel">Register a new borrower account</h2>
-                    <p class="modal-subtitle mb-0">Student ID is generated automatically after successful account creation.</p>
-                </div>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form method="post" action="${pageContext.request.contextPath}/admin/students" class="row g-3">
-                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-
-                    <div class="col-md-6">
-                        <label class="form-label" for="createName">Full name</label>
-                        <input class="form-control" id="createName" name="name" placeholder="Example: Maria Santos" required>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label" for="createEmail">Email address</label>
-                        <input class="form-control" id="createEmail" name="email" type="email" placeholder="student@example.com" required>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label" for="createPassword">Temporary password</label>
-                        <input class="form-control" id="createPassword" name="password" type="password" minlength="12" required>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label" for="createCourse">Program</label>
-                        <select class="form-select" id="createCourse" name="course">
-                            <option value="">Select program</option>
-                            <c:forEach items="${programOptionsByCollege}" var="collegeEntry">
-                                <optgroup label="${collegeEntry.key}">
-                                    <c:forEach items="${collegeEntry.value}" var="programOption">
-                                        <option value="${programOption}">${programOption}</option>
-                                    </c:forEach>
-                                </optgroup>
-                            </c:forEach>
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label" for="createYearLevel">Year level</label>
-                        <select class="form-select" id="createYearLevel" name="yearLevel" required>
-                            <option value="">Select year level</option>
-                            <c:forEach items="${yearLevelOptions}" var="yearLevelOption">
-                                <option value="${yearLevelOption}">${yearLevelOption}</option>
-                            </c:forEach>
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label" for="createPhone">Phone</label>
-                        <input class="form-control" id="createPhone" name="phone" placeholder="+639171234567">
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label" for="createDateOfBirth">Birth date</label>
-                        <input class="form-control" id="createDateOfBirth" name="dateOfBirth" type="date">
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label" for="createStatus">Account status</label>
-                        <select class="form-select" id="createStatus" name="status">
-                            <c:forEach items="${userStatuses}" var="status">
-                                <option value="${status}">${status}</option>
-                            </c:forEach>
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label" for="createProvince">Province</label>
-                        <select class="form-select" id="createProvince" name="province">
-                            <option value="Laguna" selected>Laguna</option>
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label" for="createCityMunicipality">City / Municipality</label>
-                        <select class="form-select" id="createCityMunicipality" name="cityMunicipality">
-                            <option value="">Select city / municipality</option>
-                            <c:forEach items="${registrationCityZipCodes}" var="entry">
-                                <option value="${entry.key}">${entry.key}</option>
-                            </c:forEach>
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label" for="createBarangay">Barangay</label>
-                        <select class="form-select" id="createBarangay" name="barangay" data-selected-barangay="" disabled>
-                            <option value="">Select city / municipality first</option>
-                        </select>
-                    </div>
-                    <div class="col-md-8">
-                        <label class="form-label" for="createStreet">Street / House No.</label>
-                        <input class="form-control" id="createStreet" name="street" placeholder="Block, lot, street">
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label" for="createZipcode">Zip code</label>
-                        <input class="form-control" id="createZipcode" name="zipcode" readonly>
-                    </div>
-                    <div class="col-12 d-flex flex-wrap gap-2">
-                        <button class="btn btn-brand" type="submit">
-                            <i class="bi bi-check-circle me-2"></i>Create student
-                        </button>
-                        <button class="btn btn-warm" type="button" data-bs-dismiss="modal">Cancel</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
 </div>
 
 <div class="modal fade" id="studentDetailModal" tabindex="-1" aria-labelledby="studentDetailModalLabel" aria-hidden="true">
@@ -323,13 +231,6 @@
             }
 
             var scope = root || document;
-            window.LuLibrisyncAddress.initForm({
-                cityMunicipality: scope.querySelector("#createCityMunicipality"),
-                barangay: scope.querySelector("#createBarangay"),
-                zipcode: scope.querySelector("#createZipcode"),
-                endpoint: "${pageContext.request.contextPath}/register/barangays",
-                cityZipCodes: cityZipCodes
-            });
             window.LuLibrisyncAddress.initForm({
                 cityMunicipality: scope.querySelector("#modalCityMunicipality"),
                 barangay: scope.querySelector("#modalBarangay"),

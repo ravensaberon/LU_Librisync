@@ -13,6 +13,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import com.lulibrisync.util.DisplayFormatUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -116,12 +117,20 @@ public class Fine {
         this.calculatedAt = calculatedAt;
     }
 
+    public String getCalculatedAtDisplay() {
+        return DisplayFormatUtils.formatDateTime(calculatedAt);
+    }
+
     public LocalDateTime getPaidAt() {
         return paidAt;
     }
 
     public void setPaidAt(LocalDateTime paidAt) {
         this.paidAt = paidAt;
+    }
+
+    public String getPaidAtDisplay() {
+        return DisplayFormatUtils.formatDateTime(paidAt);
     }
 
     public LocalDateTime getCreatedAt() {

@@ -20,9 +20,9 @@
         <div class="nav-links">
             <a class="nav-pill" href="${pageContext.request.contextPath}/student/dashboard">Dashboard</a>
             <a class="nav-pill active" href="${pageContext.request.contextPath}/student/catalog">Catalog</a>
-            <a class="nav-pill" href="${pageContext.request.contextPath}/student/reservations">Reservations</a>
+            <a class="nav-pill" href="${pageContext.request.contextPath}/student/reservations">Pickup requests</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/student/profile">Profile</a>
-            <a class="nav-pill" href="${pageContext.request.contextPath}/student/history">Borrowing history</a>
+            <a class="nav-pill" href="${pageContext.request.contextPath}/student/history">Borrowed books</a>
             <form method="post" action="${pageContext.request.contextPath}/logout">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
                 <button class="nav-pill warm border-0" type="submit">Logout</button>
@@ -88,11 +88,19 @@
             <c:set var="activeIssueStatus" value="${studentActiveIssueStatusByBookId[book.id]}"/>
             <c:set var="activeIssueId" value="${studentActiveIssueIdByBookId[book.id]}"/>
             <c:set var="activeIssueDueDate" value="${studentActiveIssueDueDateByBookId[book.id]}"/>
+            <c:set var="returnRequested" value="${studentActiveIssueReturnRequestedByBookId[book.id]}"/>
             <c:set var="walkInBorrowableCopies" value="${walkInBorrowableCopyCountByBook[book.id]}"/>
             <c:set var="reservationPickupDate" value="${not empty nextAvailableDateByBookId[book.id] ? nextAvailableDateByBookId[book.id] : todayDate}"/>
             <button class="catalog-card catalog-card-button" type="button" data-bs-toggle="modal" data-bs-target="#catalogBookModal${book.id}">
                 <span class="catalog-cover">
-                    <i class="bi bi-book-half"></i>
+                    <c:choose>
+                        <c:when test="${readableBookCoverByBookId[book.id]}">
+                            <img class="catalog-cover-image" src="${pageContext.request.contextPath}/books/${book.id}/cover" alt="${book.title} cover">
+                        </c:when>
+                        <c:otherwise>
+                            <i class="bi bi-book-half"></i>
+                        </c:otherwise>
+                    </c:choose>
                 </span>
                 <span class="catalog-summary">
                     <span class="catalog-title">${book.title}</span>
@@ -116,7 +124,14 @@
                             <div class="modal-panel-grid">
                                 <div class="modal-card">
                                     <div class="catalog-cover catalog-cover-large mb-3">
-                                        <i class="bi bi-journal-richtext"></i>
+                                        <c:choose>
+                                            <c:when test="${readableBookCoverByBookId[book.id]}">
+                                                <img class="catalog-cover-image" src="${pageContext.request.contextPath}/books/${book.id}/cover" alt="${book.title} cover">
+                                            </c:when>
+                                            <c:otherwise>
+                                                <i class="bi bi-journal-richtext"></i>
+                                            </c:otherwise>
+                                        </c:choose>
                                     </div>
                                     <div class="d-flex flex-wrap gap-2 mb-3">
                                         <c:choose>
@@ -124,7 +139,7 @@
                                                 <span class="tag-chip">Borrowed by you</span>
                                             </c:when>
                                             <c:when test="${reservationStatus == 'READY'}">
-                                                <span class="tag-chip">Ready for claim</span>
+                                                <span class="tag-chip">Ready for desk pickup</span>
                                             </c:when>
                                             <c:when test="${walkInBorrowableCopies > 0}">
                                                 <span class="tag-chip">Available now</span>
@@ -137,12 +152,18 @@
                                             </c:otherwise>
                                         </c:choose>
                                         <c:if test="${readableEbookByBookId[book.id]}">
-                                            <span class="tag-chip subtle">Read online</span>
+                                            <span class="tag-chip subtle">Digital copy available</span>
                                         </c:if>
                                     </div>
                                     <p class="muted-text mb-0">
                                         <c:out value="${empty book.description ? 'Synopsis is not available yet for this title.' : book.description}"/>
                                     </p>
+                                    <c:if test="${readableEbookByBookId[book.id]}">
+                                        <div class="support-item mt-3">
+                                            <strong>Digital access</strong>
+                                            <span>You can keep reading this title online even when all physical copies are already borrowed or reserved.</span>
+                                        </div>
+                                    </c:if>
                                 </div>
 
                                 <div class="modal-card">
@@ -171,6 +192,15 @@
                                             <span class="modal-stat-label">Borrow due</span>
                                             <strong class="modal-stat-value">${defaultBorrowDueDate}</strong>
                                         </div>
+                                        <div class="modal-stat-card">
+                                            <span class="modal-stat-label">Digital reading</span>
+                                            <strong class="modal-stat-value">
+                                                <c:choose>
+                                                    <c:when test="${readableEbookByBookId[book.id]}">Always available</c:when>
+                                                    <c:otherwise>Not uploaded yet</c:otherwise>
+                                                </c:choose>
+                                            </strong>
+                                        </div>
                                     </div>
 
                                     <c:if test="${walkInBorrowableCopies < 1 and empty reservationStatus and not empty nextAvailableDateByBookId[book.id]}">
@@ -197,17 +227,26 @@
                                                 <c:if test="${not empty activeIssueDueDate}">
                                                     <span class="tag-chip subtle">Due: ${activeIssueDueDate}</span>
                                                 </c:if>
-                                                <form method="post" action="${pageContext.request.contextPath}/student/issues/${activeIssueId}/return">
-                                                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                                                    <input type="hidden" name="redirectTo" value="/student/catalog">
-                                                    <button class="btn btn-outline-secondary" type="submit">Return book</button>
-                                                </form>
+                                                <c:choose>
+                                                    <c:when test="${returnRequested}">
+                                                        <span class="tag-chip warn">Return request pending</span>
+                                                        <form method="post" action="${pageContext.request.contextPath}/student/issues/${activeIssueId}/cancel-return-request">
+                                                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                                                            <input type="hidden" name="redirectTo" value="/student/catalog">
+                                                            <button class="btn btn-outline-secondary" type="submit">Cancel return request</button>
+                                                        </form>
+                                                    </c:when>
+                                                    <c:otherwise>
+                                                        <form method="post" action="${pageContext.request.contextPath}/student/issues/${activeIssueId}/request-return">
+                                                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                                                            <input type="hidden" name="redirectTo" value="/student/catalog">
+                                                            <button class="btn btn-outline-secondary" type="submit">Request return</button>
+                                                        </form>
+                                                    </c:otherwise>
+                                                </c:choose>
                                             </c:when>
                                             <c:when test="${reservationStatus == 'READY'}">
-                                                <form method="post" action="${pageContext.request.contextPath}/student/catalog/${book.id}/borrow">
-                                                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                                                    <button class="btn btn-brand" type="submit">Borrow reserved copy</button>
-                                                </form>
+                                                <span class="tag-chip">Proceed to the circulation desk for release.</span>
                                                 <a class="btn btn-outline-secondary" href="${pageContext.request.contextPath}/student/reservations">View reservation</a>
                                             </c:when>
                                             <c:when test="${not empty reservationStatus}">
@@ -217,7 +256,7 @@
                                                 <c:if test="${walkInBorrowableCopies > 0}">
                                                     <form method="post" action="${pageContext.request.contextPath}/student/catalog/${book.id}/borrow">
                                                         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                                                        <button class="btn btn-brand" type="submit">Borrow now</button>
+                                                        <button class="btn btn-brand" type="submit">Request desk pickup</button>
                                                     </form>
                                                 </c:if>
                                                 <form method="post" action="${pageContext.request.contextPath}/student/reservations" class="reservation-pickup-form">
@@ -233,7 +272,7 @@
                                                             min="${todayDate}"
                                                             max="${reservationScheduleMaxDate}"
                                                             required>
-                                                    <button class="btn btn-warm" type="submit">Reserve pickup</button>
+                                                    <button class="btn btn-warm" type="submit">Join reservation queue</button>
                                                 </form>
                                             </c:otherwise>
                                         </c:choose>
@@ -252,6 +291,24 @@
         <section class="panel-card mt-4">
             <p class="mb-0 muted-text">No books matched your current filters.</p>
         </section>
+    </c:if>
+
+    <c:if test="${booksPage.totalPages > 1}">
+        <nav class="mt-4" aria-label="Catalog pages">
+            <ul class="pagination justify-content-center mb-0">
+                <li class="page-item <c:if test='${!booksPage.hasPrevious}'>disabled</c:if>">
+                    <a class="page-link" href="${pageContext.request.contextPath}/student/catalog?page=${booksPage.previousPage}&keyword=${keyword}&categoryId=${selectedCategoryId}&authorId=${selectedAuthorId}&isbn=${isbnValue}&availableOnly=${availableOnly}">Previous</a>
+                </li>
+                <c:forEach begin="${booksPage.startPage}" end="${booksPage.endPage}" var="pageNumber">
+                    <li class="page-item <c:if test='${pageNumber == booksPage.page}'>active</c:if>">
+                        <a class="page-link" href="${pageContext.request.contextPath}/student/catalog?page=${pageNumber}&keyword=${keyword}&categoryId=${selectedCategoryId}&authorId=${selectedAuthorId}&isbn=${isbnValue}&availableOnly=${availableOnly}">${pageNumber}</a>
+                    </li>
+                </c:forEach>
+                <li class="page-item <c:if test='${!booksPage.hasNext}'>disabled</c:if>">
+                    <a class="page-link" href="${pageContext.request.contextPath}/student/catalog?page=${booksPage.nextPage}&keyword=${keyword}&categoryId=${selectedCategoryId}&authorId=${selectedAuthorId}&isbn=${isbnValue}&availableOnly=${availableOnly}">Next</a>
+                </li>
+            </ul>
+        </nav>
     </c:if>
 
     <div class="modal fade" id="catalogScannerModal" tabindex="-1" aria-hidden="true">

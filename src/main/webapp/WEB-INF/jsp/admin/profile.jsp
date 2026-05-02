@@ -75,7 +75,7 @@
         </div>
         <div class="info-tile">
             <span class="info-tile-label">Created</span>
-            <span class="info-tile-value">${adminUser.createdAt}</span>
+            <span class="info-tile-value">${adminUser.createdAtDisplay}</span>
         </div>
     </section>
 

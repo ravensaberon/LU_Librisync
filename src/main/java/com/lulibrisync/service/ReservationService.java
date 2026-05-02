@@ -2,6 +2,7 @@ package com.lulibrisync.service;
 
 import com.lulibrisync.model.Book;
 import com.lulibrisync.model.Reservation;
+import com.lulibrisync.model.ReservationRequestType;
 import com.lulibrisync.model.ReservationStatus;
 import com.lulibrisync.model.Student;
 import com.lulibrisync.model.IssueStatus;
@@ -33,6 +34,7 @@ public class ReservationService {
     private final EmailNotificationService emailNotificationService;
     private final CirculationPolicyService circulationPolicyService;
     private final int claimWindowHours;
+    private final int borrowRequestWindowMinutes;
     private final int maxPreferredPickupDays;
 
     public ReservationService(ReservationRepository reservationRepository,
@@ -42,6 +44,7 @@ public class ReservationService {
                               EmailNotificationService emailNotificationService,
                               CirculationPolicyService circulationPolicyService,
                               @org.springframework.beans.factory.annotation.Value("${lulibrisync.reservations.claim-hours:48}") int claimWindowHours,
+                              @org.springframework.beans.factory.annotation.Value("${lulibrisync.reservations.borrow-request-minutes:60}") int borrowRequestWindowMinutes,
                               @org.springframework.beans.factory.annotation.Value("${lulibrisync.reservations.max-preferred-pickup-days:30}") int maxPreferredPickupDays) {
         this.reservationRepository = reservationRepository;
         this.bookRepository = bookRepository;
@@ -50,6 +53,7 @@ public class ReservationService {
         this.emailNotificationService = emailNotificationService;
         this.circulationPolicyService = circulationPolicyService;
         this.claimWindowHours = Math.max(1, claimWindowHours);
+        this.borrowRequestWindowMinutes = Math.max(1, borrowRequestWindowMinutes);
         this.maxPreferredPickupDays = Math.max(1, maxPreferredPickupDays);
     }
 
@@ -60,6 +64,28 @@ public class ReservationService {
     public List<Reservation> getStudentReservations(String email) {
         Student student = studentService.getStudentByEmail(email);
         return reservationRepository.findByStudent_IdOrderByReservedAtDesc(student.getId());
+    }
+
+    public List<Reservation> getStudentBorrowRequests(String email) {
+        Student student = studentService.getStudentByEmail(email);
+        return reservationRepository.findByStudent_IdAndRequestTypeOrderByReservedAtDesc(student.getId(), ReservationRequestType.BORROW).stream()
+                .filter(Reservation::isActive)
+                .toList();
+    }
+
+    public List<Reservation> getStudentQueueReservations(String email) {
+        Student student = studentService.getStudentByEmail(email);
+        return reservationRepository.findByStudent_IdAndRequestTypeOrderByReservedAtDesc(student.getId(), ReservationRequestType.RESERVATION).stream()
+                .filter(Reservation::isActive)
+                .toList();
+    }
+
+    public List<Reservation> getBorrowRequests() {
+        return reservationRepository.findByStatusInAndRequestTypeOrderByReservedAtAsc(ACTIVE_STATUSES, ReservationRequestType.BORROW);
+    }
+
+    public List<Reservation> getQueueReservations() {
+        return reservationRepository.findByStatusInAndRequestTypeOrderByReservedAtAsc(ACTIVE_STATUSES, ReservationRequestType.RESERVATION);
     }
 
     public Reservation getReservationById(Long reservationId) {
@@ -80,7 +106,7 @@ public class ReservationService {
 
     public Map<Long, Integer> getActiveQueueSizesByBook() {
         Map<Long, Integer> queueSizes = new LinkedHashMap<>();
-        for (Reservation reservation : reservationRepository.findByStatusInOrderByReservedAtAsc(ACTIVE_STATUSES)) {
+        for (Reservation reservation : reservationRepository.findByStatusInAndRequestTypeOrderByReservedAtAsc(ACTIVE_STATUSES, ReservationRequestType.RESERVATION)) {
             Long bookId = reservation.getBook().getId();
             queueSizes.put(bookId, queueSizes.getOrDefault(bookId, 0) + 1);
         }
@@ -101,7 +127,7 @@ public class ReservationService {
         Map<Long, String> statuses = new LinkedHashMap<>();
         for (Reservation reservation : reservationRepository.findByStudent_IdOrderByReservedAtDesc(student.getId())) {
             if (reservation.isActive() && !statuses.containsKey(reservation.getBook().getId())) {
-                statuses.put(reservation.getBook().getId(), reservation.getStatus().name());
+                statuses.put(reservation.getBook().getId(), reservation.getRequestType().name() + ":" + reservation.getStatus().name());
             }
         }
         return statuses;
@@ -109,6 +135,48 @@ public class ReservationService {
 
     public int getMaxPreferredPickupDays() {
         return maxPreferredPickupDays;
+    }
+
+    public int getBorrowRequestWindowMinutes() {
+        return borrowRequestWindowMinutes;
+    }
+
+    @Transactional
+    public Reservation placeBorrowRequest(Long bookId, String email) {
+        if (bookId == null) {
+            throw new IllegalArgumentException("Book is required.");
+        }
+
+        promoteReservationsForBook(bookId);
+        Book book = bookRepository.findById(bookId)
+                .orElseThrow(() -> new IllegalArgumentException("Book not found."));
+        Student student = studentService.getStudentByEmail(email);
+        circulationPolicyService.validateBorrowingEligibility(student);
+
+        if (issueRecordRepository.existsByBook_IdAndStudent_IdAndStatusIn(bookId, student.getId(), List.of(IssueStatus.ISSUED, IssueStatus.OVERDUE))) {
+            throw new IllegalArgumentException("You already have this book on loan.");
+        }
+        if (reservationRepository.existsByBook_IdAndStudent_IdAndStatusIn(bookId, student.getId(), ACTIVE_STATUSES)) {
+            throw new IllegalArgumentException("You already have an active pickup request or reservation for this book.");
+        }
+        if (getWalkInBorrowableCopyCount(book) < 1) {
+            throw new IllegalArgumentException("No walk-in copy is available right now. Please join the reservation queue instead.");
+        }
+
+        Reservation reservation = new Reservation();
+        reservation.setBook(book);
+        reservation.setStudent(student);
+        reservation.setRequestType(ReservationRequestType.BORROW);
+        reservation.setStatus(ReservationStatus.READY);
+        reservation.setReservedAt(LocalDateTime.now());
+        reservation.setPreferredPickupDate(null);
+        reservation.setQueuePosition(0);
+        reservation.setExpiresAt(LocalDateTime.now().plusMinutes(borrowRequestWindowMinutes));
+
+        Reservation savedReservation = reservationRepository.save(reservation);
+        emailNotificationService.queueReservationReadyNotification(savedReservation);
+        promoteReservationsForBook(bookId);
+        return getReservationById(savedReservation.getId());
     }
 
     @Transactional
@@ -145,10 +213,11 @@ public class ReservationService {
         Reservation reservation = new Reservation();
         reservation.setBook(book);
         reservation.setStudent(student);
+        reservation.setRequestType(ReservationRequestType.RESERVATION);
         reservation.setStatus(ReservationStatus.PENDING);
         reservation.setReservedAt(LocalDateTime.now());
         reservation.setPreferredPickupDate(requestedPickupDate);
-        reservation.setQueuePosition((int) reservationRepository.countByBook_IdAndStatusIn(bookId, ACTIVE_STATUSES) + 1);
+        reservation.setQueuePosition((int) reservationRepository.countByBook_IdAndStatusInAndRequestType(bookId, ACTIVE_STATUSES, ReservationRequestType.RESERVATION) + 1);
 
         Reservation savedReservation = reservationRepository.save(reservation);
         reindexQueue(bookId);
@@ -235,6 +304,9 @@ public class ReservationService {
         }
 
         List<Reservation> activeReservations = reservationRepository.findByBook_IdAndStatusInOrderByQueuePositionAscReservedAtAsc(bookId, ACTIVE_STATUSES);
+        List<Reservation> queueReservations = activeReservations.stream()
+                .filter(Reservation::isQueueReservation)
+                .toList();
         if (activeReservations.isEmpty()) {
             return;
         }
@@ -249,7 +321,7 @@ public class ReservationService {
             return;
         }
 
-        for (Reservation reservation : activeReservations) {
+        for (Reservation reservation : queueReservations) {
             if (promotableSlots < 1) {
                 break;
             }
@@ -305,16 +377,19 @@ public class ReservationService {
 
     private void reindexQueue(Long bookId) {
         List<Reservation> activeReservations = reservationRepository.findByBook_IdAndStatusInOrderByQueuePositionAscReservedAtAsc(bookId, ACTIVE_STATUSES);
-        activeReservations.sort(Comparator
+        List<Reservation> queueReservations = activeReservations.stream()
+                .filter(Reservation::isQueueReservation)
+                .sorted(Comparator
                 .comparing(this::resolvePriorityDate)
                 .thenComparing(Reservation::getReservedAt)
-                .thenComparing(Reservation::getId));
+                .thenComparing(Reservation::getId))
+                .toList();
         int index = 1;
-        for (Reservation reservation : activeReservations) {
+        for (Reservation reservation : queueReservations) {
             reservation.setQueuePosition(index++);
         }
-        if (!activeReservations.isEmpty()) {
-            reservationRepository.saveAll(activeReservations);
+        if (!queueReservations.isEmpty()) {
+            reservationRepository.saveAll(queueReservations);
         }
     }
 
