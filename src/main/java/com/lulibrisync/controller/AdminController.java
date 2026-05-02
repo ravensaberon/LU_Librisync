@@ -13,6 +13,7 @@ import com.lulibrisync.repository.IssueRecordRepository;
 import com.lulibrisync.repository.UserRepository;
 import com.lulibrisync.service.AuditLogService;
 import com.lulibrisync.service.AdminService;
+import com.lulibrisync.service.AdminNotificationService;
 import com.lulibrisync.service.AuthService;
 import com.lulibrisync.service.FineService;
 import com.lulibrisync.service.IssueService;
@@ -46,6 +47,7 @@ public class AdminController {
     private final IssueService issueService;
     private final StudentService studentService;
     private final AdminService adminService;
+    private final AdminNotificationService adminNotificationService;
     private final AuthService authService;
     private final ReservationService reservationService;
     private final FineService fineService;
@@ -57,6 +59,7 @@ public class AdminController {
                            IssueService issueService,
                            StudentService studentService,
                            AdminService adminService,
+                           AdminNotificationService adminNotificationService,
                            AuthService authService,
                            ReservationService reservationService,
                            FineService fineService,
@@ -67,6 +70,7 @@ public class AdminController {
         this.issueService = issueService;
         this.studentService = studentService;
         this.adminService = adminService;
+        this.adminNotificationService = adminNotificationService;
         this.authService = authService;
         this.reservationService = reservationService;
         this.fineService = fineService;
@@ -74,7 +78,7 @@ public class AdminController {
     }
 
     @GetMapping("/dashboard")
-    public String dashboard(Model model) {
+    public String dashboard(Authentication authentication, Model model) {
         issueService.refreshOverdueStatuses();
         long issuedCount = issueRecordRepository.countByStatus(IssueStatus.ISSUED);
         long overdueCount = issueRecordRepository.countByStatus(IssueStatus.OVERDUE);
@@ -99,7 +103,17 @@ public class AdminController {
         model.addAttribute("blockedBorrowerCount", blockedBorrowerCount);
         model.addAttribute("recentAuditLogs", auditLogService.getRecentLogs().stream().limit(8).toList());
         model.addAttribute("recentOutstandingFines", fineService.getRecentOutstandingFines());
+        model.addAttribute("recentAdminNotifications", adminNotificationService.getRecentNotifications(authentication.getName()));
+        model.addAttribute("unreadAdminNotificationCount", adminNotificationService.countUnreadNotifications(authentication.getName()));
         return "admin/dashboard";
+    }
+
+    @PostMapping("/notifications/read-all")
+    public String markAllNotificationsRead(Authentication authentication,
+                                           RedirectAttributes redirectAttributes) {
+        adminNotificationService.markAllAsRead(authentication.getName());
+        redirectAttributes.addFlashAttribute("success", "Notifications marked as read.");
+        return "redirect:/admin/dashboard";
     }
 
     @GetMapping("/students")

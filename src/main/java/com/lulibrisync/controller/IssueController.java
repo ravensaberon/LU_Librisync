@@ -4,6 +4,7 @@ import com.lulibrisync.service.AuditLogService;
 import com.lulibrisync.service.BookService;
 import com.lulibrisync.service.CirculationPolicyService;
 import com.lulibrisync.service.IssueService;
+import com.lulibrisync.service.ReservationService;
 import com.lulibrisync.service.StudentService;
 import com.lulibrisync.util.PaginationUtils;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -29,32 +30,46 @@ public class IssueController {
     private final StudentService studentService;
     private final AuditLogService auditLogService;
     private final CirculationPolicyService circulationPolicyService;
+    private final ReservationService reservationService;
 
     public IssueController(IssueService issueService,
                            BookService bookService,
                            StudentService studentService,
                            AuditLogService auditLogService,
-                           CirculationPolicyService circulationPolicyService) {
+                           CirculationPolicyService circulationPolicyService,
+                           ReservationService reservationService) {
         this.issueService = issueService;
         this.bookService = bookService;
         this.studentService = studentService;
         this.auditLogService = auditLogService;
         this.circulationPolicyService = circulationPolicyService;
+        this.reservationService = reservationService;
     }
 
     @GetMapping("/admin/issues")
     public String issues(@RequestParam(required = false) Long editId,
                          @RequestParam(defaultValue = "1") Integer activePage,
                          @RequestParam(defaultValue = "1") Integer historyPage,
+                         @RequestParam(defaultValue = "1") Integer reservationBorrowPage,
+                         @RequestParam(defaultValue = "1") Integer reservationQueuePage,
                          Model model) {
+        reservationService.syncReadyReservations();
         var activeIssues = issueService.getActiveIssues();
         var issueHistory = issueService.getAllIssues();
+        var borrowRequests = reservationService.getBorrowRequests();
+        var queueReservations = reservationService.getQueueReservations();
         var activeIssuesPage = PaginationUtils.paginate(activeIssues, activePage, ACTIVE_ISSUES_PAGE_SIZE);
         var issueHistoryPage = PaginationUtils.paginate(issueHistory, historyPage, ISSUE_HISTORY_PAGE_SIZE);
+        var borrowRequestsPage = PaginationUtils.paginate(borrowRequests, reservationBorrowPage, 8);
+        var queueReservationsPage = PaginationUtils.paginate(queueReservations, reservationQueuePage, 8);
         model.addAttribute("activeIssues", activeIssuesPage.getItems());
         model.addAttribute("activeIssuesPage", activeIssuesPage);
         model.addAttribute("issueHistory", issueHistoryPage.getItems());
         model.addAttribute("issueHistoryPage", issueHistoryPage);
+        model.addAttribute("borrowRequests", borrowRequestsPage.getItems());
+        model.addAttribute("borrowRequestsPage", borrowRequestsPage);
+        model.addAttribute("queueReservations", queueReservationsPage.getItems());
+        model.addAttribute("queueReservationsPage", queueReservationsPage);
         model.addAttribute("availableBooks", bookService.getAvailableBooks());
         model.addAttribute("students", studentService.searchStudents(null));
         model.addAttribute("defaultDueDate", LocalDate.now().plusDays(7));
@@ -64,6 +79,11 @@ public class IssueController {
         model.addAttribute("pendingReturnRequestCount", issueService.countPendingReturnRequests());
         model.addAttribute("maxLoanDays", circulationPolicyService.getMaxLoanDays());
         model.addAttribute("maxActiveLoans", circulationPolicyService.getMaxActiveLoans());
+        model.addAttribute("reservationCount", borrowRequests.size() + queueReservations.size());
+        model.addAttribute("pendingReservationCount", queueReservations.stream().filter(reservation -> reservation.getStatus().name().equals("PENDING")).count());
+        model.addAttribute("readyReservationCount", borrowRequests.stream().filter(reservation -> reservation.getStatus().name().equals("READY")).count()
+                + queueReservations.stream().filter(reservation -> reservation.getStatus().name().equals("READY")).count());
+        model.addAttribute("borrowRequestWindowMinutes", reservationService.getBorrowRequestWindowMinutes());
         if (editId != null) {
             var editIssue = issueService.getIssueById(editId);
             model.addAttribute("editIssue", editIssue);

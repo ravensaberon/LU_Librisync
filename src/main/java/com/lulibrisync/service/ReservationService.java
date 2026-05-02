@@ -1,6 +1,7 @@
 package com.lulibrisync.service;
 
 import com.lulibrisync.model.Book;
+import com.lulibrisync.model.AdminNotificationType;
 import com.lulibrisync.model.Reservation;
 import com.lulibrisync.model.ReservationRequestType;
 import com.lulibrisync.model.ReservationStatus;
@@ -32,6 +33,7 @@ public class ReservationService {
     private final IssueRecordRepository issueRecordRepository;
     private final StudentService studentService;
     private final EmailNotificationService emailNotificationService;
+    private final AdminNotificationService adminNotificationService;
     private final CirculationPolicyService circulationPolicyService;
     private final int claimWindowHours;
     private final int borrowRequestWindowMinutes;
@@ -42,6 +44,7 @@ public class ReservationService {
                               IssueRecordRepository issueRecordRepository,
                               StudentService studentService,
                               EmailNotificationService emailNotificationService,
+                              AdminNotificationService adminNotificationService,
                               CirculationPolicyService circulationPolicyService,
                               @org.springframework.beans.factory.annotation.Value("${lulibrisync.reservations.claim-hours:48}") int claimWindowHours,
                               @org.springframework.beans.factory.annotation.Value("${lulibrisync.reservations.borrow-request-minutes:60}") int borrowRequestWindowMinutes,
@@ -51,6 +54,7 @@ public class ReservationService {
         this.issueRecordRepository = issueRecordRepository;
         this.studentService = studentService;
         this.emailNotificationService = emailNotificationService;
+        this.adminNotificationService = adminNotificationService;
         this.circulationPolicyService = circulationPolicyService;
         this.claimWindowHours = Math.max(1, claimWindowHours);
         this.borrowRequestWindowMinutes = Math.max(1, borrowRequestWindowMinutes);
@@ -94,6 +98,33 @@ public class ReservationService {
         }
         return reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new IllegalArgumentException("Reservation not found."));
+    }
+
+    public Reservation getReservationByDeskQrCode(String qrCode) {
+        if (qrCode == null || qrCode.isBlank()) {
+            throw new IllegalArgumentException("Reservation QR code is required.");
+        }
+
+        String normalizedQrCode = qrCode.trim();
+        String[] segments = normalizedQrCode.split("-");
+        if (segments.length < 5
+                || !"LU".equalsIgnoreCase(segments[0])
+                || !"RES".equalsIgnoreCase(segments[1])) {
+            throw new IllegalArgumentException("Scanned QR code is not a valid LU Librisync reservation code.");
+        }
+
+        Long reservationId;
+        try {
+            reservationId = Long.parseLong(segments[2]);
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException("Scanned QR code is not a valid LU Librisync reservation code.");
+        }
+
+        Reservation reservation = getReservationById(reservationId);
+        if (!reservation.getDeskQrCode().equalsIgnoreCase(normalizedQrCode)) {
+            throw new IllegalArgumentException("Scanned QR code does not match the reservation record.");
+        }
+        return reservation;
     }
 
     public long countPendingReservations() {
@@ -175,6 +206,12 @@ public class ReservationService {
 
         Reservation savedReservation = reservationRepository.save(reservation);
         emailNotificationService.queueReservationReadyNotification(savedReservation);
+        adminNotificationService.notifyAdmins(
+                AdminNotificationType.BORROW_REQUEST,
+                "New borrow request",
+                student.getUser().getName() + " requested a walk-in borrow for " + book.getTitle() + ".",
+                "/admin/issues#reservation-desk"
+        );
         promoteReservationsForBook(bookId);
         return getReservationById(savedReservation.getId());
     }
@@ -220,6 +257,12 @@ public class ReservationService {
         reservation.setQueuePosition((int) reservationRepository.countByBook_IdAndStatusInAndRequestType(bookId, ACTIVE_STATUSES, ReservationRequestType.RESERVATION) + 1);
 
         Reservation savedReservation = reservationRepository.save(reservation);
+        adminNotificationService.notifyAdmins(
+                AdminNotificationType.RESERVATION_REQUEST,
+                "New reservation request",
+                student.getUser().getName() + " placed a reservation for " + book.getTitle() + ".",
+                "/admin/issues#reservation-desk"
+        );
         reindexQueue(bookId);
         promoteReservationsForBook(bookId);
         return getReservationById(savedReservation.getId());

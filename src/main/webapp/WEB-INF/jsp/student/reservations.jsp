@@ -7,6 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Pickup Requests</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="${pageContext.request.contextPath}/css/app.css">
 </head>
 <body>
@@ -24,7 +25,7 @@
             <a class="nav-pill" href="${pageContext.request.contextPath}/student/history">Borrowed books</a>
             <form method="post" action="${pageContext.request.contextPath}/logout">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                <button class="nav-pill warm border-0" type="submit">Logout</button>
+                <button class="nav-pill warm border-0" type="submit" aria-label="Logout" title="Logout"><span class="nav-pill-icon"><i class="bi bi-power" aria-hidden="true"></i></span><span class="nav-pill-label">Logout</span></button>
             </form>
         </div>
     </div>
@@ -88,6 +89,15 @@
                                         <c:if test="${reservation.status.name() == 'READY'}">
                                             <span class="tag-chip">Bring your ID and visit the circulation desk for release.</span>
                                         </c:if>
+                                        <button class="btn btn-outline-secondary" type="button"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#reservationQrModal"
+                                                data-reservation-qr="${reservation.deskQrCode}"
+                                                data-book-title="${reservation.book.title}"
+                                                data-reservation-type="Borrow request"
+                                                data-reservation-status="${reservation.status}">
+                                            <i class="bi bi-qr-code me-2"></i>Show pickup QR
+                                        </button>
                                         <c:if test="${reservation.active}">
                                             <form method="post" action="${pageContext.request.contextPath}/student/reservations/${reservation.id}/cancel">
                                                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
@@ -173,6 +183,15 @@
                                         <c:if test="${reservation.status.name() == 'READY'}">
                                             <span class="tag-chip">Bring your ID and visit the circulation desk for release.</span>
                                         </c:if>
+                                        <button class="btn btn-outline-secondary" type="button"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#reservationQrModal"
+                                                data-reservation-qr="${reservation.deskQrCode}"
+                                                data-book-title="${reservation.book.title}"
+                                                data-reservation-type="Reservation queue"
+                                                data-reservation-status="${reservation.status}">
+                                            <i class="bi bi-qr-code me-2"></i>Show pickup QR
+                                        </button>
                                         <c:if test="${reservation.active}">
                                             <form method="post" action="${pageContext.request.contextPath}/student/reservations/${reservation.id}/cancel">
                                                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
@@ -214,8 +233,96 @@
             </div>
         </c:if>
     </section>
+
+    <div class="modal fade" id="reservationQrModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header modal-header-brand">
+                    <div>
+                        <span class="modal-kicker">Pickup QR</span>
+                        <h2 class="h4 mb-1 mt-2">Show this code at the circulation desk</h2>
+                        <p class="modal-subtitle mb-0">Admin can scan this QR from your phone to match your request and record the desk release faster.</p>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="qr-card">
+                        <div class="qr-code-shell mb-3" id="reservationQrCanvas"></div>
+                        <div class="qr-code-meta">
+                            <div>
+                                <span class="info-tile-label">Reservation code</span>
+                                <span class="qr-code-value" id="reservationQrValue">No reservation selected yet.</span>
+                            </div>
+                            <div class="info-grid">
+                                <div class="info-tile">
+                                    <span class="info-tile-label">Book</span>
+                                    <span class="info-tile-value" id="reservationQrBookTitle">Not selected</span>
+                                </div>
+                                <div class="info-tile">
+                                    <span class="info-tile-label">Request type</span>
+                                    <span class="info-tile-value" id="reservationQrType">Not selected</span>
+                                </div>
+                                <div class="info-tile">
+                                    <span class="info-tile-label">Status</span>
+                                    <span class="info-tile-value" id="reservationQrStatus">Not selected</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 mt-3">
+                            <button class="btn btn-brand" id="downloadReservationQrButton" type="button" disabled>Download PNG</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="${pageContext.request.contextPath}/vendor/qrious.min.js"></script>
+<script src="${pageContext.request.contextPath}/js/qr-tools.js"></script>
 <script src="${pageContext.request.contextPath}/js/app.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const qrModalElement = document.getElementById("reservationQrModal");
+        const qrCanvasElement = document.getElementById("reservationQrCanvas");
+        const qrValueElement = document.getElementById("reservationQrValue");
+        const qrBookTitleElement = document.getElementById("reservationQrBookTitle");
+        const qrTypeElement = document.getElementById("reservationQrType");
+        const qrStatusElement = document.getElementById("reservationQrStatus");
+        const downloadButton = document.getElementById("downloadReservationQrButton");
+        let currentReservationQrCanvas = null;
+
+        qrModalElement.addEventListener("show.bs.modal", function (event) {
+            const trigger = event.relatedTarget;
+            const reservationQr = trigger.getAttribute("data-reservation-qr") || "";
+            const bookTitle = trigger.getAttribute("data-book-title") || "Not selected";
+            const reservationType = trigger.getAttribute("data-reservation-type") || "Not selected";
+            const reservationStatus = trigger.getAttribute("data-reservation-status") || "Not selected";
+
+            qrValueElement.textContent = reservationQr;
+            qrBookTitleElement.textContent = bookTitle;
+            qrTypeElement.textContent = reservationType;
+            qrStatusElement.textContent = reservationStatus;
+            currentReservationQrCanvas = window.LuLibrisyncQr.renderQr(qrCanvasElement, reservationQr, {
+                size: 240,
+                emptyText: "No reservation QR code is available.",
+                errorText: "Unable to render this reservation QR code."
+            });
+            downloadButton.disabled = !currentReservationQrCanvas;
+            downloadButton.dataset.filename = window.LuLibrisyncQr.normalizeFilename(bookTitle, "reservation") + "-pickup-qr.png";
+        });
+
+        downloadButton.addEventListener("click", function () {
+            if (!currentReservationQrCanvas) {
+                return;
+            }
+
+            window.LuLibrisyncQr.downloadCanvas(currentReservationQrCanvas, downloadButton.dataset.filename);
+        });
+    });
+</script>
 </body>
 </html>
+
+

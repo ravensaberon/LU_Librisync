@@ -25,7 +25,7 @@
             <a class="nav-pill" href="${pageContext.request.contextPath}/student/history">Borrowed books</a>
             <form method="post" action="${pageContext.request.contextPath}/logout">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                <button class="nav-pill warm border-0" type="submit">Logout</button>
+                <button class="nav-pill warm border-0" type="submit" aria-label="Logout" title="Logout"><span class="nav-pill-icon"><i class="bi bi-power" aria-hidden="true"></i></span><span class="nav-pill-label">Logout</span></button>
             </form>
         </div>
     </div>
@@ -82,7 +82,7 @@
         </form>
     </section>
 
-    <section class="catalog-grid">
+    <section class="catalog-grid catalog-grid-uniform">
         <c:forEach items="${books}" var="book">
             <c:set var="reservationStatus" value="${studentReservationStatusByBookId[book.id]}"/>
             <c:set var="activeIssueStatus" value="${studentActiveIssueStatusByBookId[book.id]}"/>
@@ -103,8 +103,8 @@
                     </c:choose>
                 </span>
                 <span class="catalog-summary">
-                    <span class="catalog-title">${book.title}</span>
-                    <span class="catalog-author">${book.author.name}</span>
+                    <span class="catalog-title" title="${book.title}">${book.title}</span>
+                    <span class="catalog-author" title="${book.author.name}">${book.author.name}</span>
                     <span class="catalog-year"><c:out value="${empty book.publicationYear ? 'Year not set' : book.publicationYear}"/></span>
                 </span>
             </button>
@@ -392,3 +392,5 @@
 </script>
 </body>
 </html>
+
+

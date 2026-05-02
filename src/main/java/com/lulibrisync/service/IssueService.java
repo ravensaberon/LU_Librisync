@@ -1,6 +1,7 @@
 package com.lulibrisync.service;
 
 import com.lulibrisync.dto.AdminDashboardChartPoint;
+import com.lulibrisync.model.AdminNotificationType;
 import com.lulibrisync.model.Book;
 import com.lulibrisync.model.IssueRecord;
 import com.lulibrisync.model.IssueStatus;
@@ -37,9 +38,11 @@ public class IssueService {
     private final StudentService studentService;
     private final ReservationService reservationService;
     private final EmailNotificationService emailNotificationService;
+    private final AdminNotificationService adminNotificationService;
     private final FineService fineService;
     private final CirculationPolicyService circulationPolicyService;
     private final BigDecimal dailyFine;
+    private final BigDecimal reserveDailyFine;
 
     public IssueService(IssueRecordRepository issueRecordRepository,
                         BookRepository bookRepository,
@@ -48,9 +51,11 @@ public class IssueService {
                         StudentService studentService,
                         ReservationService reservationService,
                         EmailNotificationService emailNotificationService,
+                        AdminNotificationService adminNotificationService,
                         FineService fineService,
                         CirculationPolicyService circulationPolicyService,
-                        @org.springframework.beans.factory.annotation.Value("${lulibrisync.circulation.daily-fine:10.00}") BigDecimal dailyFine) {
+                        @org.springframework.beans.factory.annotation.Value("${lulibrisync.circulation.daily-fine:2.00}") BigDecimal dailyFine,
+                        @org.springframework.beans.factory.annotation.Value("${lulibrisync.circulation.reserve-daily-fine:50.00}") BigDecimal reserveDailyFine) {
         this.issueRecordRepository = issueRecordRepository;
         this.bookRepository = bookRepository;
         this.studentRepository = studentRepository;
@@ -58,9 +63,11 @@ public class IssueService {
         this.studentService = studentService;
         this.reservationService = reservationService;
         this.emailNotificationService = emailNotificationService;
+        this.adminNotificationService = adminNotificationService;
         this.fineService = fineService;
         this.circulationPolicyService = circulationPolicyService;
-        this.dailyFine = dailyFine == null ? new BigDecimal("10.00") : dailyFine;
+        this.dailyFine = dailyFine == null ? new BigDecimal("2.00") : dailyFine;
+        this.reserveDailyFine = reserveDailyFine == null ? new BigDecimal("50.00") : reserveDailyFine;
     }
 
     @Transactional
@@ -132,7 +139,7 @@ public class IssueService {
         LocalDateTime returnTimestamp = LocalDateTime.now();
         issueRecord.setReturnDate(returnTimestamp);
         issueRecord.setReturnRequestedAt(null);
-        issueRecord.setFineAmount(calculateFine(issueRecord.getDueDate(), returnTimestamp));
+        issueRecord.setFineAmount(calculateFine(issueRecord.getBook(), issueRecord.getDueDate(), returnTimestamp));
         issueRecord.setStatus(IssueStatus.RETURNED);
 
         Book book = issueRecord.getBook();
@@ -157,7 +164,7 @@ public class IssueService {
                 continue;
             }
 
-            BigDecimal fine = calculateFine(issueRecord.getDueDate(), now);
+            BigDecimal fine = calculateFine(issueRecord.getBook(), issueRecord.getDueDate(), now);
             if (now.isAfter(issueRecord.getDueDate())) {
                 issueRecord.setStatus(IssueStatus.OVERDUE);
                 issueRecord.setFineAmount(fine);
@@ -298,7 +305,14 @@ public class IssueService {
         }
 
         issueRecord.setReturnRequestedAt(LocalDateTime.now());
-        return issueRecordRepository.save(issueRecord);
+        IssueRecord savedIssueRecord = issueRecordRepository.save(issueRecord);
+        adminNotificationService.notifyAdmins(
+                AdminNotificationType.RETURN_REQUEST,
+                "New return request",
+                student.getUser().getName() + " requested a desk return for " + issueRecord.getBook().getTitle() + ".",
+                "/admin/issues#reservation-desk"
+        );
+        return savedIssueRecord;
     }
 
     @Transactional
@@ -333,7 +347,7 @@ public class IssueService {
 
         if (!issueRecord.isReturned()) {
             LocalDateTime now = LocalDateTime.now();
-            BigDecimal fine = calculateFine(issueRecord.getDueDate(), now);
+            BigDecimal fine = calculateFine(issueRecord.getBook(), issueRecord.getDueDate(), now);
             if (now.isAfter(issueRecord.getDueDate())) {
                 issueRecord.setStatus(IssueStatus.OVERDUE);
                 issueRecord.setFineAmount(fine);
@@ -410,7 +424,7 @@ public class IssueService {
                 .toList();
     }
 
-    private BigDecimal calculateFine(LocalDateTime dueDate, LocalDateTime referenceDate) {
+    private BigDecimal calculateFine(Book book, LocalDateTime dueDate, LocalDateTime referenceDate) {
         if (dueDate == null || referenceDate == null || !referenceDate.isAfter(dueDate)) {
             return BigDecimal.ZERO;
         }
@@ -419,7 +433,25 @@ public class IssueService {
         if (overdueDays < 1) {
             overdueDays = 1;
         }
-        return dailyFine.multiply(BigDecimal.valueOf(overdueDays));
+        return resolveDailyFine(book).multiply(BigDecimal.valueOf(overdueDays));
+    }
+
+    private BigDecimal resolveDailyFine(Book book) {
+        return isReserveBook(book) ? reserveDailyFine : dailyFine;
+    }
+
+    private boolean isReserveBook(Book book) {
+        if (book == null) {
+            return false;
+        }
+
+        return containsReserveKeyword(book.getShelfLocation())
+                || (book.getCategory() != null && containsReserveKeyword(book.getCategory().getName()))
+                || containsReserveKeyword(book.getTitle());
+    }
+
+    private boolean containsReserveKeyword(String value) {
+        return value != null && value.toLowerCase(Locale.ENGLISH).contains("reserve");
     }
 
     private String blankToNull(String value) {

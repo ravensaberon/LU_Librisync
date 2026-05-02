@@ -52,10 +52,10 @@ public class CirculationPolicyService {
             blockers.add("Account is inactive.");
         }
         if (blockOnOverdue && overdueCount > 0) {
-            blockers.add("Student has overdue borrowed items.");
+            blockers.add("Library hold is active because the student has overdue borrowed items.");
         }
         if (blockOnUnpaidFines && outstandingFineAmount.compareTo(BigDecimal.ZERO) > 0) {
-            blockers.add("Student has unpaid fine obligations.");
+            blockers.add("Library hold is active because the student has unpaid fine obligations.");
         }
         if (activeLoansCount >= maxActiveLoans) {
             blockers.add("Maximum active loan limit has been reached.");

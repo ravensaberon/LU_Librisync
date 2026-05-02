@@ -22,6 +22,7 @@ import java.util.Locale;
 @Table(name = "reservations")
 public class Reservation {
 
+    private static final String DESK_QR_PREFIX = "LU-RES";
     private static final DateTimeFormatter DISPLAY_DATE_TIME_FORMATTER =
             DateTimeFormatter.ofPattern("MMMM d, yyyy h:mm a", Locale.ENGLISH);
     private static final DateTimeFormatter DISPLAY_DATE_FORMATTER =
@@ -173,5 +174,23 @@ public class Reservation {
 
     public String getPreferredPickupDateDisplay() {
         return preferredPickupDate == null ? "" : DISPLAY_DATE_FORMATTER.format(preferredPickupDate);
+    }
+
+    public String getDeskQrCode() {
+        if (id == null || student == null || requestType == null) {
+            return "";
+        }
+
+        return DESK_QR_PREFIX
+                + "-" + id
+                + "-" + sanitizeDeskQrSegment(student.getStudentId())
+                + "-" + requestType.name();
+    }
+
+    private String sanitizeDeskQrSegment(String value) {
+        if (value == null || value.isBlank()) {
+            return "STUDENT";
+        }
+        return value.replaceAll("[^A-Za-z0-9]", "").toUpperCase(Locale.ENGLISH);
     }
 }

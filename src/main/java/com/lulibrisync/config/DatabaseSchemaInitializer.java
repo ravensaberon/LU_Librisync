@@ -29,6 +29,7 @@ public class DatabaseSchemaInitializer implements ApplicationRunner {
             ensurePreferredPickupDateColumn(statement);
             ensureReservationRequestTypeColumn(statement);
             ensureIssueReturnRequestColumn(statement);
+            ensureAdminNotificationsTable(statement);
         }
     }
 
@@ -81,5 +82,23 @@ public class DatabaseSchemaInitializer implements ApplicationRunner {
         }
 
         statement.executeUpdate("UPDATE reservations SET request_type = 'RESERVATION' WHERE request_type IS NULL OR request_type = ''");
+    }
+
+    private void ensureAdminNotificationsTable(Statement statement) throws Exception {
+        statement.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS admin_notifications (
+                    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                    admin_user_id BIGINT NOT NULL,
+                    notification_type VARCHAR(30) NOT NULL,
+                    title VARCHAR(180) NOT NULL,
+                    message TEXT NOT NULL,
+                    link_url VARCHAR(255),
+                    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+                    read_at DATETIME NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT fk_admin_notifications_user FOREIGN KEY (admin_user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+                """);
+        logger.info("Ensured admin_notifications table exists for in-app admin alerts.");
     }
 }

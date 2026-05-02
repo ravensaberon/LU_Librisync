@@ -168,20 +168,20 @@ public class DigitalLibraryService {
                 && coverImagePath.replace('\\', '/').startsWith("book-covers/");
     }
 
-    private Path resolveManagedPath(String ebookPath) {
-        Path resolvedPath = storageRoot.resolve(ebookPath).toAbsolutePath().normalize();
+    private Path resolveManagedPath(String relativeStoragePath) {
+        Path resolvedPath = storageRoot.resolve(relativeStoragePath).toAbsolutePath().normalize();
         if (!resolvedPath.startsWith(storageRoot)) {
-            throw new IllegalArgumentException("Invalid e-book path.");
+            throw new IllegalArgumentException("Invalid managed storage path.");
         }
         return resolvedPath;
     }
 
-    private Path resolveBookPath(String ebookPath) {
-        if (isManagedEbookPath(ebookPath)) {
-            return resolveManagedPath(ebookPath);
+    private Path resolveBookPath(String storedPath) {
+        if (isManagedEbookPath(storedPath) || isManagedBookCoverPath(storedPath)) {
+            return resolveManagedPath(storedPath);
         }
 
-        Path directPath = Path.of(ebookPath);
+        Path directPath = Path.of(storedPath);
         if (!directPath.isAbsolute()) {
             directPath = Path.of(System.getProperty("user.dir")).resolve(directPath);
         }

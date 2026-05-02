@@ -26,7 +26,7 @@
             <a class="nav-pill" href="${pageContext.request.contextPath}/student/history">Borrowed books</a>
             <form method="post" action="${pageContext.request.contextPath}/logout">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                <button class="nav-pill warm border-0" type="submit">Logout</button>
+                <button class="nav-pill warm border-0" type="submit" aria-label="Logout" title="Logout"><span class="nav-pill-icon"><i class="bi bi-power" aria-hidden="true"></i></span><span class="nav-pill-label">Logout</span></button>
             </form>
         </div>
     </div>
@@ -553,3 +553,5 @@
 </script>
 </body>
 </html>
+
+

@@ -11,6 +11,8 @@ public final class DisplayFormatUtils {
             DateTimeFormatter.ofPattern("MMMM d, yyyy h:mm a", Locale.ENGLISH);
     private static final DateTimeFormatter DATE_FORMATTER =
             DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.ENGLISH);
+    private static final DateTimeFormatter TIME_FORMATTER =
+            DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH);
 
     private DisplayFormatUtils() {
     }
@@ -21,5 +23,9 @@ public final class DisplayFormatUtils {
 
     public static String formatDate(LocalDate value) {
         return value == null ? "" : DATE_FORMATTER.format(value);
+    }
+
+    public static String formatTime(LocalDateTime value) {
+        return value == null ? "" : TIME_FORMATTER.format(value);
     }
 }

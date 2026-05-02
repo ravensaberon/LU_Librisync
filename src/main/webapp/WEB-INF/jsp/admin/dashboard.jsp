@@ -22,7 +22,6 @@
             <a class="nav-pill active" href="${pageContext.request.contextPath}/admin/dashboard">Dashboard</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/books">Books</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/issues">Issue / Return</a>
-            <a class="nav-pill" href="${pageContext.request.contextPath}/admin/reservations">Reservations</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/students">Students</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/fines">Fines</a>
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/reports">Reports</a>
@@ -30,7 +29,7 @@
             <a class="nav-pill" href="${pageContext.request.contextPath}/admin/profile">Profile</a>
             <form method="post" action="${pageContext.request.contextPath}/logout">
                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                <button class="nav-pill warm border-0" type="submit">Logout</button>
+                <button class="nav-pill warm border-0" type="submit" aria-label="Logout" title="Logout"><span class="nav-pill-icon"><i class="bi bi-power" aria-hidden="true"></i></span><span class="nav-pill-label">Logout</span></button>
             </form>
         </div>
     </div>
@@ -102,6 +101,47 @@
         </section>
 
         <section class="panel-card mb-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+                <div>
+                    <div class="section-title mb-2">Student request notifications</div>
+                    <p class="helper-copy mb-0">Latest borrow, reservation, and return requests from students.</p>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="tag-chip">Unread: ${unreadAdminNotificationCount}</span>
+                    <form method="post" action="${pageContext.request.contextPath}/admin/notifications/read-all" class="m-0">
+                        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                        <button class="btn btn-outline-success btn-sm" type="submit">Mark all read</button>
+                    </form>
+                </div>
+            </div>
+
+            <c:choose>
+                <c:when test="${not empty recentAdminNotifications}">
+                    <div class="dashboard-notification-list">
+                        <c:forEach var="notification" items="${recentAdminNotifications}">
+                            <a class="dashboard-notification-item" href="${pageContext.request.contextPath}${notification.linkUrl}">
+                                <span class="dashboard-notification-icon">
+                                    <i class="bi bi-bell-fill" aria-hidden="true"></i>
+                                </span>
+                                <span class="dashboard-notification-copy">
+                                    <strong>${notification.title}</strong>
+                                    <span>${notification.message}</span>
+                                    <small>${notification.createdAtDisplay}</small>
+                                </span>
+                                <c:if test="${not notification.read}">
+                                    <span class="tag-chip">New</span>
+                                </c:if>
+                            </a>
+                        </c:forEach>
+                    </div>
+                </c:when>
+                <c:otherwise>
+                    <p class="muted-text mb-0">No student request notifications yet.</p>
+                </c:otherwise>
+            </c:choose>
+        </section>
+
+        <section class="panel-card mb-4">
             <div class="dashboard-summary-grid">
                 <div class="dashboard-summary-item">
                     <span class="dashboard-summary-label">Catalog</span>
@@ -158,7 +198,7 @@
                         </div>
                         <span class="dashboard-action-meta">${studentCount} students</span>
                     </a>
-                    <a class="dashboard-action-card" href="${pageContext.request.contextPath}/admin/reservations">
+                    <a class="dashboard-action-card" href="${pageContext.request.contextPath}/admin/issues#reservation-desk">
                         <span class="dashboard-action-icon"><i class="bi bi-bookmark-check"></i></span>
                         <div class="dashboard-action-copy">
                             <h3>Reservation queue</h3>
@@ -569,3 +609,5 @@
 <script src="${pageContext.request.contextPath}/js/app.js"></script>
 </body>
 </html>
+
+

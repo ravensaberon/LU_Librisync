@@ -132,6 +132,14 @@ public class User {
         return DisplayFormatUtils.formatDateTime(createdAt);
     }
 
+    public String getCreatedAtDateDisplay() {
+        return DisplayFormatUtils.formatDate(createdAt == null ? null : createdAt.toLocalDate());
+    }
+
+    public String getCreatedAtTimeDisplay() {
+        return DisplayFormatUtils.formatTime(createdAt);
+    }
+
     public LocalDateTime getUpdatedAt() {
         return updatedAt;
     }

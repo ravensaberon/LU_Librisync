@@ -135,6 +135,19 @@ CREATE TABLE IF NOT EXISTS email_notifications (
     CONSTRAINT fk_email_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS admin_notifications (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    admin_user_id BIGINT NOT NULL,
+    notification_type VARCHAR(30) NOT NULL,
+    title VARCHAR(180) NOT NULL,
+    message TEXT NOT NULL,
+    link_url VARCHAR(255),
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    read_at DATETIME NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_admin_notifications_user FOREIGN KEY (admin_user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS audit_logs (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     actor_email VARCHAR(120) NULL,

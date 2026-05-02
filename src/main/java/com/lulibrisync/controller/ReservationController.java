@@ -1,11 +1,10 @@
 package com.lulibrisync.controller;
 
 import com.lulibrisync.service.AuditLogService;
-import com.lulibrisync.service.CirculationPolicyService;
 import com.lulibrisync.service.IssueService;
 import com.lulibrisync.service.ReservationService;
-import com.lulibrisync.service.StudentService;
 import com.lulibrisync.util.PaginationUtils;
+import com.lulibrisync.model.Reservation;
 import com.lulibrisync.model.ReservationStatus;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.Authentication;
@@ -14,7 +13,6 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
@@ -28,19 +26,13 @@ public class ReservationController {
     private final ReservationService reservationService;
     private final IssueService issueService;
     private final AuditLogService auditLogService;
-    private final StudentService studentService;
-    private final CirculationPolicyService circulationPolicyService;
 
     public ReservationController(ReservationService reservationService,
                                  IssueService issueService,
-                                 AuditLogService auditLogService,
-                                 StudentService studentService,
-                                 CirculationPolicyService circulationPolicyService) {
+                                 AuditLogService auditLogService) {
         this.reservationService = reservationService;
         this.issueService = issueService;
         this.auditLogService = auditLogService;
-        this.studentService = studentService;
-        this.circulationPolicyService = circulationPolicyService;
     }
 
     @GetMapping("/student/reservations")
@@ -133,25 +125,10 @@ public class ReservationController {
 
     @GetMapping("/admin/reservations")
     public String adminReservations(@RequestParam(defaultValue = "1") Integer borrowPage,
-                                    @RequestParam(defaultValue = "1") Integer queuePage,
-                                    Model model) {
-        reservationService.syncReadyReservations();
-        var borrowRequests = reservationService.getBorrowRequests();
-        var queueReservations = reservationService.getQueueReservations();
-        var borrowRequestsPage = PaginationUtils.paginate(borrowRequests, borrowPage, RESERVATION_SECTION_PAGE_SIZE);
-        var queueReservationsPage = PaginationUtils.paginate(queueReservations, queuePage, RESERVATION_SECTION_PAGE_SIZE);
-        model.addAttribute("borrowRequests", borrowRequestsPage.getItems());
-        model.addAttribute("borrowRequestsPage", borrowRequestsPage);
-        model.addAttribute("queueReservations", queueReservationsPage.getItems());
-        model.addAttribute("queueReservationsPage", queueReservationsPage);
-        model.addAttribute("defaultDueDate", LocalDate.now().plusDays(7));
-        model.addAttribute("reservationCount", borrowRequests.size() + queueReservations.size());
-        model.addAttribute("borrowRequestCount", borrowRequests.stream().filter(reservation -> reservation.getStatus() == ReservationStatus.READY).count());
-        model.addAttribute("pendingReservationCount", queueReservations.stream().filter(reservation -> reservation.getStatus().name().equals("PENDING")).count());
-        model.addAttribute("readyReservationCount", borrowRequests.stream().filter(reservation -> reservation.getStatus().name().equals("READY")).count()
-                + queueReservations.stream().filter(reservation -> reservation.getStatus().name().equals("READY")).count());
-        model.addAttribute("borrowRequestWindowMinutes", reservationService.getBorrowRequestWindowMinutes());
-        return "admin/reservations";
+                                    @RequestParam(defaultValue = "1") Integer queuePage) {
+        return "redirect:/admin/issues?reservationBorrowPage=" + Math.max(1, borrowPage)
+                + "&reservationQueuePage=" + Math.max(1, queuePage)
+                + "#reservation-desk";
     }
 
     @PostMapping("/admin/reservations/{reservationId}/claim")
@@ -163,21 +140,29 @@ public class ReservationController {
                                    Authentication authentication,
                                    RedirectAttributes redirectAttributes) {
         try {
-            var reservation = reservationService.getReservationById(reservationId);
-            var issueRecord = issueService.issueBook(reservation.getBook().getId(), reservation.getStudent().getId(), dueDate, authentication.getName(), remarks);
-            auditLogService.log(
-                    authentication.getName(),
-                    "RESERVATION_CLAIMED",
-                    "RESERVATION",
-                    reservationId.toString(),
-                    "Reserved book issued by staff",
-                    "Reservation claimed and issued as " + issueRecord.getQrIssueCode()
-            );
-            redirectAttributes.addFlashAttribute("success", "Reserved book released and issued successfully.");
+            Reservation reservation = reservationService.getReservationById(reservationId);
+            claimReservationForPickup(reservation, dueDate, remarks, authentication, redirectAttributes);
         } catch (IllegalArgumentException exception) {
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
         }
-        return "redirect:/admin/reservations?borrowPage=" + Math.max(1, borrowPage) + "&queuePage=" + Math.max(1, queuePage);
+        return "redirect:/admin/issues?reservationBorrowPage=" + Math.max(1, borrowPage) + "&reservationQueuePage=" + Math.max(1, queuePage) + "#reservation-desk";
+    }
+
+    @PostMapping("/admin/reservations/claim-by-qr")
+    public String claimReservationByQr(@RequestParam String qrCode,
+                                       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDate,
+                                       @RequestParam(required = false) String remarks,
+                                       @RequestParam(defaultValue = "1") Integer borrowPage,
+                                       @RequestParam(defaultValue = "1") Integer queuePage,
+                                       Authentication authentication,
+                                       RedirectAttributes redirectAttributes) {
+        try {
+            Reservation reservation = reservationService.getReservationByDeskQrCode(qrCode);
+            claimReservationForPickup(reservation, dueDate, remarks, authentication, redirectAttributes);
+        } catch (IllegalArgumentException exception) {
+            redirectAttributes.addFlashAttribute("error", exception.getMessage());
+        }
+        return "redirect:/admin/issues?reservationBorrowPage=" + Math.max(1, borrowPage) + "&reservationQueuePage=" + Math.max(1, queuePage) + "#reservation-desk";
     }
 
     @PostMapping("/admin/reservations/{reservationId}/cancel")
@@ -200,6 +185,36 @@ public class ReservationController {
         } catch (IllegalArgumentException exception) {
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
         }
-        return "redirect:/admin/reservations?borrowPage=" + Math.max(1, borrowPage) + "&queuePage=" + Math.max(1, queuePage);
+        return "redirect:/admin/issues?reservationBorrowPage=" + Math.max(1, borrowPage) + "&reservationQueuePage=" + Math.max(1, queuePage) + "#reservation-desk";
+    }
+
+    private void claimReservationForPickup(Reservation reservation,
+                                           LocalDate dueDate,
+                                           String remarks,
+                                           Authentication authentication,
+                                           RedirectAttributes redirectAttributes) {
+        if (reservation == null) {
+            throw new IllegalArgumentException("Reservation not found.");
+        }
+        if (!ReservationStatus.READY.equals(reservation.getStatus())) {
+            if (ReservationStatus.PENDING.equals(reservation.getStatus())) {
+                throw new IllegalArgumentException("This reservation is not ready for desk release yet.");
+            }
+            if (ReservationStatus.CLAIMED.equals(reservation.getStatus())) {
+                throw new IllegalArgumentException("This reservation QR code was already processed.");
+            }
+            throw new IllegalArgumentException("This reservation is no longer active.");
+        }
+
+        var issueRecord = issueService.issueBook(reservation.getBook().getId(), reservation.getStudent().getId(), dueDate, authentication.getName(), remarks);
+        auditLogService.log(
+                authentication.getName(),
+                "RESERVATION_CLAIMED",
+                "RESERVATION",
+                reservation.getId().toString(),
+                "Reserved book issued by staff",
+                "Reservation claimed and issued as " + issueRecord.getQrIssueCode()
+        );
+        redirectAttributes.addFlashAttribute("success", "Reserved book released and issued successfully.");
     }
 }
