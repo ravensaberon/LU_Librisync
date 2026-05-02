@@ -1,12 +1,7 @@
 package com.lulibrisync.controller;
 
-<<<<<<< HEAD
-import com.lulibrisync.dto.StudentPasswordOtpDispatchResult;
-import com.lulibrisync.dto.StudentPasswordOtpState;
-=======
 import com.lulibrisync.dto.PasswordResetOtpDispatchResult;
 import com.lulibrisync.dto.PasswordResetOtpState;
->>>>>>> 68cfa95363c4194ddda2068f525c4fb2c549a372
 import com.lulibrisync.dto.StudentProfileOtpDispatchResult;
 import com.lulibrisync.dto.StudentProfileOtpState;
 import com.lulibrisync.dto.StudentProfileUpdateRequest;
@@ -63,11 +58,7 @@ public class StudentController {
     private final ReservationService reservationService;
     private final AdminNotificationService adminNotificationService;
     private final StudentProfileOtpService studentProfileOtpService;
-<<<<<<< HEAD
-    private final StudentPasswordChangeOtpService studentPasswordChangeOtpService;
-=======
     private final PasswordResetService passwordResetService;
->>>>>>> 68cfa95363c4194ddda2068f525c4fb2c549a372
     private final FineService fineService;
     private final StudentProfileImageService studentProfileImageService;
     private final AuthService authService;
@@ -77,11 +68,7 @@ public class StudentController {
                              ReservationService reservationService,
                              AdminNotificationService adminNotificationService,
                              StudentProfileOtpService studentProfileOtpService,
-<<<<<<< HEAD
-                             StudentPasswordChangeOtpService studentPasswordChangeOtpService,
-=======
                              PasswordResetService passwordResetService,
->>>>>>> 68cfa95363c4194ddda2068f525c4fb2c549a372
                              FineService fineService,
                              StudentProfileImageService studentProfileImageService,
                              AuthService authService) {
@@ -90,11 +77,7 @@ public class StudentController {
         this.reservationService = reservationService;
         this.adminNotificationService = adminNotificationService;
         this.studentProfileOtpService = studentProfileOtpService;
-<<<<<<< HEAD
-        this.studentPasswordChangeOtpService = studentPasswordChangeOtpService;
-=======
         this.passwordResetService = passwordResetService;
->>>>>>> 68cfa95363c4194ddda2068f525c4fb2c549a372
         this.fineService = fineService;
         this.studentProfileImageService = studentProfileImageService;
         this.authService = authService;
@@ -298,7 +281,6 @@ public class StudentController {
         return "redirect:/student/profile";
     }
 
-<<<<<<< HEAD
     @PostMapping("/student/profile/password/request-otp")
     public String requestPasswordChangeOtp(Authentication authentication,
                                            @RequestParam String currentPassword,

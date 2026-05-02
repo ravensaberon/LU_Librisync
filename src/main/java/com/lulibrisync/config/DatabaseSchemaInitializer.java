@@ -27,14 +27,11 @@ public class DatabaseSchemaInitializer implements ApplicationRunner {
         try (Connection connection = dataSource.getConnection();
              Statement statement = connection.createStatement()) {
             ensurePreferredPickupDateColumn(statement);
-<<<<<<< HEAD
             ensureStudentRegistrationOtpTable(statement);
             ensureStudentPasswordChangeOtpTable(statement);
-=======
             ensureReservationRequestTypeColumn(statement);
             ensureIssueReturnRequestColumn(statement);
             ensureAdminNotificationsTable(statement);
->>>>>>> 68cfa95363c4194ddda2068f525c4fb2c549a372
         }
     }
 
@@ -55,7 +52,6 @@ public class DatabaseSchemaInitializer implements ApplicationRunner {
         logger.info("Added reservations.preferred_pickup_date column for scheduled pickup support.");
     }
 
-<<<<<<< HEAD
     private void ensureStudentRegistrationOtpTable(Statement statement) throws Exception {
         statement.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS student_registration_otp_requests (
@@ -107,22 +103,6 @@ public class DatabaseSchemaInitializer implements ApplicationRunner {
                     CONSTRAINT fk_student_password_otp_student FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
                 )
                 """);
-=======
-    private void ensureIssueReturnRequestColumn(Statement statement) throws Exception {
-        try (ResultSet tables = statement.executeQuery("SHOW TABLES LIKE 'issue_records'")) {
-            if (!tables.next()) {
-                return;
-            }
-        }
-
-        try (ResultSet columns = statement.executeQuery("SHOW COLUMNS FROM issue_records LIKE 'return_requested_at'")) {
-            if (columns.next()) {
-                return;
-            }
-        }
-
-        statement.executeUpdate("ALTER TABLE issue_records ADD COLUMN return_requested_at DATETIME NULL AFTER return_date");
-        logger.info("Added issue_records.return_requested_at column for desk-confirmed returns.");
     }
 
     private void ensureReservationRequestTypeColumn(Statement statement) throws Exception {
@@ -142,6 +122,23 @@ public class DatabaseSchemaInitializer implements ApplicationRunner {
         statement.executeUpdate("UPDATE reservations SET request_type = 'RESERVATION' WHERE request_type IS NULL OR request_type = ''");
     }
 
+    private void ensureIssueReturnRequestColumn(Statement statement) throws Exception {
+        try (ResultSet tables = statement.executeQuery("SHOW TABLES LIKE 'issue_records'")) {
+            if (!tables.next()) {
+                return;
+            }
+        }
+
+        try (ResultSet columns = statement.executeQuery("SHOW COLUMNS FROM issue_records LIKE 'return_requested_at'")) {
+            if (columns.next()) {
+                return;
+            }
+        }
+
+        statement.executeUpdate("ALTER TABLE issue_records ADD COLUMN return_requested_at DATETIME NULL AFTER return_date");
+        logger.info("Added issue_records.return_requested_at column for desk-confirmed returns.");
+    }
+
     private void ensureAdminNotificationsTable(Statement statement) throws Exception {
         statement.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS admin_notifications (
@@ -158,6 +155,5 @@ public class DatabaseSchemaInitializer implements ApplicationRunner {
                 )
                 """);
         logger.info("Ensured admin_notifications table exists for in-app admin alerts.");
->>>>>>> 68cfa95363c4194ddda2068f525c4fb2c549a372
     }
 }
