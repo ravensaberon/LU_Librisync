@@ -18,6 +18,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
 @Service
+@SuppressWarnings("null")
 public class DigitalLibraryService {
 
     private final Path storageRoot;
@@ -73,7 +74,8 @@ public class DigitalLibraryService {
             throw new IllegalArgumentException("Only JPG, PNG, or WEBP files are allowed for book cover upload.");
         }
 
-        String safeFileName = slugify(bookTitle) + "-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")) + "." + fileExtension.toLowerCase(Locale.ROOT);
+        String normalizedFileExtension = fileExtension.toLowerCase(Locale.ROOT);
+        String safeFileName = slugify(bookTitle) + "-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")) + "." + normalizedFileExtension;
         Path targetPath = bookCoversRoot.resolve(safeFileName).normalize();
         if (!targetPath.startsWith(bookCoversRoot)) {
             throw new IllegalArgumentException("Invalid book cover upload path.");

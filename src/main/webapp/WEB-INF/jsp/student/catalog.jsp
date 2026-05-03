@@ -361,24 +361,66 @@
         });
 
         function applyDetectedCode(rawValue) {
-            const detectedCode = (rawValue || "").trim();
+            var detectedCode = (rawValue || "").trim();
             if (!detectedCode) {
                 return;
             }
 
-            keywordInput.value = detectedCode;
-            if (/^\d{10}(\d{3})?$/.test(detectedCode)) {
-                isbnInput.value = detectedCode;
-            }
+            scanner.setStatus("Code detected: " + detectedCode + ". Looking up book...", false);
 
-            scanner.setStatus("Code detected: " + detectedCode + ". Applying it to the search form now.", false);
-            const modal = bootstrap.Modal.getInstance(modalElement);
-            if (modal) {
-                modal.hide();
-            }
-            window.setTimeout(function () {
-                searchForm.requestSubmit();
-            }, 220);
+            // Try exact barcode/ISBN lookup first for instant navigation
+            fetch("${pageContext.request.contextPath}/student/catalog/barcode-lookup?code=" + encodeURIComponent(detectedCode), {
+                headers: { "Accept": "application/json" }
+            })
+            .then(function (response) {
+                if (response.ok) {
+                    return response.json();
+                }
+                return null;
+            })
+            .then(function (data) {
+                var modal = bootstrap.Modal.getInstance(modalElement);
+                if (modal) {
+                    modal.hide();
+                }
+
+                if (data && data.bookId) {
+                    // Exact match found — open the book detail modal directly
+                    window.setTimeout(function () {
+                        var bookModal = document.getElementById("catalogBookModal" + data.bookId);
+                        if (bookModal) {
+                            bootstrap.Modal.getOrCreateInstance(bookModal).show();
+                        } else {
+                            // Book is on a different page — fall back to search
+                            keywordInput.value = detectedCode;
+                            searchForm.requestSubmit();
+                        }
+                    }, 220);
+                } else {
+                    // No exact match — fall back to keyword search
+                    keywordInput.value = detectedCode;
+                    if (/^\d{10}(\d{3})?$/.test(detectedCode)) {
+                        isbnInput.value = detectedCode;
+                    }
+                    window.setTimeout(function () {
+                        searchForm.requestSubmit();
+                    }, 220);
+                }
+            })
+            .catch(function () {
+                // Network error — fall back to keyword search
+                var modal = bootstrap.Modal.getInstance(modalElement);
+                if (modal) {
+                    modal.hide();
+                }
+                keywordInput.value = detectedCode;
+                if (/^\d{10}(\d{3})?$/.test(detectedCode)) {
+                    isbnInput.value = detectedCode;
+                }
+                window.setTimeout(function () {
+                    searchForm.requestSubmit();
+                }, 220);
+            });
         }
 
         modalElement.addEventListener("shown.bs.modal", function () {

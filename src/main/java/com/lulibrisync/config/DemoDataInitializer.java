@@ -16,6 +16,7 @@ import java.sql.Connection;
 
 @Component
 @ConditionalOnProperty(name = "lulibrisync.demo-data.enabled", havingValue = "true", matchIfMissing = true)
+@SuppressWarnings("null")
 public class DemoDataInitializer implements ApplicationRunner {
 
     private static final Logger logger = LoggerFactory.getLogger(DemoDataInitializer.class);

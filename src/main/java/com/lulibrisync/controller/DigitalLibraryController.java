@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
 @Controller
+@SuppressWarnings("null")
 public class DigitalLibraryController {
 
     private final BookService bookService;

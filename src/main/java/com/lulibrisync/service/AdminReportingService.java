@@ -5,7 +5,6 @@ import com.lulibrisync.model.Fine;
 import com.lulibrisync.model.IssueRecord;
 import com.lulibrisync.model.IssueStatus;
 import com.lulibrisync.model.Reservation;
-import com.lulibrisync.model.ReservationStatus;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;

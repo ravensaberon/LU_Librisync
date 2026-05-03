@@ -364,10 +364,6 @@ public class EmailNotificationService {
         return (value == null ? "" : value).replace("'", "''");
     }
 
-    private void writeOutboxCopy(String toEmail, String subject, String body) {
-        writeOutboxCopy(toEmail, subject, body, false);
-    }
-
     private void writeOutboxCopy(String toEmail, String subject, String body, boolean htmlBody) {
         String fileName = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS")) + "-notification.txt";
         Path targetFile = outboxRoot.resolve(fileName);

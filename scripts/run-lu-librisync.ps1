@@ -85,7 +85,7 @@ if (Test-Path $mysqlCli) {
 
 Push-Location $projectRoot
 try {
-    & $mavenCmd "-Dmaven.repo.local=$mavenRepo" spring-boot:run
+    & $mavenCmd "-o" "-Dmaven.repo.local=$mavenRepo" spring-boot:run
 } finally {
     Pop-Location
 }

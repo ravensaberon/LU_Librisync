@@ -1,9 +1,7 @@
 package com.lulibrisync.service;
 
 import com.lulibrisync.config.LegacyAwarePasswordEncoder;
-import com.lulibrisync.dto.PreparedStudentRegistration;
 import com.lulibrisync.dto.RegistrationAvailabilityResult;
-import com.lulibrisync.dto.StudentRegistrationForm;
 import com.lulibrisync.model.Role;
 import com.lulibrisync.model.Student;
 import com.lulibrisync.model.User;
@@ -18,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -86,8 +85,8 @@ public class AuthService {
     private final UserRepository userRepository;
     private final StudentRepository studentRepository;
     private final LegacyAwarePasswordEncoder passwordEncoder;
-    private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
+    private HttpClient httpClient;
     private final Map<String, List<String>> lagunaBarangaysByCityCache = new ConcurrentHashMap<>();
 
     public AuthService(UserRepository userRepository,
@@ -96,9 +95,6 @@ public class AuthService {
         this.userRepository = userRepository;
         this.studentRepository = studentRepository;
         this.passwordEncoder = passwordEncoder;
-        this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(10))
-                .build();
         this.objectMapper = new ObjectMapper();
     }
 
@@ -119,95 +115,29 @@ public class AuthService {
                                    String password,
                                    String confirmPassword,
                                    boolean agreed) {
-        return createStudentFromPreparedRegistration(prepareStudentRegistration(new StudentRegistrationForm(
-                firstName,
-                middleName,
-                lastName,
-                program,
-                yearLevel,
-                email,
-                contactNumber,
-                birthDate,
-                province,
-                cityMunicipality,
-                barangay,
-                street,
-                zipcode,
-                password,
-                confirmPassword,
-                agreed
-        )));
-    }
-
-    public PreparedStudentRegistration prepareStudentRegistration(StudentRegistrationForm form) {
-        if (form == null) {
-            throw new IllegalArgumentException("Registration details are required.");
-        }
-
-        String normalizedFirstName = normalizeAndValidateName(form.getFirstName(), "First name", false);
-        String normalizedMiddleName = normalizeAndValidateName(form.getMiddleName(), "Middle name", true);
-        String normalizedLastName = normalizeAndValidateName(form.getLastName(), "Last name", false);
+        String normalizedFirstName = normalizeAndValidateName(firstName, "First name", false);
+        String normalizedMiddleName = normalizeAndValidateName(middleName, "Middle name", true);
+        String normalizedLastName = normalizeAndValidateName(lastName, "Last name", false);
         String normalizedFullName = buildFullName(normalizedFirstName, normalizedMiddleName, normalizedLastName);
-        String normalizedProgram = normalizeAndValidateProgram(form.getProgram());
-        String normalizedYearLevel = validateRequiredYearLevel(form.getYearLevel());
-        String normalizedEmail = normalizeAndValidateEmail(form.getEmail());
-        String normalizedContactNumber = normalizeAndValidateContact(form.getContactNumber());
-        LocalDate parsedBirthDate = parseAndValidateBirthDate(form.getBirthDate());
-        String normalizedProvince = validateProvince(form.getProvince());
-        String normalizedCityMunicipality = validateCityMunicipality(form.getCityMunicipality());
-        String normalizedBarangay = validateBarangayForCityMunicipality(normalizedCityMunicipality, form.getBarangay());
-        String normalizedStreet = normalizeAndValidateAddressPart(form.getStreet(), "Street", 180);
-        String normalizedZipCode = validateZipCode(form.getZipcode(), normalizedCityMunicipality);
-        String normalizedPassword = validatePassword(
-                form.getPassword(),
-                form.getConfirmPassword(),
-                normalizedFirstName,
-                normalizedMiddleName,
-                normalizedLastName,
-                normalizedEmail,
-                normalizedContactNumber,
-                form.getBirthDate()
-        );
-        validateTerms(form.isAgreeChecked());
-
-        return new PreparedStudentRegistration(
-                normalizedFirstName,
-                normalizedMiddleName,
-                normalizedLastName,
-                normalizedFullName,
-                normalizedProgram,
-                normalizedYearLevel,
-                normalizedEmail,
-                normalizedContactNumber,
-                parsedBirthDate,
-                normalizedProvince,
-                normalizedCityMunicipality,
-                normalizedBarangay,
-                normalizedStreet,
-                normalizedZipCode,
-                buildAddress(normalizedStreet, normalizedBarangay, normalizedCityMunicipality, normalizedProvince, normalizedZipCode),
-                passwordEncoder.encode(normalizedPassword)
-        );
-    }
-
-    @Transactional
-    public Student createStudentFromPreparedRegistration(PreparedStudentRegistration preparedRegistration) {
-        if (preparedRegistration == null) {
-            throw new IllegalArgumentException("Prepared registration details are required.");
-        }
-        if (userRepository.existsByEmailIgnoreCase(preparedRegistration.getEmail())) {
-            throw new IllegalArgumentException("This email is already taken.");
-        }
-        if (studentRepository.existsByPhone(preparedRegistration.getContactNumber())) {
-            throw new IllegalArgumentException("This contact number is already used.");
-        }
+        String normalizedProgram = normalizeAndValidateProgram(program);
+        String normalizedYearLevel = validateRequiredYearLevel(yearLevel);
+        String normalizedEmail = normalizeAndValidateEmail(email);
+        String normalizedContactNumber = normalizeAndValidateContact(contactNumber);
+        LocalDate parsedBirthDate = parseAndValidateBirthDate(birthDate);
+        String normalizedProvince = validateProvince(province);
+        String normalizedCityMunicipality = validateCityMunicipality(cityMunicipality);
+        String normalizedBarangay = validateBarangayForCityMunicipality(normalizedCityMunicipality, barangay);
+        String normalizedStreet = normalizeAndValidateAddressPart(street, "Street", 180);
+        String normalizedZipCode = validateZipCode(zipcode, normalizedCityMunicipality);
+        String normalizedPassword = validatePassword(password, confirmPassword, normalizedFirstName, normalizedMiddleName, normalizedLastName, normalizedEmail, normalizedContactNumber, birthDate);
+        validateTerms(agreed);
 
         String generatedStudentId = generateStudentId();
 
         User user = new User();
-        user.setName(preparedRegistration.getFullName());
-        user.setEmail(preparedRegistration.getEmail());
-        user.setPasswordHash(preparedRegistration.getPasswordHash());
+        user.setName(normalizedFullName);
+        user.setEmail(normalizedEmail);
+        user.setPasswordHash(passwordEncoder.encode(normalizedPassword));
         user.setRole(Role.STUDENT);
         user.setStatus(UserStatus.ACTIVE);
         user.setStudentId(generatedStudentId);
@@ -216,11 +146,11 @@ public class AuthService {
         Student student = new Student();
         student.setUser(user);
         student.setStudentId(generatedStudentId);
-        student.setCourse(preparedRegistration.getProgram());
-        student.setYearLevel(preparedRegistration.getYearLevel());
-        student.setPhone(preparedRegistration.getContactNumber());
-        student.setAddress(preparedRegistration.getAddress());
-        student.setDateOfBirth(preparedRegistration.getBirthDate());
+        student.setCourse(normalizedProgram);
+        student.setYearLevel(normalizedYearLevel);
+        student.setPhone(normalizedContactNumber);
+        student.setAddress(buildAddress(normalizedStreet, normalizedBarangay, normalizedCityMunicipality, normalizedProvince, normalizedZipCode));
+        student.setDateOfBirth(parsedBirthDate);
 
         return studentRepository.save(student);
     }
@@ -762,7 +692,7 @@ public class AuthService {
                 .build();
 
         try {
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = getHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 throw new IllegalStateException("Unable to load barangay data at the moment.");
             }
@@ -785,9 +715,18 @@ public class AuthService {
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Unable to load barangay data at the moment.", exception);
-        } catch (IOException exception) {
+        } catch (IOException | UncheckedIOException exception) {
             throw new IllegalStateException("Unable to load barangay data at the moment.", exception);
         }
+    }
+
+    private HttpClient getHttpClient() {
+        if (httpClient == null) {
+            httpClient = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(10))
+                    .build();
+        }
+        return httpClient;
     }
 
     private boolean containsBarangayIgnoreCase(List<String> barangays, String candidate) {

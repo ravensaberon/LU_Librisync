@@ -6,7 +6,6 @@ import com.lulibrisync.service.CirculationPolicyService;
 import com.lulibrisync.service.DigitalLibraryService;
 import com.lulibrisync.service.IssueService;
 import com.lulibrisync.service.ReservationService;
-import com.lulibrisync.service.StudentService;
 import com.lulibrisync.util.PaginationUtils;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -29,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Controller
+@SuppressWarnings("null")
 public class BookController {
 
     private static final int ADMIN_BOOKS_PAGE_SIZE = 10;
@@ -39,7 +39,6 @@ public class BookController {
     private final DigitalLibraryService digitalLibraryService;
     private final AuditLogService auditLogService;
     private final IssueService issueService;
-    private final StudentService studentService;
     private final CirculationPolicyService circulationPolicyService;
 
     public BookController(BookService bookService,
@@ -47,14 +46,12 @@ public class BookController {
                           DigitalLibraryService digitalLibraryService,
                           AuditLogService auditLogService,
                           IssueService issueService,
-                          StudentService studentService,
                           CirculationPolicyService circulationPolicyService) {
         this.bookService = bookService;
         this.reservationService = reservationService;
         this.digitalLibraryService = digitalLibraryService;
         this.auditLogService = auditLogService;
         this.issueService = issueService;
-        this.studentService = studentService;
         this.circulationPolicyService = circulationPolicyService;
     }
 
@@ -278,6 +275,18 @@ public class BookController {
         model.addAttribute("defaultBorrowDueDate", LocalDate.now().plusDays(circulationPolicyService.getMaxLoanDays()));
         model.addAttribute("maxLoanDays", circulationPolicyService.getMaxLoanDays());
         return "student/catalog";
+    }
+
+    @GetMapping(value = "/student/catalog/barcode-lookup", produces = "application/json")
+    public ResponseEntity<Map<String, Object>> barcodeLookup(@RequestParam String code) {
+        return bookService.findBookByCode(code)
+                .map(book -> {
+                    Map<String, Object> result = new LinkedHashMap<>();
+                    result.put("bookId", book.getId());
+                    result.put("title", book.getTitle());
+                    return ResponseEntity.ok(result);
+                })
+                .orElseGet(() -> ResponseEntity.notFound().<Map<String, Object>>build());
     }
 
     @PostMapping("/student/catalog/{bookId}/borrow")

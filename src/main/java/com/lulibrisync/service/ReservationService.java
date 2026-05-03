@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 
 @Service
+@SuppressWarnings("null")
 public class ReservationService {
 
     private static final List<ReservationStatus> ACTIVE_STATUSES = List.of(ReservationStatus.PENDING, ReservationStatus.READY);

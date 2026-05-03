@@ -6,10 +6,15 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface BookRepository extends JpaRepository<Book, Long> {
 
     List<Book> findAllByOrderByTitleAsc();
+
+    Optional<Book> findByBarcodeIgnoreCase(String barcode);
+
+    Optional<Book> findByIsbnIgnoreCase(String isbn);
 
     List<Book> findByAvailableQuantityGreaterThanOrderByTitleAsc(Integer availableQuantity);
 

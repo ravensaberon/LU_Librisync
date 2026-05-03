@@ -243,6 +243,30 @@
         </div>
     </div>
 </div>
+<div class="modal fade" id="adminBarcodeScannerModal" tabindex="-1" aria-labelledby="adminBarcodeScannerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header modal-header-brand">
+                <div>
+                    <span class="modal-kicker">Barcode Registration</span>
+                    <h2 class="h4 mb-1 mt-2" id="adminBarcodeScannerModalLabel">Scan the physical book barcode</h2>
+                    <p class="modal-subtitle mb-0">Point your camera at the barcode on the physical book. The code will be registered automatically.</p>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="scanner-shell">
+                    <video id="adminBarcodeVideo" autoplay muted playsinline></video>
+                    <div class="scanner-overlay"></div>
+                    <div class="scanner-target"></div>
+                </div>
+                <div class="scanner-status" id="adminBarcodeStatus">
+                    Camera scanner is preparing. Hold the barcode steady inside the highlighted frame.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 <div class="modal fade" id="bookFormModal" tabindex="-1" aria-labelledby="bookFormModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
@@ -275,7 +299,13 @@
                         </div>
                         <div class="col-md-3">
                             <label class="form-label" for="barcode">Barcode</label>
-                            <input class="form-control" id="barcode" name="barcode" value="${editBook.barcode}">
+                            <div class="input-group">
+                                <input class="form-control" id="barcode" name="barcode" value="${editBook.barcode}" placeholder="Type or scan">
+                                <button class="btn btn-outline-secondary" type="button" id="openBarcodeScannerBtn" title="Scan physical barcode with camera" aria-label="Scan barcode">
+                                    <i class="bi bi-upc-scan"></i>
+                                </button>
+                            </div>
+                            <div class="form-text">Scan the physical book to register its barcode.</div>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label" for="categoryId">Category</label>
@@ -357,6 +387,7 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://unpkg.com/@zxing/browser@0.1.5"></script>
 <script src="${pageContext.request.contextPath}/vendor/qrious.min.js"></script>
 <script src="${pageContext.request.contextPath}/js/qr-tools.js"></script>
 <script src="${pageContext.request.contextPath}/js/app.js"></script>
@@ -403,6 +434,66 @@
             }
 
             window.LuLibrisyncQr.downloadCanvas(currentQrCanvas, downloadButton.dataset.filename);
+        });
+    })();
+</script>
+<script>
+    (function () {
+        var scannerModalElement = document.getElementById("adminBarcodeScannerModal");
+        var barcodeInput = document.getElementById("barcode");
+        var openScannerBtn = document.getElementById("openBarcodeScannerBtn");
+
+        var scanner = window.LuLibrisyncQr.createScanner({
+            videoElement: document.getElementById("adminBarcodeVideo"),
+            statusElement: document.getElementById("adminBarcodeStatus"),
+            formats: ["code_128", "ean_13", "ean_8", "upc_a", "upc_e", "code_39", "codabar", "itf"],
+            liveMessage: "Scanner is live. Align the barcode inside the frame and hold still.",
+            unsupportedMessage: "This browser cannot decode live barcodes. You can still type the barcode manually.",
+            permissionMessage: "Camera access was blocked. Please allow camera access and try again.",
+            onDetected: function (rawValue) {
+                var detectedCode = (rawValue || "").trim();
+                if (!detectedCode) {
+                    return;
+                }
+
+                // Fill the barcode field
+                barcodeInput.value = detectedCode;
+                barcodeInput.dispatchEvent(new Event("input", { bubbles: true }));
+
+                scanner.setStatus("Barcode registered: " + detectedCode, false);
+
+                // Close scanner modal and reopen the book form modal
+                var scannerModal = bootstrap.Modal.getInstance(scannerModalElement);
+                if (scannerModal) {
+                    scannerModal.hide();
+                }
+            },
+            onScanError: function () {
+                scanner.setStatus("Scanning... Hold the barcode steady inside the frame.", false);
+            }
+        });
+
+        // Open scanner: hide book form modal first, then show scanner modal
+        openScannerBtn.addEventListener("click", function () {
+            var bookFormModal = bootstrap.Modal.getInstance(document.getElementById("bookFormModal"));
+            if (bookFormModal) {
+                bookFormModal.hide();
+            }
+            window.setTimeout(function () {
+                bootstrap.Modal.getOrCreateInstance(scannerModalElement).show();
+            }, 300);
+        });
+
+        scannerModalElement.addEventListener("shown.bs.modal", function () {
+            scanner.start();
+        });
+
+        // When scanner modal closes, stop camera and reopen the book form
+        scannerModalElement.addEventListener("hidden.bs.modal", function () {
+            scanner.stop();
+            scanner.setStatus("Camera scanner is preparing. Hold the barcode steady inside the highlighted frame.", false);
+            var bookFormModal = bootstrap.Modal.getOrCreateInstance(document.getElementById("bookFormModal"));
+            bookFormModal.show();
         });
     })();
 </script>

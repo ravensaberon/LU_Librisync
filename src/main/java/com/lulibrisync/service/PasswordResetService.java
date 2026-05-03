@@ -24,6 +24,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 @Service
+@SuppressWarnings("null")
 public class PasswordResetService {
 
     private static final Pattern PASSWORD_PATTERN = Pattern.compile("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z\\d\\s]).{12,100}$");

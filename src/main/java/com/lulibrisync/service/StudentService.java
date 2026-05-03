@@ -20,6 +20,7 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 
 @Service
+@SuppressWarnings("null")
 public class StudentService {
 
     private static final Pattern PROFILE_PHONE_PATTERN = Pattern.compile("^\\+?[0-9 ()\\-]{7,20}$");
@@ -224,15 +225,8 @@ public class StudentService {
                                String currentPassword,
                                String newPassword,
                                String confirmPassword) {
-        String encodedPasswordHash = preparePasswordChange(email, currentPassword, newPassword, confirmPassword);
-        applyEncodedPasswordChange(email, encodedPasswordHash);
-    }
-
-    public String preparePasswordChange(String email,
-                                        String currentPassword,
-                                        String newPassword,
-                                        String confirmPassword) {
-        User user = findUserByEmail(email);
+        User user = userRepository.findByEmailIgnoreCase(required(email, "User not found."))
+                .orElseThrow(() -> new IllegalArgumentException("User not found."));
 
         String normalizedCurrentPassword = required(currentPassword, "Current password is required.");
         String normalizedNewPassword = required(newPassword, "New password is required.");
@@ -254,14 +248,7 @@ public class StudentService {
             throw new IllegalArgumentException("Choose a different password from the current one.");
         }
 
-        return passwordEncoder.encode(normalizedNewPassword);
-    }
-
-    @Transactional
-    public void applyEncodedPasswordChange(String email, String encodedPasswordHash) {
-        User user = findUserByEmail(email);
-        String normalizedHash = required(encodedPasswordHash, "Password update payload is missing.");
-        user.setPasswordHash(normalizedHash);
+        user.setPasswordHash(passwordEncoder.encode(normalizedNewPassword));
         userRepository.save(user);
     }
 
@@ -285,11 +272,6 @@ public class StudentService {
             throw new IllegalArgumentException(message);
         }
         return value.trim();
-    }
-
-    private User findUserByEmail(String email) {
-        return userRepository.findByEmailIgnoreCase(required(email, "User not found."))
-                .orElseThrow(() -> new IllegalArgumentException("User not found."));
     }
 
     private String normalizeEmail(String value) {

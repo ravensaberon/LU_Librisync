@@ -101,91 +101,6 @@
                 <span class="profile-highlight-label">Program</span>
                 <strong>${empty student.course ? 'Not set' : student.course}</strong>
             </div>
-<<<<<<< HEAD
-        </article>
-
-        <article class="panel-card profile-security-card" id="password-security">
-            <div class="section-title mb-3">Account security</div>
-            <c:choose>
-                <c:when test="${hasPendingProfileOtp}">
-                    <div class="profile-pending-otp mb-4">
-                        <i class="bi bi-hourglass-split"></i>
-                        <div>
-                            <strong>Pending verification</strong>
-                            <p class="mb-1">You still have a profile update waiting for OTP confirmation.</p>
-                            <div class="small muted-text">
-                                OTP expires in <strong id="profileOtpExpiryCountdown">calculating...</strong>
-                                <span class="mx-1">|</span>
-                                New OTP in <strong id="profileOtpResendCountdown">calculating...</strong>
-                            </div>
-                        </div>
-                    </div>
-                </c:when>
-                <c:otherwise>
-                    <p class="muted-text mb-4">No pending verification.</p>
-                </c:otherwise>
-            </c:choose>
-
-            <form method="post" action="${pageContext.request.contextPath}/student/profile/password/request-otp" class="row g-3">
-                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                <div class="col-12">
-                    <label class="form-label" for="studentCurrentPassword">Current password</label>
-                    <input class="form-control" id="studentCurrentPassword" name="currentPassword" type="password" required>
-                </div>
-                <div class="col-12">
-                    <label class="form-label" for="studentNewPassword">New password</label>
-                    <input class="form-control" id="studentNewPassword" name="newPassword" type="password" required>
-                </div>
-                <div class="col-12">
-                    <label class="form-label" for="studentConfirmPassword">Confirm new password</label>
-                    <input class="form-control" id="studentConfirmPassword" name="confirmPassword" type="password" required>
-                </div>
-                <div class="col-12">
-                    <button class="btn btn-warm" type="submit">Send password OTP</button>
-                </div>
-            </form>
-
-            <c:if test="${hasPendingPasswordOtp or openPasswordOtpPanel}">
-                <div class="panel-card mt-4">
-                    <div class="section-title mb-2">Verify password change</div>
-                    <c:if test="${hasPendingPasswordOtp}">
-                        <div class="otp-panel mb-3">
-                            <div class="otp-panel-icon"><i class="bi bi-envelope-paper"></i></div>
-                            <div>
-                                <strong>${empty passwordOtpMaskedEmail ? 'Registered email' : passwordOtpMaskedEmail}</strong>
-                                <div class="small muted-text">
-                                    OTP expires in <strong id="passwordOtpExpiryCountdown">calculating...</strong>
-                                    <span class="mx-1">|</span>
-                                    New OTP in <strong id="passwordOtpResendCountdown">calculating...</strong>
-                                </div>
-                            </div>
-                        </div>
-                    </c:if>
-
-                    <form method="post" action="${pageContext.request.contextPath}/student/profile/password/verify-otp" class="mb-3">
-                        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                        <div class="mb-3">
-                            <label class="form-label" for="passwordOtpCode">6-digit OTP</label>
-                            <input class="form-control form-control-lg otp-input"
-                                   id="passwordOtpCode"
-                                   name="otpCode"
-                                   maxlength="6"
-                                   inputmode="numeric"
-                                   pattern="[0-9]{6}"
-                                   placeholder="Enter OTP"
-                                   required>
-                        </div>
-                        <button class="btn btn-brand" type="submit">Verify OTP and change password</button>
-                    </form>
-
-                    <form method="post" action="${pageContext.request.contextPath}/student/profile/password/resend-otp">
-                        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                        <button class="btn btn-warm" type="submit" id="resendPasswordOtpButton">Resend OTP</button>
-                    </form>
-                </div>
-            </c:if>
-        </article>
-=======
             <div class="profile-highlight-tile">
                 <span class="profile-highlight-label">Year level</span>
                 <strong>${empty student.yearLevel ? 'Not set' : student.yearLevel}</strong>
@@ -199,7 +114,6 @@
                 <strong>${empty student.dateOfBirth ? 'Not provided' : student.dateOfBirthDisplay}</strong>
             </div>
         </div>
->>>>>>> 68cfa95363c4194ddda2068f525c4fb2c549a372
     </section>
 
     <section class="panel-grid panel-grid-equal mb-4">
@@ -550,15 +464,12 @@
         var shouldOpenOtpModal = ${openOtpModal ? 'true' : 'false'};
         var otpExpiresAtEpochMs = ${empty otpExpiresAtEpochMs ? 'null' : otpExpiresAtEpochMs};
         var otpResendAvailableAtEpochMs = ${empty otpResendAvailableAtEpochMs ? 'null' : otpResendAvailableAtEpochMs};
-        var passwordOtpExpiresAtEpochMs = ${empty passwordOtpExpiresAtEpochMs ? 'null' : passwordOtpExpiresAtEpochMs};
-        var passwordOtpResendAvailableAtEpochMs = ${empty passwordOtpResendAvailableAtEpochMs ? 'null' : passwordOtpResendAvailableAtEpochMs};
         var profileImageInput = document.getElementById("profileImageInput");
         var profileImageTrigger = document.getElementById("profileImageTrigger");
 
         var editProfileModal = document.getElementById("editProfileModal");
         var verifyProfileOtpModal = document.getElementById("verifyProfileOtpModal");
         var resendOtpButton = document.getElementById("resendOtpButton");
-        var resendPasswordOtpButton = document.getElementById("resendPasswordOtpButton");
         var profileCityMunicipality = document.getElementById("profileCityMunicipality");
         var profileBarangay = document.getElementById("profileBarangay");
         var profileZipcode = document.getElementById("profileZipcode");
@@ -582,8 +493,6 @@
         function updateOtpCountdowns() {
             var expiryTargets = document.querySelectorAll("#profileOtpExpiryCountdown, #modalOtpExpiryCountdown");
             var resendTargets = document.querySelectorAll("#profileOtpResendCountdown, #modalOtpResendCountdown");
-            var passwordExpiryTargets = document.querySelectorAll("#passwordOtpExpiryCountdown");
-            var passwordResendTargets = document.querySelectorAll("#passwordOtpResendCountdown");
 
             expiryTargets.forEach(function (element) {
                 if (element) {
@@ -601,24 +510,6 @@
             if (resendOtpButton) {
                 var resendBlocked = otpResendAvailableAtEpochMs && otpResendAvailableAtEpochMs > Date.now();
                 resendOtpButton.disabled = resendBlocked;
-            }
-
-            passwordExpiryTargets.forEach(function (element) {
-                if (element) {
-                    element.textContent = formatCountdown(passwordOtpExpiresAtEpochMs);
-                }
-            });
-
-            var passwordResendCountdown = formatCountdown(passwordOtpResendAvailableAtEpochMs);
-            passwordResendTargets.forEach(function (element) {
-                if (element) {
-                    element.textContent = passwordResendCountdown;
-                }
-            });
-
-            if (resendPasswordOtpButton) {
-                var passwordResendBlocked = passwordOtpResendAvailableAtEpochMs && passwordOtpResendAvailableAtEpochMs > Date.now();
-                resendPasswordOtpButton.disabled = passwordResendBlocked;
             }
         }
 

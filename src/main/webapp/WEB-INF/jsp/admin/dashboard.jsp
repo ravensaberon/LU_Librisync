@@ -42,10 +42,6 @@
         </div>
 
         <div class="dashboard-tab-nav" role="tablist" aria-label="Admin dashboard views">
-            <button class="dashboard-tab-button is-active" type="button" role="tab" id="admin-overview-tab" aria-selected="true" aria-controls="admin-overview-panel" data-dashboard-tab-button data-dashboard-tab-target="admin-overview-panel" data-dashboard-default-tab="true">
-                <i class="bi bi-house-door-fill"></i>
-                <span>Library overview</span>
-            </button>
             <button class="dashboard-tab-button" type="button" role="tab" id="admin-ops-tab" aria-selected="false" aria-controls="admin-ops-panel" data-dashboard-tab-button data-dashboard-tab-target="admin-ops-panel">
                 <i class="bi bi-grid-1x2-fill"></i>
                 <span>Operations</span>
@@ -65,7 +61,7 @@
         </div>
     </section>
 
-    <div class="dashboard-default-view" id="admin-overview-panel" data-dashboard-default-view>
+    <div class="dashboard-default-view" data-dashboard-default-view>
         <section class="hero-card mb-4">
             <div class="hero-card-grid">
                 <div>
@@ -380,14 +376,12 @@
         var panels = document.querySelectorAll("[data-dashboard-tab-panel]");
         var defaultView = document.querySelector("[data-dashboard-default-view]");
         var panelShell = document.querySelector("[data-dashboard-panel-shell]");
-        var defaultButton = document.querySelector("[data-dashboard-default-tab]");
 
         function resetView() {
             Array.prototype.forEach.call(buttons, function (button) {
-                var isDefault = defaultButton && button === defaultButton;
-                button.classList.toggle("is-active", !!isDefault);
-                button.setAttribute("aria-selected", isDefault ? "true" : "false");
-                button.setAttribute("tabindex", isDefault ? "0" : "-1");
+                button.classList.remove("is-active");
+                button.setAttribute("aria-selected", "false");
+                button.setAttribute("tabindex", "0");
             });
 
             Array.prototype.forEach.call(panels, function (panel) {
@@ -402,12 +396,6 @@
             if (panelShell) {
                 panelShell.hidden = true;
             }
-
-            document.dispatchEvent(new CustomEvent("dashboard:tabchange", {
-                detail: {
-                    panelId: defaultView ? defaultView.id : null
-                }
-            }));
         }
 
         function activateTab(targetId) {
@@ -441,13 +429,7 @@
 
         Array.prototype.forEach.call(buttons, function (button) {
             button.addEventListener("click", function () {
-                var targetId = button.getAttribute("data-dashboard-tab-target");
-                if (defaultView && targetId === defaultView.id) {
-                    resetView();
-                    return;
-                }
-
-                activateTab(targetId);
+                activateTab(button.getAttribute("data-dashboard-tab-target"));
             });
         });
 

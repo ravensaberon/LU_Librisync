@@ -29,6 +29,7 @@ import java.util.Locale;
 import java.util.Map;
 
 @Service
+@SuppressWarnings("null")
 public class IssueService {
 
     private final IssueRecordRepository issueRecordRepository;

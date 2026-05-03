@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Service
+@SuppressWarnings("null")
 public class BookService {
 
     private final BookRepository bookRepository;
@@ -61,6 +62,22 @@ public class BookService {
         }
         return bookRepository.findById(bookId)
                 .orElseThrow(() -> new IllegalArgumentException("Book not found."));
+    }
+
+    /**
+     * Looks up a book by its registered barcode first, then falls back to ISBN.
+     * Returns the matching book or empty if no exact match is found.
+     */
+    public java.util.Optional<Book> findBookByCode(String code) {
+        if (code == null || code.isBlank()) {
+            return java.util.Optional.empty();
+        }
+        String normalized = code.trim();
+        var byBarcode = bookRepository.findByBarcodeIgnoreCase(normalized);
+        if (byBarcode.isPresent()) {
+            return byBarcode;
+        }
+        return bookRepository.findByIsbnIgnoreCase(normalized);
     }
 
     public Category getCategoryById(Long categoryId) {
