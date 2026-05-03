@@ -131,6 +131,52 @@ public class ReservationController {
                 + "#reservation-desk";
     }
 
+    @PostMapping("/admin/reservations/{reservationId}/approve")
+    public String approveBorrowRequest(@PathVariable Long reservationId,
+                                       @RequestParam(defaultValue = "1") Integer borrowPage,
+                                       @RequestParam(defaultValue = "1") Integer queuePage,
+                                       Authentication authentication,
+                                       RedirectAttributes redirectAttributes) {
+        try {
+            reservationService.approveBorrowRequest(reservationId);
+            auditLogService.log(
+                    authentication.getName(),
+                    "BORROW_REQUEST_APPROVED",
+                    "RESERVATION",
+                    reservationId.toString(),
+                    "Borrow request approved by admin",
+                    "Admin approved borrow request " + reservationId + "."
+            );
+            redirectAttributes.addFlashAttribute("success", "Borrow request approved. Student has been notified.");
+        } catch (IllegalArgumentException exception) {
+            redirectAttributes.addFlashAttribute("error", exception.getMessage());
+        }
+        return "redirect:/admin/issues?reservationBorrowPage=" + Math.max(1, borrowPage) + "&reservationQueuePage=" + Math.max(1, queuePage) + "#reservation-desk";
+    }
+
+    @PostMapping("/admin/reservations/{reservationId}/deny")
+    public String denyBorrowRequest(@PathVariable Long reservationId,
+                                    @RequestParam(defaultValue = "1") Integer borrowPage,
+                                    @RequestParam(defaultValue = "1") Integer queuePage,
+                                    Authentication authentication,
+                                    RedirectAttributes redirectAttributes) {
+        try {
+            reservationService.denyBorrowRequest(reservationId);
+            auditLogService.log(
+                    authentication.getName(),
+                    "BORROW_REQUEST_DENIED",
+                    "RESERVATION",
+                    reservationId.toString(),
+                    "Borrow request denied by admin",
+                    "Admin denied borrow request " + reservationId + "."
+            );
+            redirectAttributes.addFlashAttribute("success", "Borrow request denied. Student has been notified.");
+        } catch (IllegalArgumentException exception) {
+            redirectAttributes.addFlashAttribute("error", exception.getMessage());
+        }
+        return "redirect:/admin/issues?reservationBorrowPage=" + Math.max(1, borrowPage) + "&reservationQueuePage=" + Math.max(1, queuePage) + "#reservation-desk";
+    }
+
     @PostMapping("/admin/reservations/{reservationId}/claim")
     public String claimReservation(@PathVariable Long reservationId,
                                    @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDate,
@@ -196,6 +242,13 @@ public class ReservationController {
         if (reservation == null) {
             throw new IllegalArgumentException("Reservation not found.");
         }
+
+        // If still pending approval, auto-approve first (QR scan = student is physically present)
+        if (ReservationStatus.PENDING_APPROVAL.equals(reservation.getStatus())) {
+            reservationService.approveBorrowRequest(reservation.getId());
+            reservation = reservationService.getReservationById(reservation.getId());
+        }
+
         if (!ReservationStatus.READY.equals(reservation.getStatus())) {
             if (ReservationStatus.PENDING.equals(reservation.getStatus())) {
                 throw new IllegalArgumentException("This reservation is not ready for desk release yet.");
@@ -215,6 +268,6 @@ public class ReservationController {
                 "Reserved book issued by staff",
                 "Reservation claimed and issued as " + issueRecord.getQrIssueCode()
         );
-        redirectAttributes.addFlashAttribute("success", "Reserved book released and issued successfully.");
+        redirectAttributes.addFlashAttribute("success", "Book issued successfully.");
     }
 }

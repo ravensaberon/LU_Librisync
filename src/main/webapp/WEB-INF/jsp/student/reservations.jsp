@@ -68,7 +68,7 @@
                             <th>Book</th>
                             <th>Status</th>
                             <th>Requested at</th>
-                            <th>Pickup until</th>
+                            <th>Claim by</th>
                             <th>Action</th>
                         </tr>
                         </thead>
@@ -80,33 +80,52 @@
                                     <div class="muted-text small">Desk pickup request</div>
                                 </td>
                                 <td>
-                                    <span class="tag-chip">${reservation.status}</span>
+                                    <c:choose>
+                                        <c:when test="${reservation.status.name() == 'PENDING_APPROVAL'}">
+                                            <span class="tag-chip warn">Pending approval</span>
+                                        </c:when>
+                                        <c:when test="${reservation.status.name() == 'READY'}">
+                                            <span class="tag-chip">Approved</span>
+                                        </c:when>
+                                        <c:otherwise>
+                                            <span class="tag-chip">${reservation.status}</span>
+                                        </c:otherwise>
+                                    </c:choose>
                                 </td>
                                 <td>${reservation.reservedAtDisplay}</td>
                                 <td>${reservation.expiresAtDisplay}</td>
-                                <td>
-                                    <div class="d-flex flex-wrap gap-2">
-                                        <c:if test="${reservation.status.name() == 'READY'}">
-                                            <span class="tag-chip">Bring your ID and visit the circulation desk for release.</span>
-                                        </c:if>
-                                        <button class="btn btn-outline-secondary" type="button"
-                                                data-bs-toggle="modal"
-                                                data-bs-target="#reservationQrModal"
-                                                data-reservation-qr="${reservation.deskQrCode}"
-                                                data-book-title="${reservation.book.title}"
-                                                data-reservation-type="Borrow request"
-                                                data-reservation-status="${reservation.status}">
-                                            <i class="bi bi-qr-code me-2"></i>Show pickup QR
-                                        </button>
-                                        <c:if test="${reservation.active}">
-                                            <form method="post" action="${pageContext.request.contextPath}/student/reservations/${reservation.id}/cancel">
-                                                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                                                <input type="hidden" name="tab" value="borrow">
-                                                <input type="hidden" name="borrowPage" value="${borrowRequestsPage.page}">
-                                                <input type="hidden" name="queuePage" value="${queueReservationsPage.page}">
-                                                <button class="btn btn-warm" type="submit">Cancel</button>
-                                            </form>
-                                        </c:if>
+                                <td style="min-width:180px">
+                                    <div class="d-flex flex-column gap-2 align-items-start">
+                                        <c:choose>
+                                            <c:when test="${reservation.status.name() == 'PENDING_APPROVAL'}">
+                                                <span class="muted-text small">Waiting for staff approval.</span>
+                                            </c:when>
+                                            <c:when test="${reservation.status.name() == 'READY'}">
+                                                <span class="muted-text small">Bring your ID to the desk.</span>
+                                            </c:when>
+                                        </c:choose>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <c:if test="${reservation.status.name() == 'PENDING_APPROVAL' or reservation.status.name() == 'READY'}">
+                                                <button class="btn btn-warm btn-sm" type="button"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="#reservationQrModal"
+                                                        data-reservation-qr="${reservation.deskQrCode}"
+                                                        data-book-title="${reservation.book.title}"
+                                                        data-reservation-type="Borrow request"
+                                                        data-reservation-status="${reservation.status}">
+                                                    <i class="bi bi-qr-code me-1"></i>Show QR
+                                                </button>
+                                            </c:if>
+                                            <c:if test="${reservation.active}">
+                                                <form method="post" action="${pageContext.request.contextPath}/student/reservations/${reservation.id}/cancel">
+                                                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                                                    <input type="hidden" name="tab" value="borrow">
+                                                    <input type="hidden" name="borrowPage" value="${borrowRequestsPage.page}">
+                                                    <input type="hidden" name="queuePage" value="${queueReservationsPage.page}">
+                                                    <button class="btn btn-outline-secondary btn-sm" type="submit">Cancel</button>
+                                                </form>
+                                            </c:if>
+                                        </div>
                                     </div>
                                 </td>
                             </tr>
@@ -151,7 +170,7 @@
                             <th>Queue position</th>
                             <th>Status</th>
                             <th>Reserved at</th>
-                            <th>Pickup until</th>
+                            <th>Claim by</th>
                             <th>Action</th>
                         </tr>
                         </thead>
@@ -253,18 +272,24 @@
                                 <span class="info-tile-label">Reservation code</span>
                                 <span class="qr-code-value" id="reservationQrValue">No reservation selected yet.</span>
                             </div>
-                            <div class="info-grid">
-                                <div class="info-tile">
-                                    <span class="info-tile-label">Book</span>
-                                    <span class="info-tile-value" id="reservationQrBookTitle">Not selected</span>
+                            <div class="row g-2 mt-1">
+                                <div class="col-12">
+                                    <div class="info-tile">
+                                        <span class="info-tile-label">Book</span>
+                                        <span class="info-tile-value" id="reservationQrBookTitle">Not selected</span>
+                                    </div>
                                 </div>
-                                <div class="info-tile">
-                                    <span class="info-tile-label">Request type</span>
-                                    <span class="info-tile-value" id="reservationQrType">Not selected</span>
+                                <div class="col-6">
+                                    <div class="info-tile">
+                                        <span class="info-tile-label">Request type</span>
+                                        <span class="info-tile-value" id="reservationQrType">Not selected</span>
+                                    </div>
                                 </div>
-                                <div class="info-tile">
-                                    <span class="info-tile-label">Status</span>
-                                    <span class="info-tile-value" id="reservationQrStatus">Not selected</span>
+                                <div class="col-6">
+                                    <div class="info-tile">
+                                        <span class="info-tile-label">Status</span>
+                                        <span class="info-tile-value" id="reservationQrStatus">Not selected</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>

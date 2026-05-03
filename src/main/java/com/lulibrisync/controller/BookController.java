@@ -303,7 +303,7 @@ public class BookController {
                     "Student requested a physical checkout",
                     "Book: " + reservation.getBook().getTitle() + " | Status: " + reservation.getStatus()
             );
-            redirectAttributes.addFlashAttribute("success", "Borrow request approved. Please show your ID at the circulation desk within " + reservationService.getBorrowRequestWindowMinutes() + " minutes.");
+            redirectAttributes.addFlashAttribute("success", "Borrow request submitted. Please wait for staff approval.");
         } catch (IllegalArgumentException exception) {
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
         }

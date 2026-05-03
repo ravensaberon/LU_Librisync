@@ -73,7 +73,7 @@ public class Reservation {
     }
 
     public boolean isActive() {
-        return ReservationStatus.PENDING.equals(status) || ReservationStatus.READY.equals(status);
+        return ReservationStatus.PENDING.equals(status) || ReservationStatus.PENDING_APPROVAL.equals(status) || ReservationStatus.READY.equals(status);
     }
 
     public boolean isBorrowRequest() {

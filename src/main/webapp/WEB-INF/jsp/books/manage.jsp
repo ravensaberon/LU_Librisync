@@ -219,18 +219,24 @@
                                 <span class="info-tile-label">Encoded value</span>
                                 <span class="qr-code-value" id="bookQrValue">No code selected yet.</span>
                             </div>
-                            <div class="info-grid">
-                                <div class="info-tile">
-                                    <span class="info-tile-label">Title</span>
-                                    <span class="info-tile-value" id="bookQrTitle">Not selected</span>
+                            <div class="row g-2 mt-1">
+                                <div class="col-12">
+                                    <div class="info-tile">
+                                        <span class="info-tile-label">Title</span>
+                                        <span class="info-tile-value" id="bookQrTitle">Not selected</span>
+                                    </div>
                                 </div>
-                                <div class="info-tile">
-                                    <span class="info-tile-label">ISBN</span>
-                                    <span class="info-tile-value" id="bookQrIsbn">Not selected</span>
+                                <div class="col-6">
+                                    <div class="info-tile">
+                                        <span class="info-tile-label">ISBN</span>
+                                        <span class="info-tile-value" id="bookQrIsbn">Not selected</span>
+                                    </div>
                                 </div>
-                                <div class="info-tile">
-                                    <span class="info-tile-label">Code type</span>
-                                    <span class="info-tile-value" id="bookQrType">Not selected</span>
+                                <div class="col-6">
+                                    <div class="info-tile">
+                                        <span class="info-tile-label">Code type</span>
+                                        <span class="info-tile-value" id="bookQrType">Not selected</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>

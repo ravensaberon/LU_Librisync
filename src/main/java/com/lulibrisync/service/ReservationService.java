@@ -27,7 +27,7 @@ import java.util.Set;
 @SuppressWarnings("null")
 public class ReservationService {
 
-    private static final List<ReservationStatus> ACTIVE_STATUSES = List.of(ReservationStatus.PENDING, ReservationStatus.READY);
+    private static final List<ReservationStatus> ACTIVE_STATUSES = List.of(ReservationStatus.PENDING, ReservationStatus.PENDING_APPROVAL, ReservationStatus.READY);
 
     private final ReservationRepository reservationRepository;
     private final BookRepository bookRepository;
@@ -199,25 +199,24 @@ public class ReservationService {
         reservation.setBook(book);
         reservation.setStudent(student);
         reservation.setRequestType(ReservationRequestType.BORROW);
-        reservation.setStatus(ReservationStatus.READY);
+        reservation.setStatus(ReservationStatus.PENDING_APPROVAL);
         reservation.setReservedAt(LocalDateTime.now());
         reservation.setPreferredPickupDate(null);
         reservation.setQueuePosition(0);
-        reservation.setExpiresAt(LocalDateTime.now().plusMinutes(borrowRequestWindowMinutes));
+        reservation.setExpiresAt(null);
 
         Reservation savedReservation = reservationRepository.save(reservation);
-        emailNotificationService.queueReservationReadyNotification(savedReservation);
-        adminNotificationService.notifyUserIfAbsent(
+        adminNotificationService.notifyUser(
                 student.getUser().getEmail(),
                 AdminNotificationType.BORROW_STATUS,
-                "Borrow request approved",
-                "Your borrow request for " + book.getTitle() + " is ready at the circulation desk.",
+                "Borrow request submitted",
+                "Your borrow request for " + book.getTitle() + " is pending staff approval.",
                 "/student/reservations?tab=borrow"
         );
         adminNotificationService.notifyAdmins(
                 AdminNotificationType.BORROW_REQUEST,
                 "New borrow request",
-                student.getUser().getName() + " requested a walk-in borrow for " + book.getTitle() + ".",
+                student.getUser().getName() + " requested a walk-in borrow for " + book.getTitle() + ". Approve or deny from the reservation desk.",
                 "/admin/issues#reservation-desk"
         );
         promoteReservationsForBook(bookId);
@@ -281,6 +280,50 @@ public class ReservationService {
         reindexQueue(bookId);
         promoteReservationsForBook(bookId);
         return getReservationById(savedReservation.getId());
+    }
+
+    @Transactional
+    public void approveBorrowRequest(Long reservationId) {
+        Reservation reservation = getReservationById(reservationId);
+        if (!ReservationRequestType.BORROW.equals(reservation.getRequestType())) {
+            throw new IllegalArgumentException("Only borrow requests can be approved.");
+        }
+        if (!ReservationStatus.PENDING_APPROVAL.equals(reservation.getStatus())) {
+            throw new IllegalArgumentException("Only pending borrow requests can be approved.");
+        }
+        reservation.setStatus(ReservationStatus.READY);
+        reservation.setExpiresAt(LocalDateTime.now().plusMinutes(borrowRequestWindowMinutes));
+        reservationRepository.save(reservation);
+        emailNotificationService.queueReservationReadyNotification(reservation);
+        adminNotificationService.notifyUserIfAbsent(
+                reservation.getStudent().getUser().getEmail(),
+                AdminNotificationType.BORROW_STATUS,
+                "Borrow request approved",
+                "Your borrow request for " + reservation.getBook().getTitle() + " was approved. You have " + borrowRequestWindowMinutes + " minutes to claim it at the circulation desk.",
+                "/student/reservations?tab=borrow"
+        );
+    }
+
+    @Transactional
+    public void denyBorrowRequest(Long reservationId) {
+        Reservation reservation = getReservationById(reservationId);
+        if (!ReservationRequestType.BORROW.equals(reservation.getRequestType())) {
+            throw new IllegalArgumentException("Only borrow requests can be denied.");
+        }
+        if (!ReservationStatus.PENDING_APPROVAL.equals(reservation.getStatus())) {
+            throw new IllegalArgumentException("Only pending borrow requests can be denied.");
+        }
+        reservation.setStatus(ReservationStatus.DENIED);
+        reservation.setExpiresAt(null);
+        reservationRepository.save(reservation);
+        adminNotificationService.notifyUser(
+                reservation.getStudent().getUser().getEmail(),
+                AdminNotificationType.BORROW_STATUS,
+                "Borrow request denied",
+                "Your borrow request for " + reservation.getBook().getTitle() + " was denied by library staff.",
+                "/student/reservations?tab=borrow"
+        );
+        promoteReservationsForBook(reservation.getBook().getId());
     }
 
     @Transactional
@@ -393,7 +436,8 @@ public class ReservationService {
 
         int availableCopies = book.getAvailableQuantity() == null ? 0 : book.getAvailableQuantity();
         long readyCount = activeReservations.stream()
-                .filter(reservation -> ReservationStatus.READY.equals(reservation.getStatus()))
+                .filter(reservation -> ReservationStatus.READY.equals(reservation.getStatus())
+                        || ReservationStatus.PENDING_APPROVAL.equals(reservation.getStatus()))
                 .count();
         int promotableSlots = Math.max(0, availableCopies - (int) readyCount);
         if (promotableSlots < 1) {
@@ -493,8 +537,8 @@ public class ReservationService {
         if (book == null || book.getId() == null) {
             return 0;
         }
-        int readyReservationCount = (int) reservationRepository.countByBook_IdAndStatusIn(book.getId(), List.of(ReservationStatus.READY));
-        return Math.max(0, getAvailableCopyCount(book) - readyReservationCount);
+        int readyOrPendingCount = (int) reservationRepository.countByBook_IdAndStatusIn(book.getId(), List.of(ReservationStatus.READY, ReservationStatus.PENDING_APPROVAL));
+        return Math.max(0, getAvailableCopyCount(book) - readyOrPendingCount);
     }
 
     private int getAvailableCopyCount(Book book) {

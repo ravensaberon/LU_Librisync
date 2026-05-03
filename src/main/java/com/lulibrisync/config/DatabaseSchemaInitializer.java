@@ -32,6 +32,7 @@ public class DatabaseSchemaInitializer implements ApplicationRunner {
             ensureReservationRequestTypeColumn(statement);
             ensureIssueReturnRequestColumn(statement);
             ensureAdminNotificationsTable(statement);
+            ensureReservationStatusEnumValues(statement);
         }
     }
 
@@ -155,5 +156,30 @@ public class DatabaseSchemaInitializer implements ApplicationRunner {
                         + ")"
         );
         logger.info("Ensured admin_notifications table exists for in-app admin alerts.");
+    }
+
+    private void ensureReservationStatusEnumValues(Statement statement) throws Exception {
+        try (ResultSet tables = statement.executeQuery("SHOW TABLES LIKE 'reservations'")) {
+            if (!tables.next()) {
+                return;
+            }
+        }
+
+        // Check if PENDING_APPROVAL is already in the enum
+        try (ResultSet columns = statement.executeQuery("SHOW COLUMNS FROM reservations LIKE 'status'")) {
+            if (columns.next()) {
+                String columnType = columns.getString("Type");
+                if (columnType != null && columnType.contains("PENDING_APPROVAL")) {
+                    return; // Already migrated
+                }
+            }
+        }
+
+        statement.executeUpdate(
+                "ALTER TABLE reservations MODIFY COLUMN status "
+                        + "ENUM('PENDING','PENDING_APPROVAL','READY','CLAIMED','CANCELLED','DENIED') "
+                        + "NOT NULL DEFAULT 'PENDING'"
+        );
+        logger.info("Updated reservations.status enum to include PENDING_APPROVAL and DENIED values.");
     }
 }

@@ -77,7 +77,7 @@
                     <th>Student</th>
                     <th>Status</th>
                     <th>Requested at</th>
-                    <th>Pickup until</th>
+                    <th>Claim by</th>
                     <th>Desk release</th>
                     <th>Cancel</th>
                 </tr>
@@ -157,7 +157,7 @@
                     <th>Queue</th>
                     <th>Status</th>
                     <th>Reserved at</th>
-                    <th>Pickup until</th>
+                    <th>Claim by</th>
                     <th>Desk release</th>
                     <th>Cancel</th>
                 </tr>

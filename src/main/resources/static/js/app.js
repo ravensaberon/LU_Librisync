@@ -484,17 +484,15 @@ window.LuLibrisyncAddress = (function () {
         notificationWrap.appendChild(notification);
 
         var alertCount = pageShell.querySelectorAll(".alert").length;
-        if (!meta.isStudent || alertCount > 0) {
-            var badge = document.createElement("span");
-            badge.className = "shell-alert-badge";
-            badge.setAttribute("data-shell-notification-badge", "true");
-            if (!meta.isStudent) {
-                badge.hidden = true;
-            } else {
-                badge.textContent = alertCount > 9 ? "9+" : String(alertCount);
-            }
-            notificationWrap.appendChild(badge);
+        var badge = document.createElement("span");
+        badge.className = "shell-alert-badge";
+        badge.setAttribute("data-shell-notification-badge", "true");
+        badge.hidden = true;
+        if (meta.isStudent && alertCount > 0) {
+            badge.textContent = alertCount > 9 ? "9+" : String(alertCount);
+            badge.hidden = false;
         }
+        notificationWrap.appendChild(badge);
 
         var account = document.createElement("button");
         account.type = "button";

@@ -249,9 +249,9 @@
     </section>
 
     <section class="panel-card mb-4 dashboard-tab-panel" id="issue-reservation-panel" role="tabpanel" data-issue-desk-tab-panel hidden>
-        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
             <div>
-                <div class="section-title mb-2">Reservation Desk Release</div>
+                <div class="section-title mb-1">Reservation Desk Release</div>
                 <p class="helper-copy mb-0">Pending and ready reservations are handled here so circulation, pickup confirmation, and issue recording stay in one workspace.</p>
             </div>
             <button class="btn btn-warm scanner-trigger" type="button" data-bs-toggle="modal" data-bs-target="#reservationQrScannerModal">
@@ -259,7 +259,10 @@
             </button>
         </div>
 
-        <div class="table-responsive mb-4">
+        <%-- ── Borrow Requests ── --%>
+        <div class="section-title mb-2">Borrow Requests</div>
+        <p class="helper-copy mb-3">Walk-in requests submitted by students. Approve or deny before the book is released.</p>
+        <div class="table-responsive mb-2">
             <table class="table align-middle">
                 <thead>
                 <tr>
@@ -267,57 +270,81 @@
                     <th>Student</th>
                     <th>Status</th>
                     <th>Requested at</th>
-                    <th>Pickup until</th>
-                    <th>Desk release</th>
-                    <th>Cancel</th>
+                    <th>Claim by</th>
+                    <th>Action</th>
                 </tr>
                 </thead>
                 <tbody>
                 <c:forEach items="${borrowRequests}" var="reservation">
                     <tr>
                         <td>${reservation.book.title}</td>
-                        <td>${reservation.student.studentId} - ${reservation.student.user.name}</td>
-                        <td><span class="tag-chip">${reservation.status}</span></td>
+                        <td>${reservation.student.studentId} &ndash; ${reservation.student.user.name}</td>
+                        <td>
+                            <c:choose>
+                                <c:when test="${reservation.status.name() == 'PENDING_APPROVAL'}">
+                                    <span class="tag-chip warn">Pending approval</span>
+                                </c:when>
+                                <c:when test="${reservation.status.name() == 'READY'}">
+                                    <span class="tag-chip">Ready</span>
+                                </c:when>
+                                <c:otherwise>
+                                    <span class="tag-chip">${reservation.status}</span>
+                                </c:otherwise>
+                            </c:choose>
+                        </td>
                         <td>${reservation.reservedAtDisplay}</td>
                         <td>${reservation.expiresAtDisplay}</td>
                         <td>
                             <c:choose>
+                                <c:when test="${reservation.status.name() == 'PENDING_APPROVAL'}">
+                                    <div class="d-flex gap-2">
+                                        <form method="post" action="${pageContext.request.contextPath}/admin/reservations/${reservation.id}/approve">
+                                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                                            <input type="hidden" name="borrowPage" value="${borrowRequestsPage.page}">
+                                            <input type="hidden" name="queuePage" value="${queueReservationsPage.page}">
+                                            <button class="btn btn-brand btn-sm" type="submit"><i class="bi bi-check-lg me-1"></i>Approve</button>
+                                        </form>
+                                        <form method="post" action="${pageContext.request.contextPath}/admin/reservations/${reservation.id}/deny">
+                                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                                            <input type="hidden" name="borrowPage" value="${borrowRequestsPage.page}">
+                                            <input type="hidden" name="queuePage" value="${queueReservationsPage.page}">
+                                            <button class="btn btn-warm btn-sm" type="submit"><i class="bi bi-x-lg me-1"></i>Deny</button>
+                                        </form>
+                                    </div>
+                                </c:when>
                                 <c:when test="${reservation.status.name() == 'READY'}">
-                                    <form method="post" action="${pageContext.request.contextPath}/admin/reservations/${reservation.id}/claim" class="d-grid gap-2">
-                                        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                                        <input type="hidden" name="borrowPage" value="${borrowRequestsPage.page}">
-                                        <input type="hidden" name="queuePage" value="${queueReservationsPage.page}">
-                                        <input class="form-control form-control-sm" name="dueDate" type="date" value="${defaultDueDate}" required>
-                                        <input class="form-control form-control-sm" name="remarks" placeholder="Optional remarks">
-                                        <button class="btn btn-brand" type="submit"><i class="bi bi-box-arrow-right me-2"></i>Confirm pickup and issue</button>
-                                    </form>
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                        <form method="post" action="${pageContext.request.contextPath}/admin/reservations/${reservation.id}/claim" class="d-flex align-items-center gap-2 flex-wrap">
+                                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                                            <input type="hidden" name="borrowPage" value="${borrowRequestsPage.page}">
+                                            <input type="hidden" name="queuePage" value="${queueReservationsPage.page}">
+                                            <input class="form-control form-control-sm" style="width:140px" name="dueDate" type="date" value="${defaultDueDate}" required>
+                                            <input class="form-control form-control-sm" style="width:140px" name="remarks" placeholder="Remarks (optional)">
+                                            <button class="btn btn-brand btn-sm" type="submit"><i class="bi bi-box-arrow-right me-1"></i>Confirm pickup</button>
+                                        </form>
+                                        <form method="post" action="${pageContext.request.contextPath}/admin/reservations/${reservation.id}/cancel">
+                                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                                            <input type="hidden" name="borrowPage" value="${borrowRequestsPage.page}">
+                                            <input type="hidden" name="queuePage" value="${queueReservationsPage.page}">
+                                            <button class="btn btn-warm btn-sm" type="submit">Cancel</button>
+                                        </form>
+                                    </div>
                                 </c:when>
                                 <c:otherwise>
-                                    <span class="muted-text">Desk release unlocks when the reservation becomes READY.</span>
+                                    <span class="muted-text small">—</span>
                                 </c:otherwise>
                             </c:choose>
-                        </td>
-                        <td>
-                            <c:if test="${reservation.active}">
-                                <form method="post" action="${pageContext.request.contextPath}/admin/reservations/${reservation.id}/cancel">
-                                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                                    <input type="hidden" name="borrowPage" value="${borrowRequestsPage.page}">
-                                    <input type="hidden" name="queuePage" value="${queueReservationsPage.page}">
-                                    <button class="btn btn-warm" type="submit">Cancel</button>
-                                </form>
-                            </c:if>
                         </td>
                     </tr>
                 </c:forEach>
                 <c:if test="${empty borrowRequests}">
                     <tr>
-                        <td colspan="7" class="text-center muted-text">No active borrow requests available yet.</td>
+                        <td colspan="6" class="text-center muted-text">No active borrow requests.</td>
                     </tr>
                 </c:if>
                 </tbody>
             </table>
         </div>
-
         <c:if test="${borrowRequestsPage.totalPages > 1}">
             <nav class="mb-4" aria-label="Admin borrow request pages">
                 <ul class="pagination justify-content-center mb-0">
@@ -336,6 +363,11 @@
             </nav>
         </c:if>
 
+        <hr class="my-4">
+
+        <%-- ── Queue Reservations ── --%>
+        <div class="section-title mb-2">Queue Reservations</div>
+        <p class="helper-copy mb-3">Students who reserved a book in advance. Release when their copy is ready.</p>
         <div class="table-responsive">
             <table class="table align-middle">
                 <thead>
@@ -345,16 +377,15 @@
                     <th>Queue</th>
                     <th>Status</th>
                     <th>Reserved at</th>
-                    <th>Pickup until</th>
-                    <th>Desk release</th>
-                    <th>Cancel</th>
+                    <th>Claim by</th>
+                    <th>Action</th>
                 </tr>
                 </thead>
                 <tbody>
                 <c:forEach items="${queueReservations}" var="reservation">
                     <tr>
                         <td>${reservation.book.title}</td>
-                        <td>${reservation.student.studentId} - ${reservation.student.user.name}</td>
+                        <td>${reservation.student.studentId} &ndash; ${reservation.student.user.name}</td>
                         <td>${reservation.queuePosition}</td>
                         <td><span class="tag-chip">${reservation.status}</span></td>
                         <td>${reservation.reservedAtDisplay}</td>
@@ -362,41 +393,48 @@
                         <td>
                             <c:choose>
                                 <c:when test="${reservation.status.name() == 'READY'}">
-                                    <form method="post" action="${pageContext.request.contextPath}/admin/reservations/${reservation.id}/claim" class="d-grid gap-2">
-                                        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                                        <input type="hidden" name="borrowPage" value="${borrowRequestsPage.page}">
-                                        <input type="hidden" name="queuePage" value="${queueReservationsPage.page}">
-                                        <input class="form-control form-control-sm" name="dueDate" type="date" value="${defaultDueDate}" required>
-                                        <input class="form-control form-control-sm" name="remarks" placeholder="Optional remarks">
-                                        <button class="btn btn-brand" type="submit"><i class="bi bi-box-arrow-right me-2"></i>Confirm pickup and issue</button>
-                                    </form>
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                        <form method="post" action="${pageContext.request.contextPath}/admin/reservations/${reservation.id}/claim" class="d-flex align-items-center gap-2 flex-wrap">
+                                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                                            <input type="hidden" name="borrowPage" value="${borrowRequestsPage.page}">
+                                            <input type="hidden" name="queuePage" value="${queueReservationsPage.page}">
+                                            <input class="form-control form-control-sm" style="width:140px" name="dueDate" type="date" value="${defaultDueDate}" required>
+                                            <input class="form-control form-control-sm" style="width:140px" name="remarks" placeholder="Remarks (optional)">
+                                            <button class="btn btn-brand btn-sm" type="submit"><i class="bi bi-box-arrow-right me-1"></i>Confirm pickup</button>
+                                        </form>
+                                        <form method="post" action="${pageContext.request.contextPath}/admin/reservations/${reservation.id}/cancel">
+                                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                                            <input type="hidden" name="borrowPage" value="${borrowRequestsPage.page}">
+                                            <input type="hidden" name="queuePage" value="${queueReservationsPage.page}">
+                                            <button class="btn btn-warm btn-sm" type="submit">Cancel</button>
+                                        </form>
+                                    </div>
                                 </c:when>
                                 <c:otherwise>
-                                    <span class="muted-text">Desk release unlocks when the reservation becomes READY.</span>
+                                    <div class="d-flex gap-2 align-items-center">
+                                        <span class="muted-text small">Waiting for a copy to become available.</span>
+                                        <c:if test="${reservation.active}">
+                                            <form method="post" action="${pageContext.request.contextPath}/admin/reservations/${reservation.id}/cancel">
+                                                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
+                                                <input type="hidden" name="borrowPage" value="${borrowRequestsPage.page}">
+                                                <input type="hidden" name="queuePage" value="${queueReservationsPage.page}">
+                                                <button class="btn btn-warm btn-sm" type="submit">Cancel</button>
+                                            </form>
+                                        </c:if>
+                                    </div>
                                 </c:otherwise>
                             </c:choose>
-                        </td>
-                        <td>
-                            <c:if test="${reservation.active}">
-                                <form method="post" action="${pageContext.request.contextPath}/admin/reservations/${reservation.id}/cancel">
-                                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                                    <input type="hidden" name="borrowPage" value="${borrowRequestsPage.page}">
-                                    <input type="hidden" name="queuePage" value="${queueReservationsPage.page}">
-                                    <button class="btn btn-warm" type="submit">Cancel</button>
-                                </form>
-                            </c:if>
                         </td>
                     </tr>
                 </c:forEach>
                 <c:if test="${empty queueReservations}">
                     <tr>
-                        <td colspan="8" class="text-center muted-text">No queue reservation records available yet.</td>
+                        <td colspan="7" class="text-center muted-text">No queue reservations yet.</td>
                     </tr>
                 </c:if>
                 </tbody>
             </table>
         </div>
-
         <c:if test="${queueReservationsPage.totalPages > 1}">
             <nav class="mt-4" aria-label="Admin reservation queue pages">
                 <ul class="pagination justify-content-center mb-0">
@@ -587,14 +625,18 @@
                                 <span class="info-tile-label">Issue code</span>
                                 <span class="qr-code-value" id="issueQrValue">No code selected yet.</span>
                             </div>
-                            <div class="info-grid">
-                                <div class="info-tile">
-                                    <span class="info-tile-label">Book</span>
-                                    <span class="info-tile-value" id="issueQrBookTitle">Not selected</span>
+                            <div class="row g-2 mt-1">
+                                <div class="col-12">
+                                    <div class="info-tile">
+                                        <span class="info-tile-label">Book</span>
+                                        <span class="info-tile-value" id="issueQrBookTitle">Not selected</span>
+                                    </div>
                                 </div>
-                                <div class="info-tile">
-                                    <span class="info-tile-label">Borrower</span>
-                                    <span class="info-tile-value" id="issueQrStudentName">Not selected</span>
+                                <div class="col-12">
+                                    <div class="info-tile">
+                                        <span class="info-tile-label">Borrower</span>
+                                        <span class="info-tile-value" id="issueQrStudentName">Not selected</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -633,21 +675,42 @@
                             <input class="form-control" id="reservationScannerRemarks" name="remarks" placeholder="Optional remarks for the issued copy">
                         </div>
                     </form>
-                    <div class="scanner-shell">
-                        <video id="reservationScannerVideo" autoplay muted playsinline></video>
-                        <div class="scanner-overlay"></div>
-                        <div class="scanner-target scanner-target-qr"></div>
+
+                    <%-- Scanner view (shown while scanning) --%>
+                    <div id="reservationScannerView">
+                        <div class="scanner-shell">
+                            <video id="reservationScannerVideo" autoplay muted playsinline></video>
+                            <div class="scanner-overlay"></div>
+                            <div class="scanner-target scanner-target-qr"></div>
+                        </div>
+                        <div class="scanner-status" id="reservationScannerStatus">
+                            Camera scanner is preparing. Hold the student pickup QR inside the highlighted frame.
+                        </div>
+                        <div class="scanner-upload">
+                            <div class="scanner-upload-actions">
+                                <label class="btn btn-warm mb-0" for="reservationScannerUpload">
+                                    <i class="bi bi-image me-2"></i>Upload QR from gallery
+                                </label>
+                                <input class="d-none" id="reservationScannerUpload" type="file" accept="image/*">
+                                <span class="form-note">You can also choose a saved screenshot of the student's QR code.</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="scanner-status" id="reservationScannerStatus">
-                        Camera scanner is preparing. Hold the student pickup QR inside the highlighted frame.
-                    </div>
-                    <div class="scanner-upload">
-                        <div class="scanner-upload-actions">
-                            <label class="btn btn-warm mb-0" for="reservationScannerUpload">
-                                <i class="bi bi-image me-2"></i>Upload QR from gallery
-                            </label>
-                            <input class="d-none" id="reservationScannerUpload" type="file" accept="image/*">
-                            <span class="form-note">You can also choose a saved screenshot of the student's QR code.</span>
+
+                    <%-- Preview view (shown after scan, before submit) --%>
+                    <div id="reservationScannerPreview" hidden>
+                        <div class="support-item mb-3">
+                            <strong>QR code detected</strong>
+                            <span id="reservationPreviewCode" class="d-block mt-1" style="font-family:monospace;font-size:.9rem;word-break:break-all;color:var(--primary-900)"></span>
+                        </div>
+                        <p class="muted-text mb-3">Review the details above. If correct, click <strong>Confirm &amp; Issue</strong> to complete the desk release. Otherwise, click <strong>Re-scan</strong> to try again.</p>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-brand" type="button" id="reservationPreviewConfirmBtn">
+                                <i class="bi bi-box-arrow-right me-2"></i>Confirm &amp; Issue
+                            </button>
+                            <button class="btn btn-warm" type="button" id="reservationPreviewRescanBtn">
+                                <i class="bi bi-arrow-repeat me-2"></i>Re-scan
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -806,6 +869,12 @@
         const reservationScannerUploadInput = document.getElementById("reservationScannerUpload");
         const reservationQrCodeField = document.getElementById("reservationQrCodeField");
         const reservationClaimForm = document.getElementById("reservationQrClaimForm");
+        const reservationScannerView = document.getElementById("reservationScannerView");
+        const reservationScannerPreview = document.getElementById("reservationScannerPreview");
+        const reservationPreviewCode = document.getElementById("reservationPreviewCode");
+        const reservationPreviewConfirmBtn = document.getElementById("reservationPreviewConfirmBtn");
+        const reservationPreviewRescanBtn = document.getElementById("reservationPreviewRescanBtn");
+
         const reservationScanner = window.LuLibrisyncQr.createScanner({
             videoElement: document.getElementById("reservationScannerVideo"),
             statusElement: document.getElementById("reservationScannerStatus"),
@@ -814,8 +883,8 @@
             qrFallbackMessage: "QR-only scanning is active on this browser. Aim the camera at the student's reservation QR.",
             unsupportedMessage: "This browser cannot decode live QR codes. You can still upload a saved QR image.",
             permissionMessage: "Camera access was blocked or unavailable. Please allow camera use, then try again.",
-            fileSuccessMessage: "QR image decoded successfully. Recording the desk release now.",
-            onDetected: submitClaimFromQr,
+            fileSuccessMessage: "QR image decoded. Review the details below.",
+            onDetected: showScanPreview,
             onScanError: function () {
                 window.LuLibrisyncQr.setStatus(
                     document.getElementById("reservationScannerStatus"),
@@ -825,19 +894,37 @@
             }
         });
 
-        function submitClaimFromQr(rawValue) {
+        function showScanPreview(rawValue) {
             const detectedCode = (rawValue || "").trim();
             if (!detectedCode) {
                 return;
             }
-
-            reservationQrCodeField.value = detectedCode;
-            reservationScanner.setStatus("Reservation QR detected. Recording the pickup and issuing the book now.", false);
             reservationScanner.stop();
-            reservationClaimForm.requestSubmit();
+            reservationQrCodeField.value = detectedCode;
+            reservationPreviewCode.textContent = detectedCode;
+            reservationScannerView.hidden = true;
+            reservationScannerPreview.hidden = false;
         }
 
+        function resetToScanner() {
+            reservationQrCodeField.value = "";
+            reservationPreviewCode.textContent = "";
+            reservationScannerPreview.hidden = true;
+            reservationScannerView.hidden = false;
+            reservationScanner.start();
+        }
+
+        reservationPreviewConfirmBtn.addEventListener("click", function () {
+            reservationClaimForm.requestSubmit();
+        });
+
+        reservationPreviewRescanBtn.addEventListener("click", function () {
+            resetToScanner();
+        });
+
         reservationScannerModalElement.addEventListener("shown.bs.modal", function () {
+            reservationScannerPreview.hidden = true;
+            reservationScannerView.hidden = false;
             reservationScanner.start();
         });
 
@@ -846,6 +933,9 @@
             reservationScanner.setStatus("Camera scanner is preparing. Hold the student pickup QR inside the highlighted frame.", false);
             reservationScannerUploadInput.value = "";
             reservationQrCodeField.value = "";
+            reservationPreviewCode.textContent = "";
+            reservationScannerPreview.hidden = true;
+            reservationScannerView.hidden = false;
         });
 
         reservationScannerUploadInput.addEventListener("change", function (event) {

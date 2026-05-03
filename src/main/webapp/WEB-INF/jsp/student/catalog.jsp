@@ -138,8 +138,11 @@
                                             <c:when test="${not empty activeIssueStatus}">
                                                 <span class="tag-chip">Borrowed by you</span>
                                             </c:when>
-                                            <c:when test="${reservationStatus == 'READY'}">
+                                            <c:when test="${reservationStatus == 'BORROW:READY'}">
                                                 <span class="tag-chip">Ready for desk pickup</span>
+                                            </c:when>
+                                            <c:when test="${reservationStatus == 'BORROW:PENDING_APPROVAL'}">
+                                                <span class="tag-chip warn">Borrow request pending approval</span>
                                             </c:when>
                                             <c:when test="${walkInBorrowableCopies > 0}">
                                                 <span class="tag-chip">Available now</span>
@@ -245,9 +248,13 @@
                                                     </c:otherwise>
                                                 </c:choose>
                                             </c:when>
-                                            <c:when test="${reservationStatus == 'READY'}">
+                                            <c:when test="${reservationStatus == 'BORROW:READY'}">
                                                 <span class="tag-chip">Proceed to the circulation desk for release.</span>
                                                 <a class="btn btn-outline-secondary" href="${pageContext.request.contextPath}/student/reservations">View reservation</a>
+                                            </c:when>
+                                            <c:when test="${reservationStatus == 'BORROW:PENDING_APPROVAL'}">
+                                                <span class="tag-chip warn">Borrow request pending staff approval.</span>
+                                                <a class="btn btn-outline-secondary" href="${pageContext.request.contextPath}/student/reservations">View request</a>
                                             </c:when>
                                             <c:when test="${not empty reservationStatus}">
                                                 <a class="btn btn-outline-secondary" href="${pageContext.request.contextPath}/student/reservations">View reservation</a>

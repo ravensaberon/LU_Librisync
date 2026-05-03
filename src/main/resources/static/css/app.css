@@ -1969,6 +1969,12 @@ body.shell-nav-collapsed .app-nav {
     align-self: start;
 }
 
+/* info-grid inside a modal should not use the wide 6-column layout */
+.modal .info-grid,
+.modal-body .info-grid {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
 .modal-loading-state {
     min-height: 240px;
     display: grid;
