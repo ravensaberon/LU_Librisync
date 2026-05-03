@@ -127,6 +127,65 @@ window.LuLibrisyncQr = (function () {
             });
     }
 
+    function decodeBarcodeFromImageFile(file) {
+        if (!file) {
+            return Promise.reject(new Error("Choose an image first."));
+        }
+
+        return new Promise(function (resolve, reject) {
+            var objectUrl = URL.createObjectURL(file);
+
+            // Try ZXing first — handles all 1D barcodes and QR from images
+            if (window.ZXingBrowser && typeof window.ZXingBrowser.BrowserMultiFormatReader === "function") {
+                var reader = new window.ZXingBrowser.BrowserMultiFormatReader();
+                reader.decodeFromImageUrl(objectUrl)
+                    .then(function (result) {
+                        URL.revokeObjectURL(objectUrl);
+                        var text = extractDetectedText(result);
+                        if (text) {
+                            resolve(text);
+                        } else {
+                            reject(new Error("No barcode was found in the selected image."));
+                        }
+                    })
+                    .catch(function () {
+                        URL.revokeObjectURL(objectUrl);
+                        reject(new Error("No barcode was found in the selected image. Try a clearer photo with the barcode fully visible."));
+                    });
+                return;
+            }
+
+            // Fallback: jsQR for QR-only images
+            if (typeof window.jsQR === "function") {
+                var image = new Image();
+                image.onload = function () {
+                    var canvas = document.createElement("canvas");
+                    var context = canvas.getContext("2d", { willReadFrequently: true });
+                    canvas.width = image.naturalWidth || image.width;
+                    canvas.height = image.naturalHeight || image.height;
+                    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+                    var imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                    var qrResult = window.jsQR(imageData.data, canvas.width, canvas.height, { inversionAttempts: "attemptBoth" });
+                    URL.revokeObjectURL(objectUrl);
+                    if (qrResult && qrResult.data) {
+                        resolve(qrResult.data);
+                    } else {
+                        reject(new Error("No barcode was found in the selected image."));
+                    }
+                };
+                image.onerror = function () {
+                    URL.revokeObjectURL(objectUrl);
+                    reject(new Error("Unable to open the selected image."));
+                };
+                image.src = objectUrl;
+                return;
+            }
+
+            URL.revokeObjectURL(objectUrl);
+            reject(new Error("Barcode image decoding is unavailable in this browser."));
+        });
+    }
+
     function extractDetectedText(result) {
         if (!result) {
             return "";
@@ -424,6 +483,7 @@ window.LuLibrisyncQr = (function () {
 
     return {
         createScanner: createScanner,
+        decodeBarcodeFromImageFile: decodeBarcodeFromImageFile,
         downloadCanvas: downloadCanvas,
         normalizeFilename: normalizeFilename,
         renderQr: renderQr,

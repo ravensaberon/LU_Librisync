@@ -331,6 +331,16 @@
                     <div class="scanner-status" id="catalogScannerStatus">
                         Camera scanner is preparing. Hold the barcode steady inside the highlighted frame.
                     </div>
+                    <div class="mt-3 pt-3 border-top">
+                        <p class="muted-text mb-2" style="font-size:.85rem;">Camera not working? Take a photo of the barcode and upload it instead.</p>
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <label class="btn btn-warm mb-0" for="catalogBarcodeImageUpload" style="cursor:pointer;">
+                                <i class="bi bi-image me-1"></i>Upload barcode photo
+                            </label>
+                            <input type="file" id="catalogBarcodeImageUpload" accept="image/*" capture="environment" style="display:none;">
+                            <span class="muted-text" id="catalogUploadStatus" style="font-size:.85rem;"></span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -429,6 +439,27 @@
         modalElement.addEventListener("hidden.bs.modal", function () {
             scanner.stop();
             scanner.setStatus("Camera scanner is preparing. Hold the barcode steady inside the highlighted frame.", false);
+        });
+
+        // Image upload fallback
+        var uploadInput = document.getElementById("catalogBarcodeImageUpload");
+        var uploadStatus = document.getElementById("catalogUploadStatus");
+        uploadInput.addEventListener("change", function () {
+            var file = uploadInput.files && uploadInput.files[0];
+            if (!file) {
+                return;
+            }
+            uploadStatus.textContent = "Reading barcode from image...";
+            window.LuLibrisyncQr.decodeBarcodeFromImageFile(file)
+                .then(function (code) {
+                    uploadStatus.textContent = "";
+                    uploadInput.value = "";
+                    applyDetectedCode(code);
+                })
+                .catch(function (err) {
+                    uploadStatus.textContent = err && err.message ? err.message : "Could not read barcode from image.";
+                    uploadInput.value = "";
+                });
         });
     });
 </script>

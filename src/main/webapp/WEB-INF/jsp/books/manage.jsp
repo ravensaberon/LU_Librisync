@@ -263,6 +263,16 @@
                 <div class="scanner-status" id="adminBarcodeStatus">
                     Camera scanner is preparing. Hold the barcode steady inside the highlighted frame.
                 </div>
+                <div class="mt-3 pt-3 border-top">
+                    <p class="muted-text mb-2" style="font-size:.85rem;">Camera not working? Take a photo of the barcode and upload it instead.</p>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <label class="btn btn-warm mb-0" for="adminBarcodeImageUpload" style="cursor:pointer;">
+                            <i class="bi bi-image me-1"></i>Upload barcode photo
+                        </label>
+                        <input type="file" id="adminBarcodeImageUpload" accept="image/*" capture="environment" style="display:none;">
+                        <span class="muted-text" id="adminUploadStatus" style="font-size:.85rem;"></span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -494,6 +504,32 @@
             scanner.setStatus("Camera scanner is preparing. Hold the barcode steady inside the highlighted frame.", false);
             var bookFormModal = bootstrap.Modal.getOrCreateInstance(document.getElementById("bookFormModal"));
             bookFormModal.show();
+        });
+
+        // Image upload fallback
+        var adminUploadInput = document.getElementById("adminBarcodeImageUpload");
+        var adminUploadStatus = document.getElementById("adminUploadStatus");
+        adminUploadInput.addEventListener("change", function () {
+            var file = adminUploadInput.files && adminUploadInput.files[0];
+            if (!file) {
+                return;
+            }
+            adminUploadStatus.textContent = "Reading barcode from image...";
+            window.LuLibrisyncQr.decodeBarcodeFromImageFile(file)
+                .then(function (code) {
+                    adminUploadStatus.textContent = "";
+                    adminUploadInput.value = "";
+                    barcodeInput.value = code;
+                    barcodeInput.dispatchEvent(new Event("input", { bubbles: true }));
+                    var scannerModal = bootstrap.Modal.getInstance(scannerModalElement);
+                    if (scannerModal) {
+                        scannerModal.hide();
+                    }
+                })
+                .catch(function (err) {
+                    adminUploadStatus.textContent = err && err.message ? err.message : "Could not read barcode from image.";
+                    adminUploadInput.value = "";
+                });
         });
     })();
 </script>
