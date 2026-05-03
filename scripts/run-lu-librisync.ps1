@@ -7,6 +7,7 @@ param(
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $mavenCandidates = @(
+    (Join-Path $projectRoot "tools\apache-maven-3.9.15\bin\mvn.cmd"),
     (Join-Path $projectRoot "tools\apache-maven-3.9.14\bin\mvn.cmd"),
     "C:\Users\labar\Downloads\apache-maven-3.9.9\bin\mvn.cmd"
 )

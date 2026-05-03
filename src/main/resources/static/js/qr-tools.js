@@ -298,22 +298,18 @@ window.LuLibrisyncQr = (function () {
         }
 
         async function startZxingScanner() {
-            if (!window.ZXingBrowser || typeof window.ZXingBrowser.BrowserMultiFormatOneDReader !== "function") {
+            if (!window.ZXingBrowser || typeof window.ZXingBrowser.BrowserMultiFormatReader !== "function") {
                 return false;
             }
 
             try {
-                zxingReader = new window.ZXingBrowser.BrowserMultiFormatOneDReader();
+                zxingReader = new window.ZXingBrowser.BrowserMultiFormatReader();
                 zxingControls = await zxingReader.decodeFromConstraints({
                     video: {
                         facingMode: { ideal: "environment" }
                     },
                     audio: false
-                }, videoElement, function (result, error, controls) {
-                    if (controls && !zxingControls) {
-                        zxingControls = controls;
-                    }
-
+                }, videoElement, function (result, error) {
                     var decodedText = extractDetectedText(result);
                     if (decodedText) {
                         handleDetectedValue(decodedText);

@@ -78,24 +78,7 @@ public class EmailNotificationService {
 
         User recipient = issueRecord.getStudent().getUser();
         String subject = "Due Reminder | Issue #" + issueRecord.getId() + " | " + issueRecord.getBook().getTitle();
-        String body = """
-                Hello %s,
-
-                This is a reminder from LU Librisync that your borrowed book is due soon.
-
-                Book title: %s
-                Student ID: %s
-                Due date: %s
-                Issue code: %s
-
-                Please return the book on or before the due date to avoid additional fines.
-                """.formatted(
-                recipient.getName(),
-                issueRecord.getBook().getTitle(),
-                issueRecord.getStudent().getStudentId(),
-                DATE_TIME_FORMATTER.format(issueRecord.getDueDate()),
-                issueRecord.getQrIssueCode()
-        );
+        String body = buildDueReminderEmailBody(recipient, issueRecord);
 
         LocalDateTime scheduledAt = issueRecord.getDueDate().minusDays(1).withHour(8).withMinute(0).withSecond(0).withNano(0);
         if (scheduledAt.isBefore(LocalDateTime.now())) {
@@ -103,6 +86,57 @@ public class EmailNotificationService {
         }
 
         upsertPendingNotification(recipient, EmailNotificationType.DUE_REMINDER, subject, body, scheduledAt);
+    }
+
+    private String buildDueReminderEmailBody(User recipient, IssueRecord issueRecord) {
+        return """
+                <div style="margin:0;padding:24px;background:#f4faf6;font-family:Segoe UI,Arial,sans-serif;color:#163322;">
+                  <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #d5eadc;border-radius:24px;overflow:hidden;box-shadow:0 18px 44px rgba(18,77,47,0.12);">
+                    <div style="padding:24px 32px;background:linear-gradient(135deg,#0f7a36,#34c66a);color:#ffffff;">
+                      <div style="font-size:13px;letter-spacing:0.12em;text-transform:uppercase;opacity:0.88;">LU Librisync</div>
+                      <h1 style="margin:10px 0 4px;font-size:28px;line-height:1.2;">Book Due Reminder</h1>
+                      <p style="margin:0;font-size:15px;opacity:0.92;">Your borrowed book is due tomorrow. Please return it on time to avoid fines.</p>
+                    </div>
+                    <div style="padding:32px;">
+                      <p style="margin:0 0 16px;font-size:15px;line-height:1.7;">Hello %s,</p>
+                      <p style="margin:0 0 20px;font-size:15px;line-height:1.7;">This is a friendly reminder from LU Librisync that the book you borrowed is due <strong>tomorrow</strong>. Please return it to the library on or before the due date to avoid additional fines.</p>
+                      <div style="margin:0 0 24px;padding:20px;border-radius:18px;background:#fbfefd;border:1px solid #e0efe4;">
+                        <div style="font-size:15px;font-weight:700;color:#18452d;margin-bottom:12px;">Loan Details</div>
+                        <table style="width:100%%;border-collapse:collapse;font-size:14px;line-height:1.6;">
+                          <tr><td style="padding:6px 0;color:#5f7b69;">Book Title</td><td style="padding:6px 0;text-align:right;font-weight:600;color:#173522;">%s</td></tr>
+                          <tr><td style="padding:6px 0;color:#5f7b69;">Student ID</td><td style="padding:6px 0;text-align:right;font-weight:600;color:#173522;">%s</td></tr>
+                          <tr><td style="padding:6px 0;color:#5f7b69;">Due Date</td><td style="padding:6px 0;text-align:right;font-weight:600;color:#c0392b;">%s</td></tr>
+                          <tr><td style="padding:6px 0;color:#5f7b69;">Issue Code</td><td style="padding:6px 0;text-align:right;font-weight:600;color:#173522;">%s</td></tr>
+                        </table>
+                      </div>
+                      <div style="padding:16px 18px;border-radius:16px;background:#fff8ea;border:1px solid #f1ddb1;color:#6b5112;font-size:13px;line-height:1.7;">
+                        Returning the book late will incur a daily fine. If you need more time, please contact the library directly.
+                      </div>
+                    </div>
+                    <div style="padding:18px 32px;background:#f6fbf7;border-top:1px solid #e1efe5;font-size:12px;line-height:1.7;color:#6c8375;">
+                      This is an automated message from LU Librisync. Please do not reply to this email.
+                    </div>
+                  </div>
+                </div>
+                """.formatted(
+                escapeHtml(recipient.getName()),
+                escapeHtml(issueRecord.getBook().getTitle()),
+                escapeHtml(issueRecord.getStudent().getStudentId()),
+                escapeHtml(DATE_TIME_FORMATTER.format(issueRecord.getDueDate())),
+                escapeHtml(issueRecord.getQrIssueCode())
+        );
+    }
+
+    private String escapeHtml(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&#39;");
     }
 
     @Transactional
@@ -132,41 +166,79 @@ public class EmailNotificationService {
 
         if (reservation.isBorrowRequest()) {
             subject = "Borrow Request Ready | Request #" + reservation.getId() + " | " + reservation.getBook().getTitle();
+            String expiresLabel = reservation.getExpiresAt() == null ? "As soon as possible" : DATE_TIME_FORMATTER.format(reservation.getExpiresAt());
             body = """
-                    Hello %s,
-
-                    Your borrow request is now active at the circulation desk.
-
-                    Book title: %s
-                    Student ID: %s
-                    Show your ID before: %s
-
-                    Please go to the circulation desk before the hold window expires.
+                    <div style="margin:0;padding:24px;background:#f4faf6;font-family:Segoe UI,Arial,sans-serif;color:#163322;">
+                      <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #d5eadc;border-radius:24px;overflow:hidden;box-shadow:0 18px 44px rgba(18,77,47,0.12);">
+                        <div style="padding:24px 32px;background:linear-gradient(135deg,#0f7a36,#34c66a);color:#ffffff;">
+                          <div style="font-size:13px;letter-spacing:0.12em;text-transform:uppercase;opacity:0.88;">LU Librisync</div>
+                          <h1 style="margin:10px 0 4px;font-size:28px;line-height:1.2;">Borrow Request Ready</h1>
+                          <p style="margin:0;font-size:15px;opacity:0.92;">Your borrow request is now active at the circulation desk.</p>
+                        </div>
+                        <div style="padding:32px;">
+                          <p style="margin:0 0 16px;font-size:15px;line-height:1.7;">Hello %s,</p>
+                          <p style="margin:0 0 20px;font-size:15px;line-height:1.7;">Your borrow request is now active. Please proceed to the circulation desk and present your student ID before the hold window expires.</p>
+                          <div style="margin:0 0 24px;padding:20px;border-radius:18px;background:#fbfefd;border:1px solid #e0efe4;">
+                            <div style="font-size:15px;font-weight:700;color:#18452d;margin-bottom:12px;">Request Details</div>
+                            <table style="width:100%%;border-collapse:collapse;font-size:14px;line-height:1.6;">
+                              <tr><td style="padding:6px 0;color:#5f7b69;">Book Title</td><td style="padding:6px 0;text-align:right;font-weight:600;color:#173522;">%s</td></tr>
+                              <tr><td style="padding:6px 0;color:#5f7b69;">Student ID</td><td style="padding:6px 0;text-align:right;font-weight:600;color:#173522;">%s</td></tr>
+                              <tr><td style="padding:6px 0;color:#5f7b69;">Show ID Before</td><td style="padding:6px 0;text-align:right;font-weight:600;color:#c0392b;">%s</td></tr>
+                            </table>
+                          </div>
+                          <div style="padding:16px 18px;border-radius:16px;background:#fff8ea;border:1px solid #f1ddb1;color:#6b5112;font-size:13px;line-height:1.7;">
+                            Please go to the circulation desk before the hold window expires. Unclaimed requests may be released to other borrowers.
+                          </div>
+                        </div>
+                        <div style="padding:18px 32px;background:#f6fbf7;border-top:1px solid #e1efe5;font-size:12px;line-height:1.7;color:#6c8375;">
+                          This is an automated message from LU Librisync. Please do not reply to this email.
+                        </div>
+                      </div>
+                    </div>
                     """.formatted(
-                    recipient.getName(),
-                    reservation.getBook().getTitle(),
-                    reservation.getStudent().getStudentId(),
-                    reservation.getExpiresAt() == null ? "As soon as possible" : DATE_TIME_FORMATTER.format(reservation.getExpiresAt())
+                    escapeHtml(recipient.getName()),
+                    escapeHtml(reservation.getBook().getTitle()),
+                    escapeHtml(reservation.getStudent().getStudentId()),
+                    escapeHtml(expiresLabel)
             );
         } else {
             subject = "Reservation Ready | Reservation #" + reservation.getId() + " | " + reservation.getBook().getTitle();
+            String claimUntilLabel = reservation.getExpiresAt() == null ? "As soon as possible" : DATE_TIME_FORMATTER.format(reservation.getExpiresAt());
             body = """
-                    Hello %s,
-
-                    Your reserved library book is now ready for claiming.
-
-                    Book title: %s
-                    Student ID: %s
-                    Queue position: %s
-                    Claim until: %s
-
-                    Please visit the library before the claim window expires.
+                    <div style="margin:0;padding:24px;background:#f4faf6;font-family:Segoe UI,Arial,sans-serif;color:#163322;">
+                      <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #d5eadc;border-radius:24px;overflow:hidden;box-shadow:0 18px 44px rgba(18,77,47,0.12);">
+                        <div style="padding:24px 32px;background:linear-gradient(135deg,#0f7a36,#34c66a);color:#ffffff;">
+                          <div style="font-size:13px;letter-spacing:0.12em;text-transform:uppercase;opacity:0.88;">LU Librisync</div>
+                          <h1 style="margin:10px 0 4px;font-size:28px;line-height:1.2;">Reservation Ready</h1>
+                          <p style="margin:0;font-size:15px;opacity:0.92;">Your reserved book is now available for claiming at the library.</p>
+                        </div>
+                        <div style="padding:32px;">
+                          <p style="margin:0 0 16px;font-size:15px;line-height:1.7;">Hello %s,</p>
+                          <p style="margin:0 0 20px;font-size:15px;line-height:1.7;">Great news! Your reserved library book is now ready for claiming. Please visit the library before the claim window expires.</p>
+                          <div style="margin:0 0 24px;padding:20px;border-radius:18px;background:#fbfefd;border:1px solid #e0efe4;">
+                            <div style="font-size:15px;font-weight:700;color:#18452d;margin-bottom:12px;">Reservation Details</div>
+                            <table style="width:100%%;border-collapse:collapse;font-size:14px;line-height:1.6;">
+                              <tr><td style="padding:6px 0;color:#5f7b69;">Book Title</td><td style="padding:6px 0;text-align:right;font-weight:600;color:#173522;">%s</td></tr>
+                              <tr><td style="padding:6px 0;color:#5f7b69;">Student ID</td><td style="padding:6px 0;text-align:right;font-weight:600;color:#173522;">%s</td></tr>
+                              <tr><td style="padding:6px 0;color:#5f7b69;">Queue Position</td><td style="padding:6px 0;text-align:right;font-weight:600;color:#173522;">%s</td></tr>
+                              <tr><td style="padding:6px 0;color:#5f7b69;">Claim Until</td><td style="padding:6px 0;text-align:right;font-weight:600;color:#c0392b;">%s</td></tr>
+                            </table>
+                          </div>
+                          <div style="padding:16px 18px;border-radius:16px;background:#fff8ea;border:1px solid #f1ddb1;color:#6b5112;font-size:13px;line-height:1.7;">
+                            Please visit the library before the claim window expires. Unclaimed reservations may be released to the next person in queue.
+                          </div>
+                        </div>
+                        <div style="padding:18px 32px;background:#f6fbf7;border-top:1px solid #e1efe5;font-size:12px;line-height:1.7;color:#6c8375;">
+                          This is an automated message from LU Librisync. Please do not reply to this email.
+                        </div>
+                      </div>
+                    </div>
                     """.formatted(
-                    recipient.getName(),
-                    reservation.getBook().getTitle(),
-                    reservation.getStudent().getStudentId(),
-                    reservation.getQueuePosition(),
-                    reservation.getExpiresAt() == null ? "As soon as possible" : DATE_TIME_FORMATTER.format(reservation.getExpiresAt())
+                    escapeHtml(recipient.getName()),
+                    escapeHtml(reservation.getBook().getTitle()),
+                    escapeHtml(reservation.getStudent().getStudentId()),
+                    escapeHtml(String.valueOf(reservation.getQueuePosition())),
+                    escapeHtml(claimUntilLabel)
             );
         }
 
@@ -199,7 +271,9 @@ public class EmailNotificationService {
                 .findTop25ByStatusAndScheduledAtLessThanEqualOrderByScheduledAtAsc(EmailNotificationStatus.PENDING, LocalDateTime.now());
 
         for (EmailNotification notification : dueNotifications) {
-            boolean sent = sendEmail(notification.getUser().getEmail(), notification.getSubject(), notification.getBody());
+            boolean isHtml = notification.getNotificationType() == EmailNotificationType.DUE_REMINDER
+                    || notification.getNotificationType() == EmailNotificationType.RESERVATION_READY;
+            boolean sent = sendEmail(notification.getUser().getEmail(), notification.getSubject(), notification.getBody(), isHtml);
             notification.setSentAt(LocalDateTime.now());
             notification.setStatus(sent ? EmailNotificationStatus.SENT : EmailNotificationStatus.FAILED);
             emailNotificationRepository.save(notification);

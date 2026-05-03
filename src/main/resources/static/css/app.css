@@ -1848,11 +1848,46 @@ body.shell-nav-collapsed .app-nav {
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), #fff7f6);
 }
 
+.modal-dialog {
+    margin: 1.5rem auto;
+}
+
+.modal-content {
+    border-radius: 22px;
+    overflow: hidden;
+}
+
 .modal-header-brand {
     background: linear-gradient(135deg, var(--primary-900), var(--primary-700));
     color: #fff;
     border-bottom: 0;
-    padding: 22px 24px;
+    padding: 24px 28px;
+    gap: 16px;
+    align-items: flex-start;
+}
+
+.modal-header-brand .btn-close {
+    flex-shrink: 0;
+    align-self: flex-start;
+    margin: 0;
+}
+
+.modal-body {
+    padding: 28px;
+}
+
+.modal-body.pb-0 {
+    padding-bottom: 0;
+}
+
+.modal-footer {
+    padding: 18px 28px;
+    border-top: 1px solid var(--line);
+    gap: 10px;
+}
+
+.modal-dialog-scrollable .modal-body {
+    overflow-y: auto;
 }
 
 .modal-kicker {
@@ -1870,6 +1905,9 @@ body.shell-nav-collapsed .app-nav {
 
 .modal-subtitle {
     color: rgba(255, 255, 255, 0.82);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin-top: 4px;
 }
 
 .modal-section + .modal-section {
